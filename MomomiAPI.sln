@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36202.13 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MomomiAPI", "MomomiAPI\MomomiAPI.csproj", "{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0176CD54-325E-43E6-BAC4-B447FB11F14E}
+	EndGlobalSection
+EndGlobal

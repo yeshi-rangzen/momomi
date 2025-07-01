@@ -1,0 +1,6 @@
+@MomomiAPI_HostAddress = http://localhost:5029
+
+GET {{MomomiAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

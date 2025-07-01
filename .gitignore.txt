@@ -1,0 +1,83 @@
+.gitignore
+# .NET build artifacts
+bin/
+obj/
+out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code settings
+.vscode/
+
+# Visual Studio settings
+.vs/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# NuGet packages
+*.nupkg
+# The packages folder can be ignored because of Package Restore
+**/packages/*
+!**/packages/build/
+!**/packages/repositories.config
+
+# NPM packages
+node_modules/
+
+# Dotnet tool restore
+.dotnet_tool/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Rider
+.idea/
+*.sln.iml
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Publish
+publish/
+*.publish/
+
+# Others
+*.dbmdl
+*.pdb
+*.cache
+*.config
+*.bak
+*.tmp
+
+# Local secrets
+appsettings.json
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+
+# Entity Framework Migrations
+Migrations/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
