@@ -75,6 +75,42 @@ namespace MomomiAPI.Controllers
         }
 
         /// <summary>
+        /// Toggle global discovery mode
+        /// </summary>
+        [HttpPut("discovery-mode")]
+        public async Task<IActionResult> UpdateDiscoveryMode([FromBody] DiscoveryModeRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                    return Unauthorized();
+
+                var updateRequest = new UpdateProfileRequest
+                {
+                    EnableGlobalDiscovery = request.EnableGlobalDiscovery
+                };
+
+                var success = await _userService.UpdateUserProfileAsync(userId.Value, updateRequest);
+                if (!success)
+                    return BadRequest(new { message = "Failed to update discovery mode" });
+
+                return Ok(new
+                {
+                    message = request.EnableGlobalDiscovery ?
+                        "Global discovery enabled. You can now discover profiles worldwide." :
+                        "Location-based discovery enabled. Showing profiles within your specified distance.",
+                    enableGlobalDiscovery = request.EnableGlobalDiscovery
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating discovery mode");
+                return StatusCode(500, new { message = "Internal server error" });
+            }
+        }
+
+        /// <summary>
         /// Get nearby users for discovery
         /// </summary>
         [HttpGet("nearby")]
@@ -95,6 +131,39 @@ namespace MomomiAPI.Controllers
                 return StatusCode(500, new { message = "Internal server error" });
             }
         }
+
+        /// <summary>
+        /// Get current user's discovery settings
+        /// </summary>
+        [HttpGet("discovery-settings")]
+        public async Task<IActionResult> GetDiscoverySettings()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                    return Unauthorized();
+
+                var user = await _userService.GetUserByIdAsync(userId.Value);
+                if (user == null)
+                    return NotFound();
+
+                return Ok(new
+                {
+                    enableGlobalDiscovery = user.EnableGlobalDiscovery,
+                    maxDistanceKm = user.MaxDistanceKm,
+                    minAge = user.MinAge,
+                    maxAge = user.MaxAge,
+                    hasLocation = user.Latitude.HasValue && user.Longitude.HasValue
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting discovery settings");
+                return StatusCode(500, new { message = "Internal server error" });
+            }
+        }
+
 
         /// <summary>
         /// Deactivate current user's account

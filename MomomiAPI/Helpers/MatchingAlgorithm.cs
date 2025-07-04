@@ -18,6 +18,7 @@ namespace MomomiAPI.Helpers
 
         /// <summary>
         /// Gets potential matches for a user with cultural compatibility scoring.
+        /// Supports both global and location-based discovery.
         /// </summary>
         public async Task<List<UserProfileDTO>> GetPotentialMatchesAsync(Guid userId, int maxResults = 20)
         {
@@ -73,8 +74,8 @@ namespace MomomiAPI.Helpers
                     u.DateOfBirth.Value.Year <= maxBirthYear);
             }
 
-            // Distance filter (if location available)
-            if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue)
+            // Apply distance filter only if global discovery is disabled
+            if (!currentUser.EnableGlobalDiscovery && currentUser.Latitude.HasValue && currentUser.Longitude.HasValue)
             {
                 // For now, we will filter in memore. In production use spatial queries
                 var allCandidates = await query.ToListAsync();
@@ -83,8 +84,13 @@ namespace MomomiAPI.Helpers
                 LocationHelper.CalculateDistance(
                     (double)currentUser.Latitude, (double)currentUser.Longitude, (double)u.Latitude, (double)u.Longitude) <= currentUser.MaxDistanceKm).ToList();
             }
+            else
+            {
+                _logger.LogInformation("Using global discovery for user {UserId}", currentUser.Id);
 
-            return await query.ToListAsync();
+                // Global discovery - no distance filtering
+                return await query.ToListAsync();
+            }
         }
 
         private async Task<List<UserProfileDTO>> RankMatchesByCulturalCompatibilityAsync(
@@ -123,7 +129,7 @@ namespace MomomiAPI.Helpers
                     }).OrderBy(p => p.PhotoOrder).ToList()
                 };
 
-                // Add distance if available
+                // Add distance if both users have location data
                 if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue &&
                     candidate.Latitude.HasValue && candidate.Longitude.HasValue)
                 {
@@ -136,11 +142,26 @@ namespace MomomiAPI.Helpers
             }
 
             // Sort by compatibility score (highest first)
-            return rankedMatches
-                .OrderByDescending(m => m.Score)
-                .ThenBy(m => m.Profile.DistanceKm ?? double.MaxValue) // Closer users as tiebreaker
-                .Select(m => m.Profile)
-                .ToList();
+            // For global discovery, prioritize compatibility over distance
+            // For local discovery, use distance as tiebreaker
+            if (currentUser.EnableGlobalDiscovery)
+            {
+                // Global discovery: Random order after compatibility sorting
+                return rankedMatches
+                    .OrderByDescending(m => m.Score)
+                    .ThenBy(m => Guid.NewGuid()) // Random order for diversity
+                    .Select(m => m.Profile)
+                    .ToList();
+            }
+            else
+            {
+                // Local discovery: Distance as tiebreaker
+                return rankedMatches
+                    .OrderByDescending(m => m.Score)
+                    .ThenBy(m => m.Profile.DistanceKm ?? double.MaxValue) // Closer users first
+                    .Select(m => m.Profile)
+                    .ToList();
+            }
         }
 
         /// <summary>

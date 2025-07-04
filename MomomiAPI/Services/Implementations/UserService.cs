@@ -90,6 +90,7 @@ namespace MomomiAPI.Services.Implementations
                     EducationLevel = user.EducationLevel,
                     Occupation = user.Occupation,
                     HeightCm = user.HeightCm,
+                    EnableGlobalDiscovery = user.EnableGlobalDiscovery,
                     IsVerified = user.IsVerified,
                     LastActive = user.LastActive,
                     Photos = user.Photos.Select(p => new UserPhotoDTO
@@ -160,6 +161,9 @@ namespace MomomiAPI.Services.Implementations
                 if (request.MaxAge.HasValue)
                     user.MaxAge = request.MaxAge.Value;
 
+                if (request.EnableGlobalDiscovery.HasValue)
+                    user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
+
                 // Update or create preferences
                 if (user.Preferences == null)
                 {
@@ -214,11 +218,104 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Get users globally (no distance filtering) for global discovery mode
+        /// </summary>
+        private async Task<IEnumerable<UserProfileDTO>> GetGlobalUsersAsync(Guid userId)
+        {
+            try
+            {
+                var currentUser = await _dbContext.Users.FindAsync(userId);
+                if (currentUser == null) return [];
+
+                // Get all active users except current user
+                var globalUsers = await _dbContext.Users
+                    .Include(u => u.Photos)
+                    .Where(u => u.Id != userId && u.IsActive)
+                    .Take(100) // Limit for performance - adjust as needed
+                    .ToListAsync();
+
+                var result = new List<UserProfileDTO>();
+
+                foreach (var user in globalUsers)
+                {
+                    double? distance = null;
+
+                    // Calculate distance if both users have location data
+                    if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue &&
+                        user.Latitude.HasValue && user.Longitude.HasValue)
+                    {
+                        distance = LocationHelper.CalculateDistance(
+                            (double)currentUser.Latitude, (double)currentUser.Longitude,
+                            (double)user.Latitude, (double)user.Longitude);
+                    }
+
+                    var profile = CreateUserProfileDTO(user, distance);
+                    result.Add(profile);
+                }
+
+                // For global discovery, we can randomize or sort by other criteria
+                return result.OrderBy(x => Guid.NewGuid()); // Random order
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving global users for user: {UserId}", userId);
+                return Enumerable.Empty<UserProfileDTO>();
+            }
+        }
+
+        /// <summary>
+        /// Helper method to create UserProfileDTO from User entity
+        /// </summary>
+        private UserProfileDTO CreateUserProfileDTO(User user, double? distance = null)
+        {
+            return new UserProfileDTO
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Age = user.DateOfBirth.HasValue ?
+                    DateTime.UtcNow.Year - user.DateOfBirth.Value.Year : 0,
+                Gender = user.Gender,
+                Bio = user.Bio,
+                Heritage = user.Heritage,
+                Religion = user.Religion,
+                LanguagesSpoken = user.LanguagesSpoken,
+                EducationLevel = user.EducationLevel,
+                Occupation = user.Occupation,
+                HeightCm = user.HeightCm,
+                DistanceKm = distance,
+                EnableGlobalDiscovery = user.EnableGlobalDiscovery,
+                IsVerified = user.IsVerified,
+                LastActive = user.LastActive,
+                Photos = user.Photos.Select(p => new UserPhotoDTO
+                {
+                    Id = p.Id,
+                    Url = p.Url,
+                    ThumbnailUrl = p.ThumbnailUrl,
+                    PhotoOrder = p.PhotoOrder,
+                    IsPrimary = p.IsPrimary
+                }).OrderBy(p => p.PhotoOrder).ToList() ?? new List<UserPhotoDTO>()
+            };
+        }
+
         public async Task<IEnumerable<UserProfileDTO>> GetNearbyUsersAsync(Guid userId, int maxDistance)
         {
             try
             {
                 var currentUser = await _dbContext.Users.FindAsync(userId);
+                if (currentUser == null)
+                {
+                    return [];
+                }
+
+                // If global discovery is enabled, ignore location and distance
+                if (currentUser.EnableGlobalDiscovery)
+                {
+                    _logger.LogInformation("Getting global users for user {UserId} (global discovery enabled)", userId);
+                    return await GetGlobalUsersAsync(userId);
+                }
+
                 if (currentUser?.Latitude == null || currentUser.Longitude == null)
                 {
                     return [];

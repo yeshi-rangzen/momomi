@@ -185,7 +185,7 @@ namespace MomomiAPI.Services.Implementations
                 // Find and update like records
                 var likes = await _dbContext.UserLikes
                     .Where(ul => ((ul.LikedUserId == userId && ul.LikerUserId == matchedUserId) ||
-                                  (ul.LikerUserId == matchedUserId && ul.LikedUserId == userId)) && ul.IsMatch)
+                                  (ul.LikedUserId == matchedUserId && ul.LikerUserId == userId)) && ul.IsMatch)
                     .ToListAsync();
 
                 foreach (var like in likes)

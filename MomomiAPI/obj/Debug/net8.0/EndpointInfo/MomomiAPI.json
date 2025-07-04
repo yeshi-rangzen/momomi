@@ -700,6 +700,37 @@
         }
       }
     },
+    "/api/Users/discovery-mode": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryModeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryModeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryModeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Users/nearby": {
       "get": {
         "tags": [
@@ -723,6 +754,18 @@
         }
       }
     },
+    "/api/Users/discovery-settings": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Users/deactivate": {
       "delete": {
         "tags": [
@@ -738,6 +781,15 @@
   },
   "components": {
     "schemas": {
+      "DiscoveryModeRequest": {
+        "type": "object",
+        "properties": {
+          "enableGlobalDiscovery": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "GenderType": {
         "enum": [
           "Male",
@@ -989,6 +1041,10 @@
           "maxAge": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "enableGlobalDiscovery": {
+            "type": "boolean",
             "nullable": true
           },
           "preferredHeritage": {

@@ -168,3 +168,4 @@ C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Exten
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
+C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\obj\Debug\net8.0\MomomiAPI.sourcelink.json

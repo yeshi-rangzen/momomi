@@ -18,6 +18,7 @@ namespace MomomiAPI.Models.Requests
         public int? MaxDistanceKm { get; set; }
         public int? MinAge { get; set; }
         public int? MaxAge { get; set; }
+        public bool? EnableGlobalDiscovery { get; set; }
 
         // Preferences
         public List<HeritageType>? PreferredHeritage { get; set; }

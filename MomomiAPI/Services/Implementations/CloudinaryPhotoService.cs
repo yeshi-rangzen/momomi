@@ -2,6 +2,7 @@
 using CloudinaryDotNet.Actions;
 using Microsoft.EntityFrameworkCore;
 using MomomiAPI.Data;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Services.Interfaces;
 
@@ -20,7 +21,7 @@ namespace MomomiAPI.Services.Implementations
             _logger = logger ?? throw new ArgumentNullException(nameof(logger), "Logger cannot be null.");
         }
 
-        public async Task<UserPhoto?> UploadPhotoAsync(Guid userId, IFormFile file, bool isPrimary = false)
+        public async Task<UserPhotoDTO?> UploadPhotoAsync(Guid userId, IFormFile file, bool isPrimary = false)
         {
             try
             {
@@ -42,7 +43,7 @@ namespace MomomiAPI.Services.Implementations
                 var uploadParams = new ImageUploadParams
                 {
                     File = new FileDescription(file.FileName, stream),
-                    Folder = "momomi/users",
+                    Folder = $"momomi/users/{userId}",
                     PublicId = $"user_{userId}_{Guid.NewGuid()}",
                     Transformation = new Transformation().Width(800).Height(800).Crop("fill").Quality("auto").FetchFormat("auto"),
                 };
@@ -81,7 +82,15 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserPhotos.Add(userPhoto);
                 await _dbContext.SaveChangesAsync();
 
-                return userPhoto;
+                // Return DTO instead of entity
+                return new UserPhotoDTO
+                {
+                    Id = userPhoto.Id,
+                    Url = userPhoto.Url,
+                    ThumbnailUrl = userPhoto.ThumbnailUrl,
+                    PhotoOrder = userPhoto.PhotoOrder,
+                    IsPrimary = userPhoto.IsPrimary
+                };
             }
             catch (Exception ex)
             {
@@ -161,19 +170,29 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        public async Task<IEnumerable<UserPhoto>> GetUserPhotosAsync(Guid userId)
+        public async Task<IEnumerable<UserPhotoDTO>> GetUserPhotosAsync(Guid userId)
         {
             try
             {
-                return await _dbContext.UserPhotos
+                var photos = await _dbContext.UserPhotos
                     .Where(p => p.UserId == userId)
                     .OrderBy(p => p.PhotoOrder)
+                    .Select(p => new UserPhotoDTO
+                    {
+                        Id = p.Id,
+                        Url = p.Url,
+                        ThumbnailUrl = p.ThumbnailUrl,
+                        PhotoOrder = p.PhotoOrder,
+                        IsPrimary = p.IsPrimary
+                    })
                     .ToListAsync();
+
+                return photos;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetUserPhotosAsync: An error occurred while retrieving photos for user {UserId}", userId);
-                return Enumerable.Empty<UserPhoto>();
+                return [];
             }
         }
 

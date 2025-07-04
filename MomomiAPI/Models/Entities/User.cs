@@ -79,6 +79,9 @@ namespace MomomiAPI.Models.Entities
         [Column("max_age")]
         public int MaxAge { get; set; } = 35;
 
+        [Column("enable_global_discovery")]
+        public bool EnableGlobalDiscovery { get; set; } = true;
+
         [Column("is_verified")]
         public bool IsVerified { get; set; } = false;
 

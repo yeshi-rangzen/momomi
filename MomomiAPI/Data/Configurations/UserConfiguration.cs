@@ -31,6 +31,10 @@ namespace MomomiAPI.Data.Configurations
                 .HasDatabaseName("idx_users_age")
                 .HasFilter("is_active = true");
 
+            builder.HasIndex(u => u.EnableGlobalDiscovery)
+               .HasDatabaseName("idx_users_global_discovery")
+               .HasFilter("is_active = true");
+
             // Configure enum conversions
             builder.Property(u => u.Gender)
                 .HasConversion<string>();
@@ -43,6 +47,12 @@ namespace MomomiAPI.Data.Configurations
 
             builder.Property(u => u.Religion)
                 .HasConversion<string>();
+
+            // Configure EnableGlobalDiscovery column
+            builder.Property(u => u.EnableGlobalDiscovery)
+                .HasColumnName("enable_global_discovery")
+                .HasDefaultValue(true)
+                .IsRequired();
 
             // Configure JSON column for languages with value comparer
             builder.Property(u => u.LanguagesSpoken)

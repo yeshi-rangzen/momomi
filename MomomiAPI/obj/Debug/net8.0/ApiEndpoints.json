@@ -406,6 +406,32 @@
   },
   {
     "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "Method": "UpdateDiscoveryMode",
+    "RelativePath": "api/Users/discovery-mode",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.DiscoveryModeRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "Method": "GetDiscoverySettings",
+    "RelativePath": "api/Users/discovery-settings",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UsersController",
     "Method": "GetNearbyUsers",
     "RelativePath": "api/Users/nearby",
     "HttpMethod": "GET",

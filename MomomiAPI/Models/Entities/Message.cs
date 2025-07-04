@@ -38,5 +38,11 @@ namespace MomomiAPI.Models.Entities
 
         [ForeignKey("SenderId")]
         public virtual User Sender { get; set; } = null!;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [Column("updated_at")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }
