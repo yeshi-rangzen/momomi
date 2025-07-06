@@ -82,6 +82,16 @@ namespace MomomiAPI.Models.Entities
         [Column("enable_global_discovery")]
         public bool EnableGlobalDiscovery { get; set; } = true;
 
+        [Column("is_discoverable")]
+        public bool IsDiscoverable { get; set; } = true;
+
+        [Column("push_token")]
+        [MaxLength(500)]
+        public string? PushToken { get; set; }
+
+        [Column("notifications_enabled")]
+        public bool NotificationsEnabled { get; set; } = true;
+
         [Column("is_verified")]
         public bool IsVerified { get; set; } = false;
 
@@ -109,5 +119,15 @@ namespace MomomiAPI.Models.Entities
         public virtual ICollection<UserReport> ReportsReceived { get; set; } = [];
         public virtual UserPreference? Preferences { get; set; }
 
+        // Subscription and usage tracking
+        public virtual UserSubscription? Subscription { get; set; }
+        public virtual UserUsageLimit? UsageLimit { get; set; }
+
+        // Blocking relationships
+        public virtual ICollection<UserBlock> BlocksMade { get; set; } = [];
+        public virtual ICollection<UserBlock> BlocksReceived { get; set; } = [];
+
+        // Notifications
+        public virtual ICollection<PushNotification> Notifications { get; set; } = [];
     }
 }

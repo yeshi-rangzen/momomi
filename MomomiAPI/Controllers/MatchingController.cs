@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.Enums;
+using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 using System.Security.Claims;
 
@@ -11,11 +13,16 @@ namespace MomomiAPI.Controllers
     public class MatchingController : ControllerBase
     {
         private readonly IMatchingService _matchingService;
+        private readonly ISubscriptionService _subscriptionService;
         private readonly ILogger<MatchingController> _logger;
 
-        public MatchingController(IMatchingService matchingService, ILogger<MatchingController> logger)
+        public MatchingController(
+            IMatchingService matchingService,
+            ISubscriptionService subscriptionService,
+            ILogger<MatchingController> logger)
         {
             _matchingService = matchingService;
+            _subscriptionService = subscriptionService;
             _logger = logger;
         }
 
@@ -45,7 +52,7 @@ namespace MomomiAPI.Controllers
         /// Like a user
         /// </summary>
         [HttpPost("like/{userId}")]
-        public async Task<IActionResult> LikeUser(Guid userId)
+        public async Task<IActionResult> LikeUser([FromBody] LikeUserRequest request)
         {
             try
             {
@@ -53,19 +60,39 @@ namespace MomomiAPI.Controllers
                 if (currentUserId == null)
                     return Unauthorized();
 
-                if (currentUserId == userId)
+                if (currentUserId == request.UserId)
                     return BadRequest(new { message = "You cannot like yourself" });
 
-                var success = await _matchingService.LikeUserAsync(currentUserId.Value, userId);
+                // Check if user can like based on subscription
+                var canLike = await _subscriptionService.CanUserLikeAsync(currentUserId.Value, request.LikeType);
+                if (!canLike)
+                {
+                    var usageLimits = await _subscriptionService.GetUsageLimitsAsync(currentUserId.Value);
+                    var limitType = request.LikeType == LikeType.SuperLike ? "super likes" : "likes";
+                    return BadRequest(new
+                    {
+                        message = $"You've reached your daily {limitType} limit.",
+                        usageLimits = usageLimits
+                    });
+                }
+
+                var success = await _matchingService.LikeUserAsync(currentUserId.Value, request.UserId);
 
                 if (!success)
                     return BadRequest(new { message = "User already processed or not found" });
 
-                return Ok(new { message = "User liked successfully" });
+                var updatedLimits = await _subscriptionService.GetUsageLimitsAsync(currentUserId.Value);
+                var likeTypeText = request.LikeType == LikeType.SuperLike ? "Super liked" : "Liked";
+
+                return Ok(new
+                {
+                    message = $"{likeTypeText} user successfully",
+                    usageLimits = updatedLimits
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error liking user {UserId}", userId);
+                _logger.LogError(ex, "Error liking user {UserId}", request.UserId);
                 return StatusCode(500, new { message = "Internal server error" });
             }
         }

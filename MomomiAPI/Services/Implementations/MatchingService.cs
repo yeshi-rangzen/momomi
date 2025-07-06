@@ -3,6 +3,7 @@ using MomomiAPI.Data;
 using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Services.Implementations
@@ -12,13 +13,26 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly MatchingAlgorithm _matchingAlgorithm;
         private readonly ICacheService _cacheService;
+        private readonly ISubscriptionService _subscriptionService;
+        private readonly IBlockingService _blockingService;
+        private readonly IPushNotificationService _pushNotificationService;
         private readonly ILogger<MatchingService> _logger;
 
-        public MatchingService(MomomiDbContext dbContext, MatchingAlgorithm matchingAlgorithm, ICacheService cacheService, ILogger<MatchingService> logger)
+        public MatchingService(
+           MomomiDbContext dbContext,
+           MatchingAlgorithm matchingAlgorithm,
+           ICacheService cacheService,
+           ISubscriptionService subscriptionService,
+           IBlockingService blockingService,
+           IPushNotificationService pushNotificationService,
+           ILogger<MatchingService> logger)
         {
             _dbContext = dbContext;
             _matchingAlgorithm = matchingAlgorithm;
             _cacheService = cacheService;
+            _subscriptionService = subscriptionService;
+            _blockingService = blockingService;
+            _pushNotificationService = pushNotificationService;
             _logger = logger;
         }
 
@@ -26,7 +40,17 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                var cacheKey = $"discovery_users_{userId}_{count}";
+                // Get current user to check discovery preference
+                var currentUser = await _dbContext.Users.FindAsync(userId);
+                if (currentUser == null)
+                {
+                    _logger.LogWarning("User not found for discovery: {UserId}", userId);
+                    return [];
+                }
+
+                // Create different cache keys for global vs local discovery
+                var discoveryMode = currentUser.EnableGlobalDiscovery ? "global" : "local";
+                var cacheKey = $"discovery_users_{userId}_{discoveryMode}_{count}";
                 var cachedUsers = await _cacheService.GetAsync<List<UserProfileDTO>>(cacheKey);
 
                 if (cachedUsers != null && cachedUsers.Any())
@@ -37,10 +61,25 @@ namespace MomomiAPI.Services.Implementations
 
                 var discoveryUsers = await _matchingAlgorithm.GetPotentialMatchesAsync(userId, count);
 
-                // Cache for 30 minutes
-                await _cacheService.SetAsync(cacheKey, discoveryUsers, TimeSpan.FromMinutes(30));
+                // Filter out blocked users
+                var filteredUsers = new List<UserProfileDTO>();
+                foreach (var user in discoveryUsers)
+                {
+                    var isBlocked = await _blockingService.IsUserBlockedAsync(userId, user.Id);
+                    if (!isBlocked)
+                    {
+                        filteredUsers.Add(user);
+                    }
+                }
 
-                return discoveryUsers;
+                // Cache for shorter time for global discovery to ensure fresh results
+                var cacheTime = currentUser.EnableGlobalDiscovery ?
+                    TimeSpan.FromMinutes(15) : // Global: 15 minutes
+                    TimeSpan.FromMinutes(30);  // Local: 30 minutes
+
+                await _cacheService.SetAsync(cacheKey, filteredUsers, cacheTime);
+
+                return filteredUsers;
             }
             catch (Exception ex)
             {
@@ -49,10 +88,27 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        public async Task<bool> LikeUserAsync(Guid likerUserId, Guid likedUserId)
+        public async Task<bool> LikeUserAsync(Guid likerUserId, Guid likedUserId, LikeType likeType = LikeType.Regular)
         {
             try
             {
+                // Check if user can like (subscription limits)
+                var canLike = await _subscriptionService.CanUserLikeAsync(likerUserId, likeType);
+                if (!canLike)
+                {
+                    _logger.LogWarning("User {UserId} exceeded like limits for {LikeType}", likerUserId, likeType);
+                    return false;
+                }
+
+                // Check if users are blocked
+                var isBlocked = await _blockingService.IsUserBlockedAsync(likerUserId, likedUserId);
+                if (isBlocked)
+                {
+                    _logger.LogWarning("Cannot like blocked user. Liker: {LikerUserId}, Liked: {LikedUserId}",
+                        likerUserId, likedUserId);
+                    return false;
+                }
+
                 // Check if already liked/passed
                 var existingLike = await _dbContext.UserLikes
                     .FirstOrDefaultAsync(ul => ul.LikerUserId == likerUserId && ul.LikedUserId == likedUserId);
@@ -70,6 +126,15 @@ namespace MomomiAPI.Services.Implementations
                 };
 
                 _dbContext.UserLikes.Add(like);
+
+                // Record usage
+                await _subscriptionService.RecordLikeUsageAsync(likerUserId, likeType);
+                // Send super like notification if applicable
+                if (likeType == LikeType.SuperLike)
+                {
+                    await _pushNotificationService.SendSuperLikeNotificationAsync(likedUserId, likerUserId);
+                }
+
                 await _dbContext.SaveChangesAsync();
 
                 // Check for match
@@ -77,10 +142,17 @@ namespace MomomiAPI.Services.Implementations
                 if (isMatch)
                 {
                     await _matchingAlgorithm.CreateMatchAsync(likerUserId, likedUserId);
+
+                    // Send match notifications to the liked user
+                    //await _pushNotificationService.SendMatchNotificationAsync(likerUserId, likedUserId);
+                    await _pushNotificationService.SendMatchNotificationAsync(likedUserId, likerUserId);
+
+                    _logger.LogInformation("Match created between users {User1} and {User2}",
+                        likerUserId, likedUserId);
                 }
 
-                // Clear discover cache
-                await _cacheService.RemoveAsync($"discovery_users_{likerUserId}_10");
+                // Clear discovery cache for both global and local modes
+                await ClearDiscoveryCacheAsync(likerUserId);
 
                 return true;
             }
@@ -114,8 +186,8 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserLikes.Add(pass);
                 await _dbContext.SaveChangesAsync();
 
-                // Clear discover cache
-                await _cacheService.RemoveAsync($"discovery_users_{passerUserId}_10");
+                // Clear discovery cache for both global and local modes
+                await ClearDiscoveryCacheAsync(passerUserId);
 
                 return true;
             }
@@ -215,6 +287,31 @@ namespace MomomiAPI.Services.Implementations
             {
                 _logger.LogError(ex, "Error unmatching user {UserId} from matched user {MatchedUserId}", userId, matchedUserId);
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to clear discovery cache for both modes
+        /// </summary>
+        private async Task ClearDiscoveryCacheAsync(Guid userId)
+        {
+            try
+            {
+                // Clear cache for both discovery modes
+                await _cacheService.RemoveAsync($"discovery_users_{userId}_global_10");
+                await _cacheService.RemoveAsync($"discovery_users_{userId}_local_10");
+
+                // Also clear with different counts if you use variable counts
+                for (int count = 5; count <= 20; count += 5)
+                {
+                    await _cacheService.RemoveAsync($"discovery_users_{userId}_global_{count}");
+                    await _cacheService.RemoveAsync($"discovery_users_{userId}_local_{count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error clearing discovery cache for user {UserId}", userId);
+                // Don't throw - cache clearing failure shouldn't break the main operation
             }
         }
     }

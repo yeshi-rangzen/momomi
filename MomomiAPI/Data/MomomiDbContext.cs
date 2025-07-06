@@ -17,6 +17,10 @@ namespace MomomiAPI.Data
         public DbSet<Conversation> Conversations { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserReport> UserReports { get; set; }
+        public DbSet<UserSubscription> UserSubscriptions { get; set; }
+        public DbSet<UserUsageLimit> UserUsageLimits { get; set; }
+        public DbSet<UserBlock> UserBlocks { get; set; }
+        public DbSet<PushNotification> PushNotifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +34,10 @@ namespace MomomiAPI.Data
             modelBuilder.ApplyConfiguration(new ConversationConfiguration());
             modelBuilder.ApplyConfiguration(new MessageConfiguration());
             modelBuilder.ApplyConfiguration(new UserReportConfiguration());
+            modelBuilder.ApplyConfiguration(new UserSubscriptionConfiguration());
+            modelBuilder.ApplyConfiguration(new UserUsageLimitConfiguration());
+            modelBuilder.ApplyConfiguration(new UserBlockConfiguration());
+            modelBuilder.ApplyConfiguration(new PushNotificationConfiguration());
 
             // Enable UUID extension for PostgreSQL
             modelBuilder.HasPostgresExtension("uuid-ossp");

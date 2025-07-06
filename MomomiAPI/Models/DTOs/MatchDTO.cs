@@ -12,5 +12,6 @@
         public DateTime MatchedAt { get; set; }
         public MessageDTO? LastMessage { get; set; }
         public int UnreadCount { get; set; }
+        public bool IsFromSuperLike { get; set; }
     }
 }

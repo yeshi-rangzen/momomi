@@ -24,6 +24,12 @@ namespace MomomiAPI.Data.Configurations
                 .HasDatabaseName("idx_user_likes_match")
                 .HasFilter("is_match = true");
 
+            builder.HasIndex(ul => new { ul.LikeType, ul.CreatedAt })
+                .HasDatabaseName("idx_user_likes_type_created");
+
+            builder.Property(ul => ul.LikeType)
+                .HasConversion<string>();
+
             // Configure explicit relationships to avoid ambiguity
             builder.HasOne(ul => ul.LikerUser)
                 .WithMany(u => u.LikesGiven)

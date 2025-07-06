@@ -16,10 +16,15 @@ namespace MomomiAPI.Extensions
             services.AddScoped<IPhotoService, CloudinaryPhotoService>();
             services.AddScoped<ICacheService, UpstashCacheService>();
             services.AddScoped<IJwtService, JwtService>();
-
+            services.AddScoped<ISubscriptionService, SubscriptionService>();
+            services.AddScoped<IBlockingService, BlockingService>();
+            services.AddScoped<IPushNotificationService, PushNotificationService>();
 
             // Register helpers
             services.AddScoped<MatchingAlgorithm>();
+
+            // HTTP Client for push notifications
+            services.AddHttpClient<IPushNotificationService, PushNotificationService>();
 
             return services;
         }
@@ -31,6 +36,8 @@ namespace MomomiAPI.Extensions
             services.Configure<SupabaseSettings>(configuration.GetSection("Supabase"));
             services.Configure<JwtSettings>(configuration.GetSection("JWT"));
             services.Configure<AppSettings>(configuration.GetSection("AppSettings"));
+            services.Configure<PushNotificationSettings>(configuration.GetSection("PushNotifications"));
+
             return services;
         }
 
@@ -64,6 +71,13 @@ namespace MomomiAPI.Extensions
             public int MaxDistance { get; set; } = 100;
             public int MinAge { get; set; } = 18;
             public int MaxAge { get; set; } = 65;
+        }
+
+        public class PushNotificationSettings
+        {
+            public string ExpoAccessToken { get; set; } = string.Empty;
+            public string FcmServerKey { get; set; } = string.Empty;
+            public bool EnablePushNotifications { get; set; } = true;
         }
     }
 }

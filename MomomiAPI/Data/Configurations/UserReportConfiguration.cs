@@ -19,6 +19,14 @@ namespace MomomiAPI.Data.Configurations
             builder.HasIndex(ur => ur.Status)
                 .HasDatabaseName("idx_user_reports_status");
 
+            // Index for reason
+            builder.HasIndex(ur => ur.Reason)
+                .HasDatabaseName("idx_user_reports_reason");
+
+            // Configure enum conversion
+            builder.Property(ur => ur.Reason)
+                .HasConversion<string>();
+
             // Configure explicit relationships to avoid ambiguity
             builder.HasOne(ur => ur.Reporter)
                 .WithMany(u => u.ReportsMade)

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using MomomiAPI.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MomomiAPI.Models.Entities
@@ -20,6 +21,9 @@ namespace MomomiAPI.Models.Entities
 
         [Column("is_like")]
         public bool IsLike { get; set; } = true; // true for like, false for pass
+
+        [Column("like_type")]
+        public LikeType LikeType { get; set; } = LikeType.Regular;
 
         [Column("is_match")]
         public bool IsMatch { get; set; } = false;

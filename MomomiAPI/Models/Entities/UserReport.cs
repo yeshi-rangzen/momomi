@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using MomomiAPI.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MomomiAPI.Models.Entities
@@ -19,9 +20,7 @@ namespace MomomiAPI.Models.Entities
         public Guid ReportedId { get; set; }
 
         [Column("reason")]
-        [Required]
-        [MaxLength(100)]
-        public string Reason { get; set; } = string.Empty;
+        public ReportReason Reason { get; set; } = ReportReason.Other;
 
         [Column("description")]
         public string? Description { get; set; }
@@ -29,6 +28,13 @@ namespace MomomiAPI.Models.Entities
         [Column("status")]
         [MaxLength(20)]
         public string Status { get; set; } = "pending"; // pending, reviewed, resolved
+
+        [Column("admin_notes")]
+        public string? AdminNotes { get; set; }
+
+        [Column("resolved_at")]
+        public DateTime? ResolvedAt { get; set; }
+
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
