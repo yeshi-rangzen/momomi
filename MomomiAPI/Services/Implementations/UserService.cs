@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CloudinaryDotNet;
+using Microsoft.EntityFrameworkCore;
 using MomomiAPI.Data;
 using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
@@ -13,11 +14,13 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ILogger<UserService> _logger;
+        private readonly Cloudinary _cloudinary;
 
-        public UserService(MomomiDbContext dbContext, ILogger<UserService> logger)
+        public UserService(MomomiDbContext dbContext, ILogger<UserService> logger, Cloudinary cloudinary)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _cloudinary = cloudinary;
         }
 
         public async Task<User?> GetUserByIdAsync(Guid userId)
@@ -218,9 +221,28 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        /// <summary>
-        /// Get users globally (no distance filtering) for global discovery mode
-        /// </summary>
+        public async Task<bool> UpdateDiscoveryStatusAsync(Guid userId, bool isDiscoverable)
+        {
+            try
+            {
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null) return false;
+
+                user.IsDiscoverable = isDiscoverable;
+                user.UpdatedAt = DateTime.UtcNow;
+
+                await _dbContext.SaveChangesAsync();
+
+                _logger.LogInformation("Updated discovery status for user {UserId} to {IsDiscoverable}", userId, isDiscoverable);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating discovery status for user {UserId}", userId);
+                return false;
+            }
+        }
+
         private async Task<IEnumerable<UserProfileDTO>> GetGlobalUsersAsync(Guid userId)
         {
             try
@@ -231,7 +253,7 @@ namespace MomomiAPI.Services.Implementations
                 // Get all active users except current user
                 var globalUsers = await _dbContext.Users
                     .Include(u => u.Photos)
-                    .Where(u => u.Id != userId && u.IsActive)
+                    .Where(u => u.Id != userId && u.IsActive && u.IsDiscoverable)
                     .Take(100) // Limit for performance - adjust as needed
                     .ToListAsync();
 
@@ -326,6 +348,7 @@ namespace MomomiAPI.Services.Implementations
                     .Include(u => u.Photos)
                     .Where(u => u.Id != userId &&
                                u.IsActive &&
+                               u.IsDiscoverable &&
                                u.Latitude != null &&
                                u.Longitude != null)
                     .ToListAsync();
@@ -379,5 +402,107 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        public async Task<bool> DeleteUserAsync(Guid userId)
+        {
+            try
+            {
+                using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+                try
+                {
+                    var user = await _dbContext.Users
+                        .Include(u => u.Photos)
+                        .Include(u => u.Preferences)
+                        .Include(u => u.LikesGiven)
+                        .Include(u => u.LikesReceived)
+                        .Include(u => u.ConversationsAsUser1)
+                        .Include(u => u.ConversationsAsUser2)
+                        .Include(u => u.MessagesSent)
+                        .Include(u => u.Subscription)
+                        .Include(u => u.UsageLimit)
+                        .Include(u => u.Notifications)
+                        .FirstOrDefaultAsync(u => u.Id == userId);
+
+                    if (user == null) return false;
+
+                    // 1. Delete user photos from Cloudinary first
+                    foreach (var photo in user.Photos)
+                    {
+                        try
+                        {
+                            var deleteParams = new CloudinaryDotNet.Actions.DeletionParams(photo.CloudinaryPublicId);
+                            await _cloudinary.DestroyAsync(deleteParams);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to delete photo {PhotoId} from Cloudinary", photo.Id);
+                        }
+                    }
+
+                    // 2. Delete user photos from database
+                    _dbContext.UserPhotos.RemoveRange(user.Photos);
+
+                    // 3. Delete user preferences
+                    if (user.Preferences != null)
+                    {
+                        _dbContext.UserPreferences.Remove(user.Preferences);
+                    }
+
+                    // 4. Delete likes given and received
+                    _dbContext.UserLikes.RemoveRange(user.LikesGiven);
+                    _dbContext.UserLikes.RemoveRange(user.LikesReceived);
+
+                    // 5. Delete all conversations and messages where user is participant
+                    var conversations = user.ConversationsAsUser1.Concat(user.ConversationsAsUser2).Distinct();
+                    foreach (var conversation in conversations)
+                    {
+                        // Delete all messages in the conversation
+                        var messages = await _dbContext.Messages
+                            .Where(m => m.ConversationId == conversation.Id)
+                            .ToListAsync();
+                        _dbContext.Messages.RemoveRange(messages);
+
+                        // Delete the conversation
+                        _dbContext.Conversations.Remove(conversation);
+                    }
+
+                    // 6. Delete subscription and usage limits
+                    if (user.Subscription != null)
+                    {
+                        _dbContext.UserSubscriptions.Remove(user.Subscription);
+                    }
+
+                    if (user.UsageLimit != null)
+                    {
+                        _dbContext.UserUsageLimits.Remove(user.UsageLimit);
+                    }
+
+                    // 7. Delete notifications
+                    _dbContext.PushNotifications.RemoveRange(user.Notifications);
+
+                    // 8. DO NOT DELETE: Reports and Blocks (as per requirement)
+                    // These remain in the database for audit/safety purposes
+
+                    // 9. Finally, delete the user
+                    _dbContext.Users.Remove(user);
+
+                    await _dbContext.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation("Successfully deleted user {UserId} and all associated data", userId);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting user {UserId}", userId);
+                return false;
+            }
+        }
     }
 }

@@ -226,16 +226,7 @@ namespace MomomiAPI.Services.Implementations
 
         public bool CanUserMatchAsync(Guid userId)
         {
-            try
-            {
-                // Always return true - unlimited matches for all users
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking if user {UserId} can match", userId);
-                return false;
-            }
+            return true; // Currently all users can match, no limits enforced
         }
 
         public async Task<bool> RecordLikeUsageAsync(Guid userId, LikeType likeType)

@@ -111,6 +111,37 @@ namespace MomomiAPI.Controllers
         }
 
         /// <summary>
+        /// Toggle profile discovery visibility
+        /// </summary>
+        [HttpPut("discovery-visibility")]
+        public async Task<IActionResult> UpdateDiscoveryVisibility([FromBody] UpdateDiscoveryVisibilityRequest request)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                    return Unauthorized();
+
+                var success = await _userService.UpdateDiscoveryStatusAsync(userId.Value, request.IsDiscoverable);
+                if (!success)
+                    return BadRequest(new { message = "Failed to update discovery visibility" });
+
+                return Ok(new
+                {
+                    message = request.IsDiscoverable ?
+                        "Your profile is now visible to other users" :
+                        "Your profile is now hidden from discovery",
+                    isDiscoverable = request.IsDiscoverable
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating discovery visibility");
+                return StatusCode(500, new { message = "Internal server error" });
+            }
+        }
+
+        /// <summary>
         /// Get nearby users for discovery
         /// </summary>
         [HttpGet("nearby")]
@@ -151,6 +182,7 @@ namespace MomomiAPI.Controllers
                 return Ok(new
                 {
                     enableGlobalDiscovery = user.EnableGlobalDiscovery,
+                    isDiscoverable = user.IsDiscoverable,
                     maxDistanceKm = user.MaxDistanceKm,
                     minAge = user.MinAge,
                     maxAge = user.MaxAge,
@@ -164,6 +196,30 @@ namespace MomomiAPI.Controllers
             }
         }
 
+        /// <summary>
+        /// Delete user account and all associated data
+        /// </summary>
+        [HttpDelete("delete-account")]
+        public async Task<IActionResult> DeleteAccount()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                    return Unauthorized();
+
+                var success = await _userService.DeleteUserAsync(userId.Value);
+                if (!success)
+                    return BadRequest(new { message = "Failed to delete account" });
+
+                return Ok(new { message = "Account deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting user account");
+                return StatusCode(500, new { message = "Internal server error" });
+            }
+        }
 
         /// <summary>
         /// Deactivate current user's account

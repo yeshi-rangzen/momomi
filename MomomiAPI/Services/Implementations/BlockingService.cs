@@ -1,4 +1,5 @@
-﻿using MomomiAPI.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
@@ -237,14 +238,19 @@ namespace MomomiAPI.Services.Implementations
                     like.IsMatch = false;
                 }
 
-                // Deactivate conversation
+                // DELETE conversation and messages instead of deactivating
                 var conversation = await _dbContext.Conversations
+                    .Include(c => c.Messages)
                     .FirstOrDefaultAsync(c => (c.User1Id == userId1 && c.User2Id == userId2) ||
                                             (c.User1Id == userId2 && c.User2Id == userId1));
 
                 if (conversation != null)
                 {
-                    conversation.IsActive = false;
+                    // Delete all messages first
+                    _dbContext.Messages.RemoveRange(conversation.Messages);
+
+                    // Delete the conversation
+                    _dbContext.Conversations.Remove(conversation);
                 }
 
                 await _dbContext.SaveChangesAsync();

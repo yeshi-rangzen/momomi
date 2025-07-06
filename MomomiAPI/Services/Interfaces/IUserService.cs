@@ -13,5 +13,7 @@ namespace MomomiAPI.Services.Interfaces
         Task<bool> UpdateUserProfileAsync(Guid userId, UpdateProfileRequest request);
         Task<bool> DeactivateUserAsync(Guid userId);
         Task<IEnumerable<UserProfileDTO>> GetNearbyUsersAsync(Guid userId, int maxDistance);
+        Task<bool> UpdateDiscoveryStatusAsync(Guid userId, bool isDiscoverable);
+        Task<bool> DeleteUserAsync(Guid userId);
     }
 }

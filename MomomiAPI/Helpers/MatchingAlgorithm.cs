@@ -54,7 +54,7 @@ namespace MomomiAPI.Helpers
 
         public async Task<List<User>> GetFilteredCandidatesAsync(User currentUser, List<Guid> excludedUserIds)
         {
-            var query = _dbContext.Users.Include(u => u.Photos).Include(u => u.Preferences).Where(u => u.IsActive && !excludedUserIds.Contains(u.Id));
+            var query = _dbContext.Users.Include(u => u.Photos).Include(u => u.Preferences).Where(u => u.IsActive && u.IsDiscoverable && !excludedUserIds.Contains(u.Id));
 
             // Basic filters
             if (currentUser.InterestedIn.HasValue)

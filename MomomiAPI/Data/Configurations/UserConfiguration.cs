@@ -35,6 +35,10 @@ namespace MomomiAPI.Data.Configurations
                .HasDatabaseName("idx_users_global_discovery")
                .HasFilter("is_active = true");
 
+            builder.HasIndex(u => u.IsDiscoverable)
+               .HasDatabaseName("idx_users_discoverable")
+               .HasFilter("is_active = true");
+
             // Configure enum conversions
             builder.Property(u => u.Gender)
                 .HasConversion<string>();
@@ -51,6 +55,12 @@ namespace MomomiAPI.Data.Configurations
             // Configure EnableGlobalDiscovery column
             builder.Property(u => u.EnableGlobalDiscovery)
                 .HasColumnName("enable_global_discovery")
+                .HasDefaultValue(true)
+                .IsRequired();
+
+            // Configure IsDiscoverable column
+            builder.Property(u => u.IsDiscoverable)
+                .HasColumnName("is_discoverable")
                 .HasDefaultValue(true)
                 .IsRequired();
 

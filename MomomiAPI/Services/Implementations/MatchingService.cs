@@ -129,6 +129,7 @@ namespace MomomiAPI.Services.Implementations
 
                 // Record usage
                 await _subscriptionService.RecordLikeUsageAsync(likerUserId, likeType);
+
                 // Send super like notification if applicable
                 if (likeType == LikeType.SuperLike)
                 {
@@ -144,7 +145,6 @@ namespace MomomiAPI.Services.Implementations
                     await _matchingAlgorithm.CreateMatchAsync(likerUserId, likedUserId);
 
                     // Send match notifications to the liked user
-                    //await _pushNotificationService.SendMatchNotificationAsync(likerUserId, likedUserId);
                     await _pushNotificationService.SendMatchNotificationAsync(likedUserId, likerUserId);
 
                     _logger.LogInformation("Match created between users {User1} and {User2}",
@@ -254,34 +254,54 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                // Find and update like records
-                var likes = await _dbContext.UserLikes
-                    .Where(ul => ((ul.LikedUserId == userId && ul.LikerUserId == matchedUserId) ||
-                                  (ul.LikedUserId == matchedUserId && ul.LikerUserId == userId)) && ul.IsMatch)
-                    .ToListAsync();
-
-                foreach (var like in likes)
+                using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                try
                 {
-                    like.IsMatch = false; // Unmatch
+
+                    // Find and update like records
+                    var likes = await _dbContext.UserLikes
+                        .Where(ul => ((ul.LikedUserId == userId && ul.LikerUserId == matchedUserId) ||
+                                      (ul.LikedUserId == matchedUserId && ul.LikerUserId == userId)) && ul.IsMatch)
+                        .ToListAsync();
+
+                    foreach (var like in likes)
+                    {
+                        like.IsMatch = false; // Unmatch
+                    }
+
+                    // Find and DELETE conversation and all messages
+                    var conversation = await _dbContext.Conversations
+                        .Include(c => c.Messages)
+                        .FirstOrDefaultAsync(c => (c.User1Id == userId && c.User2Id == matchedUserId) ||
+                                                  (c.User1Id == matchedUserId && c.User2Id == userId));
+
+                    if (conversation != null)
+                    {
+                        // Delete all messages first (due to foreign key constraints)
+                        _dbContext.Messages.RemoveRange(conversation.Messages);
+
+                        // Delete the conversation
+                        _dbContext.Conversations.Remove(conversation);
+                    }
+
+                    await _dbContext.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    // Clear cache
+                    await _cacheService.RemoveAsync($"user_matches_{userId}");
+                    await _cacheService.RemoveAsync($"user_matches_{matchedUserId}");
+                    await _cacheService.RemoveAsync($"user_conversations_{userId}");
+                    await _cacheService.RemoveAsync($"user_conversations_{matchedUserId}");
+
+                    _logger.LogInformation("Successfully unmatched users {UserId} and {MatchedUserId} and deleted conversation", userId, matchedUserId);
+
+                    return true;
                 }
-
-                // Deactive conversation
-                var conversation = await _dbContext.Conversations
-                    .FirstOrDefaultAsync(c => (c.User1Id == userId && c.User2Id == matchedUserId) ||
-                                              (c.User1Id == matchedUserId && c.User2Id == userId));
-
-                if (conversation != null)
+                catch (Exception)
                 {
-                    conversation.IsActive = false; // Deactivate conversation
+                    await transaction.RollbackAsync();
+                    throw;
                 }
-
-                await _dbContext.SaveChangesAsync();
-
-                // Clear cache
-                await _cacheService.RemoveAsync($"user_matches_{userId}");
-                await _cacheService.RemoveAsync($"user_matches_{matchedUserId}");
-
-                return true;
             }
             catch (Exception ex)
             {

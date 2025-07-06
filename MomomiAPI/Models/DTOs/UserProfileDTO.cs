@@ -18,6 +18,7 @@ namespace MomomiAPI.Models.DTOs
         public int? HeightCm { get; set; }
         public double? DistanceKm { get; set; }
         public bool EnableGlobalDiscovery { get; set; } = false;
+        public bool IsDiscoverable { get; set; } = true;
         public List<UserPhotoDTO> Photos { get; set; } = new();
         public bool IsVerified { get; set; }
         public DateTime LastActive { get; set; }
