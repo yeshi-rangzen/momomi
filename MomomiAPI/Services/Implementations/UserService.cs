@@ -250,11 +250,20 @@ namespace MomomiAPI.Services.Implementations
                 var currentUser = await _dbContext.Users.FindAsync(userId);
                 if (currentUser == null) return [];
 
-                // Get all active users except current user
+                // Get users that haven't been liked/passed by current user
+                var likedOrPassedUserIds = await _dbContext.UserLikes
+                    .Where(ul => ul.LikerUserId == userId)
+                    .Select(ul => ul.LikedUserId)
+                    .ToListAsync();
+
+                // Get all active AND discoverable users except current user and already processed users
                 var globalUsers = await _dbContext.Users
                     .Include(u => u.Photos)
-                    .Where(u => u.Id != userId && u.IsActive && u.IsDiscoverable)
-                    .Take(100) // Limit for performance - adjust as needed
+                    .Where(u => u.Id != userId &&
+                               u.IsActive &&
+                               u.IsDiscoverable &&
+                               !likedOrPassedUserIds.Contains(u.Id)) // Exclude already liked/passed users
+                    .Take(30) // Take only 30 users
                     .ToListAsync();
 
                 var result = new List<UserProfileDTO>();
@@ -343,14 +352,23 @@ namespace MomomiAPI.Services.Implementations
                     return [];
                 }
 
-                // Simple distance calculation - in production use proper geospatial queries
+                // Get users that haven't been liked/passed by current user
+                var likedOrPassedUserIds = await _dbContext.UserLikes
+                    .Where(ul => ul.LikerUserId == userId)
+                    .Select(ul => ul.LikedUserId)
+                    .ToListAsync();
+
+
+                // Take more users initially since we'll filter by distance
                 var nearbyUsers = await _dbContext.Users
                     .Include(u => u.Photos)
                     .Where(u => u.Id != userId &&
                                u.IsActive &&
                                u.IsDiscoverable &&
+                               !likedOrPassedUserIds.Contains(u.Id) && // Exclude already liked/passed users
                                u.Latitude != null &&
                                u.Longitude != null)
+                    .Take(100) // Take more initially for distance filtering
                     .ToListAsync();
 
                 var result = new List<UserProfileDTO>();
@@ -363,36 +381,14 @@ namespace MomomiAPI.Services.Implementations
 
                     if (distance <= maxDistance)
                     {
-                        var profile = new UserProfileDTO
-                        {
-                            Id = user.Id,
-                            FirstName = user.FirstName,
-                            LastName = user.LastName,
-                            Age = user.DateOfBirth.HasValue ?
-                                DateTime.UtcNow.Year - user.DateOfBirth.Value.Year : 0,
-                            Gender = user.Gender,
-                            Bio = user.Bio,
-                            Heritage = user.Heritage,
-                            Religion = user.Religion,
-                            LanguagesSpoken = user.LanguagesSpoken,
-                            EducationLevel = user.EducationLevel,
-                            Occupation = user.Occupation,
-                            HeightCm = user.HeightCm,
-                            DistanceKm = distance,
-                            IsVerified = user.IsVerified,
-                            LastActive = user.LastActive,
-                            Photos = user.Photos.Select(p => new UserPhotoDTO
-                            {
-                                Id = p.Id,
-                                Url = p.Url,
-                                ThumbnailUrl = p.ThumbnailUrl,
-                                PhotoOrder = p.PhotoOrder,
-                                IsPrimary = p.IsPrimary
-                            }).OrderBy(p => p.PhotoOrder).ToList()
-                        };
+                        var profile = CreateUserProfileDTO(user, distance);
                         result.Add(profile);
                     }
+
+                    // Stop when we have 30 users
+                    if (result.Count >= 30) break;
                 }
+
                 return result.OrderBy(u => u.DistanceKm);
             }
             catch (Exception ex)

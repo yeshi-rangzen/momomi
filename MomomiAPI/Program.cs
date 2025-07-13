@@ -331,7 +331,12 @@ builder.Services.AddCors(options =>
         options.AddPolicy("Development",
             policy =>
             {
-                policy.WithOrigins("http://localhost:3000", "http://localhost:8081")
+                policy.WithOrigins(
+                        "http://localhost:3000",
+                        "http://localhost:8081",
+                        "http://192.168.0.164:8081", // Add your IP
+                        "exp://192.168.0.164:8081"   // Expo Go format
+                         )
                       .AllowAnyMethod()
                       .AllowAnyHeader()
                       .AllowCredentials();
@@ -390,15 +395,19 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    app.UseCors("Development");
+    //app.UseCors("Development");
+    app.UseCors(policy => policy
+    .AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader());
 }
 else
 {
     app.UseCors("AllowAll");
+    app.UseHttpsRedirection();
 }
 
 
-app.UseHttpsRedirection();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -458,6 +467,8 @@ if (app.Environment.IsDevelopment())
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "An error occurred while migrating the database");
     }
+    app.Urls.Add("http://0.0.0.0:5029");
+    app.Urls.Add("http://localhost:5029");
 }
 
 app.Run();

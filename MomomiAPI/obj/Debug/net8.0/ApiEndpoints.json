@@ -126,6 +126,74 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "MomomiAPI.Controllers.BlockingController",
+    "Method": "BlockUser",
+    "RelativePath": "api/Blocking/block",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.BlockUserRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.BlockingController",
+    "Method": "GetBlockedUsers",
+    "RelativePath": "api/Blocking/blocked-users",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.BlockingController",
+    "Method": "GetMyReports",
+    "RelativePath": "api/Blocking/my-reports",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.BlockingController",
+    "Method": "ReportUser",
+    "RelativePath": "api/Blocking/report",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.ReportUserRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.BlockingController",
+    "Method": "UnblockUser",
+    "RelativePath": "api/Blocking/unblock/{userId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "MomomiAPI.Controllers.DebugController",
     "Method": "InspectToken",
     "RelativePath": "api/Debug/inspect-token",
@@ -166,8 +234,13 @@
     "Order": 0,
     "Parameters": [
       {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.LikeUserRequest",
+        "IsRequired": true
+      },
+      {
         "Name": "userId",
-        "Type": "System.Guid",
+        "Type": "",
         "IsRequired": true
       }
     ],
@@ -316,6 +389,95 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "GetNotifications",
+    "RelativePath": "api/Notifications",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "MarkAsRead",
+    "RelativePath": "api/Notifications/{notificationId}/read",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "notificationId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "MarkAllAsRead",
+    "RelativePath": "api/Notifications/mark-all-read",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "UpdatePushToken",
+    "RelativePath": "api/Notifications/push-token",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.UpdatePushTokenRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "UpdateNotificationSettings",
+    "RelativePath": "api/Notifications/settings",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.UpdateNotificationSettingsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.NotificationsController",
+    "Method": "GetUnreadCount",
+    "RelativePath": "api/Notifications/unread-count",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "MomomiAPI.Controllers.PhotosController",
     "Method": "GetUserPhotos",
     "RelativePath": "api/Photos",
@@ -395,9 +557,75 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
+    "Method": "CancelSubscription",
+    "RelativePath": "api/Subscription/cancel",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
+    "Method": "GetSubscriptionStatus",
+    "RelativePath": "api/Subscription/status",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
+    "Method": "UpgradeToPremium",
+    "RelativePath": "api/Subscription/upgrade",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.SubscriptionUpgradeRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
+    "Method": "GetUsageLimits",
+    "RelativePath": "api/Subscription/usage-limits",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
+    "Method": "WatchAd",
+    "RelativePath": "api/Subscription/watch-ad",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "MomomiAPI.Controllers.UsersController",
     "Method": "DeactivateAccount",
     "RelativePath": "api/Users/deactivate",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "Method": "DeleteAccount",
+    "RelativePath": "api/Users/delete-account",
     "HttpMethod": "DELETE",
     "IsController": true,
     "Order": 0,
@@ -428,6 +656,22 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "Method": "UpdateDiscoveryVisibility",
+    "RelativePath": "api/Users/discovery-visibility",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.UpdateDiscoveryVisibilityRequest",
+        "IsRequired": true
+      }
+    ],
     "ReturnTypes": []
   },
   {

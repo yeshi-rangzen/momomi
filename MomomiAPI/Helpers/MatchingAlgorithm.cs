@@ -77,19 +77,29 @@ namespace MomomiAPI.Helpers
             // Apply distance filter only if global discovery is disabled
             if (!currentUser.EnableGlobalDiscovery && currentUser.Latitude.HasValue && currentUser.Longitude.HasValue)
             {
-                // For now, we will filter in memore. In production use spatial queries
-                var allCandidates = await query.ToListAsync();
+                var localCandidates = await query.Take(100).ToListAsync(); // Get more for distance filtering
 
-                return allCandidates.Where(u => u.Latitude.HasValue && u.Longitude.HasValue &&
-                LocationHelper.CalculateDistance(
-                    (double)currentUser.Latitude, (double)currentUser.Longitude, (double)u.Latitude, (double)u.Longitude) <= currentUser.MaxDistanceKm).ToList();
+                var filteredByDistance = localCandidates.Where(u => u.Latitude.HasValue && u.Longitude.HasValue &&
+                    LocationHelper.CalculateDistance(
+                        (double)currentUser.Latitude, (double)currentUser.Longitude,
+                        (double)u.Latitude, (double)u.Longitude) <= currentUser.MaxDistanceKm)
+                    .Take(30) // Take only 30 after distance filtering
+                    .ToList();
+
+                _logger.LogInformation("Local discovery for user {UserId}: Found {Count} users within {Distance}km",
+                    currentUser.Id, filteredByDistance.Count, currentUser.MaxDistanceKm);
+
+                return filteredByDistance;
             }
             else
             {
-                _logger.LogInformation("Using global discovery for user {UserId}", currentUser.Id);
+                // Global discovery: just take first 30 users
+                var globalCandidates = await query.Take(30).ToListAsync();
 
-                // Global discovery - no distance filtering
-                return await query.ToListAsync();
+                _logger.LogInformation("Global discovery for user {UserId}: Found {Count} users",
+                    currentUser.Id, globalCandidates.Count);
+
+                return globalCandidates;
             }
         }
 
