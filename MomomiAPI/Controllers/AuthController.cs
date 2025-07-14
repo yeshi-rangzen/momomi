@@ -1,219 +1,116 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Services.Interfaces;
-using System.Security.Claims;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
 
 namespace MomomiAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AuthController : ControllerBase
+    public class AuthController : BaseApiController
     {
-        private readonly IAuthService _authService;
-        private readonly ILogger<AuthController> _logger;
+        private readonly IEmailVerificationService _emailVerificationService;
+        private readonly IUserRegistrationService _userRegistrationService;
+        private readonly IUserLoginService _userLoginService;
+        private readonly ITokenManagementService _tokenManagementService;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(
+            IEmailVerificationService emailVerificationService,
+            IUserRegistrationService userRegistrationService,
+            IUserLoginService userLoginService,
+            ITokenManagementService tokenManagementService,
+            ILogger<AuthController> logger) : base(logger)
         {
-            _authService = authService;
-            _logger = logger;
+            _emailVerificationService = emailVerificationService;
+            _userRegistrationService = userRegistrationService;
+            _userLoginService = userLoginService;
+            _tokenManagementService = tokenManagementService;
         }
 
         /// <summary>
-        /// Send OTP to email address for verification
+        /// Send verification code to email address
         /// </summary>
-        [HttpPost("send-otp")]
+        [HttpPost("send-verification-code")]
         [EnableRateLimiting("OtpPolicy")]
-        public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
+        public async Task<ActionResult<EmailVerificationResult>> SendVerificationCode([FromBody] SendOtpRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(SendVerificationCode), new { request.Email });
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                var result = await _authService.SendOtpAsync(request);
-
-                if (!result.Success)
-                    return BadRequest(new { message = result.Error, remainingAttempts = result.RemainingAttempts });
-
-                return Ok(new
-                {
-                    message = result.Message,
-                    expiresAt = result.ExpiresAt,
-                    remainingAttempts = result.RemainingAttempts
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending OTP to {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _emailVerificationService.SendVerificationCode(request.Email);
+            return HandleAuthResult(result);
         }
-
-        ///<sumary>
-        /// Verify OTP for email address (used during registration process)
-        /// </sumary>
-        [HttpPost("verify-email-otp")]
-        [EnableRateLimiting("AuthPolicy")]
-        public async Task<IActionResult> VerifyEmailOtp([FromBody] VerifyOtpRequest request)
-        {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
-
-                var result = await _authService.VerifyEmailOtpAsync(request);
-
-                if (!result.Success)
-                    return BadRequest(new { message = result.Error });
-
-                return Ok(new
-                {
-                    message = result.Message,
-                    emailVerified = true,
-                    verificationToken = result.VerificationToken // Temporary token for registration completion
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error verifying email OTP for {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
-        }
-
 
         /// <summary>
-        /// Register a new user with OTP verification
+        /// Verify email code for registration process
         /// </summary>
-        [HttpPost("complete-register")]
+        [HttpPost("verify-email-code")]
         [EnableRateLimiting("AuthPolicy")]
-        public async Task<IActionResult> Register([FromBody] CompleteRegistrationRequest request)
+        [AllowAnonymous]
+        public async Task<IActionResult> VerifyEmailCode([FromBody] VerifyOtpRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(VerifyEmailCode), new { request.Email });
 
-                // Validate age (must be 18+)
-                var age = DateTime.UtcNow.Year - request.DateOfBirth.Year;
-                if (age < 18)
-                    return BadRequest(new { message = "You must be at least 18 years old to register" });
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                var result = await _authService.CompleteRegistrationAsync(request);
+            var result = await _emailVerificationService.VerifyEmailCode(request.Email, request.Otp);
+            return HandleAuthResult(result);
+        }
 
-                if (!result.Success)
-                    return BadRequest(new { message = result.Error });
 
-                return Ok(new
-                {
-                    message = "Registration successful",
-                    user = new
-                    {
-                        id = result.User?.Id,
-                        email = result.User?.Email,
-                        firstName = result.User?.FirstName,
-                        lastName = result.User?.LastName,
-                        isActive = result.User?.IsActive
-                    },
-                    token = new
-                    {
-                        accessToken = result.AccessToken,
-                        refreshToken = result.RefreshToken,
-                        expiresAt = result.ExpiresAt
-                    },
-                    nextSteps = new
-                    {
-                        message = "Complete your profile to start discovering matches",
-                        actions = new[]
-                        {
-                            "Add profile photos",
-                            "Complete bio and preferences",
-                            "Set location for local discovery"
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during user registration for {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+        /// <summary>
+        /// Complete user registration with verified email
+        /// </summary>
+        [HttpPost("register")]
+        [EnableRateLimiting("AuthPolicy")]
+        [AllowAnonymous]
+        public async Task<ActionResult<RegistrationResult>> RegisterUser([FromBody] CompleteRegistrationRequest request)
+        {
+            LogControllerAction(nameof(RegisterUser), new { request.Email, request.FirstName });
+
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await _userRegistrationService.RegisterNewUser(request);
+            return HandleAuthResult(result);
         }
 
         /// <summary>
-        /// Login user with OTP verification
+        /// Login user with email and verification code
         /// </summary>
         [HttpPost("login")]
         [EnableRateLimiting("AuthPolicy")]
-        public async Task<IActionResult> Login([FromBody] LoginWithOtpRequest request)
+        [AllowAnonymous]
+        public async Task<ActionResult<LoginResult>> LoginUser([FromBody] LoginWithOtpRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(LoginUser), new { request.Email });
 
-                var result = await _authService.VerifyOtpAndLoginAsync(request);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                if (!result.Success)
-                    return Unauthorized(new { message = result.Error });
-
-                return Ok(new
-                {
-                    message = "Login successful",
-                    user = new
-                    {
-                        id = result.User?.Id,
-                        email = result.User?.Email,
-                        firstName = result.User?.FirstName,
-                        lastName = result.User?.LastName,
-                        isActive = result.User?.IsActive,
-                        lastActive = result.User?.LastActive
-                    },
-                    token = new
-                    {
-                        accessToken = result.AccessToken,
-                        refreshToken = result.RefreshToken,
-                        expiresAt = result.ExpiresAt
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during user login for {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _userLoginService.LoginWithEmailCode(request.Email, request.Otp);
+            return HandleAuthResult(result);
         }
 
         /// <summary>
-        /// Resend OTP to email address
+        /// Resend verification code to email
         /// </summary>
-        [HttpPost("resend-otp")]
+        [HttpPost("resend-verification-code")]
         [EnableRateLimiting("OtpPolicy")]
-        public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequest request)
+        [AllowAnonymous]
+        public async Task<ActionResult<EmailVerificationResult>> ResendVerificationCode([FromBody] ResendOtpRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(ResendVerificationCode), new { request.Email });
 
-                var result = await _authService.ResendOtpAsync(request);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                if (!result.Success)
-                    return BadRequest(new { message = result.Error });
-
-                return Ok(new
-                {
-                    message = result.Message,
-                    expiresAt = result.ExpiresAt,
-                    remainingAttempts = result.RemainingAttempts
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error resending OTP to {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _emailVerificationService.ResendVerificationCode(request.Email);
+            return HandleAuthResult(result);
         }
 
         /// <summary>
@@ -221,27 +118,22 @@ namespace MomomiAPI.Controllers
         /// </summary>
         [HttpPost("check-email")]
         [EnableRateLimiting("GeneralPolicy")]
-        public async Task<IActionResult> CheckEmail([FromBody] SendOtpRequest request)
+        [AllowAnonymous]
+        public async Task<ActionResult> CheckEmailRegistration([FromBody] SendOtpRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(CheckEmailRegistration), new { request.Email });
 
-                var isRegistered = await _authService.IsEmailRegisteredAsync(request.Email);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                return Ok(new
-                {
-                    email = request.Email,
-                    isRegistered = isRegistered,
-                    action = isRegistered ? "login" : "register"
-                });
-            }
-            catch (Exception ex)
+            var isRegistered = await _emailVerificationService.IsEmailAlreadyRegistered(request.Email);
+
+            return Ok(new
             {
-                _logger.LogError(ex, "Error checking email {Email}", request.Email);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+                email = request.Email,
+                isRegistered = isRegistered,
+                suggestedAction = isRegistered ? "login" : "register"
+            });
         }
 
         /// <summary>
@@ -249,122 +141,57 @@ namespace MomomiAPI.Controllers
         /// </summary>
         [HttpPost("refresh-token")]
         [EnableRateLimiting("AuthPolicy")]
-        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        [AllowAnonymous]
+        public async Task<ActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(RefreshToken));
 
-                var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                if (!result.Success)
-                    return Unauthorized(new { message = result.Error });
-
-                return Ok(new
-                {
-                    message = "Token refreshed successfully",
-                    token = new
-                    {
-                        accessToken = result.AccessToken,
-                        refreshToken = result.RefreshToken,
-                        expiresAt = result.ExpiresAt
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error refreshing token");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _tokenManagementService.RefreshUserToken(request.RefreshToken);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
-        /// Logout user
+        /// Logout current user
         /// </summary>
         [HttpPost("logout")]
-        [Authorize]
-        public async Task<IActionResult> Logout()
+        public async Task<ActionResult> LogoutUser()
         {
-            try
-            {
-                var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-                var result = await _authService.LogoutAsync(token);
+            LogControllerAction(nameof(LogoutUser));
 
-                return Ok(new { message = "Logout successful" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during user logout");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            var result = await _tokenManagementService.InvalidateUserToken(token);
+            return HandleOperationResult(result);
         }
+
         /// <summary>
-        /// Verify token and get current user
+        /// Get current user information
         /// </summary>
         [HttpGet("me")]
-        [Authorize]
-        public async Task<IActionResult> GetCurrentUser()
+        public async Task<ActionResult> GetCurrentUser()
         {
-            try
-            {
-                var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-                var user = await _authService.GetUserFromTokenAsync(token);
+            LogControllerAction(nameof(GetCurrentUser));
 
-                if (user == null)
-                    return Unauthorized(new { message = "Invalid token" });
-
-                return Ok(new
-                {
-                    id = user.Id,
-                    email = user.Email,
-                    firstName = user.FirstName,
-                    lastName = user.LastName,
-                    isActive = user.IsActive,
-                    lastActive = user.LastActive,
-                    createdAt = user.CreatedAt
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting current user");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+            var result = await _tokenManagementService.ValidateAndGetUser(token);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Revoke all user sessions (security feature)
         /// </summary>
-        [HttpPost("revoke-sessions")]
-        [Authorize]
-        public async Task<IActionResult> RevokeSessions()
+        [HttpPost("revoke-all-sessions")]
+        public async Task<ActionResult> RevokeAllSessions()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var result = await _authService.RevokeUserSessionsAsync(userId.Value);
+            LogControllerAction(nameof(RevokeAllSessions));
 
-                if (!result)
-                    return BadRequest(new { message = "Failed to revoke sessions" });
-
-                return Ok(new { message = "All sessions revoked successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error revoking user sessions");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
-        }
-
-        private Guid? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
-                             User.FindFirst("sub")?.Value;
-
-            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+            var result = await _tokenManagementService.InvalidateAllUserTokens(userIdResult.Value);
+            return HandleOperationResult(result);
         }
     }
 }

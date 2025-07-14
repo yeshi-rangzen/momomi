@@ -42,12 +42,12 @@ namespace MomomiAPI.Services.Interfaces
         public int? RemainingAttempts { get; set; }
     }
 
-    public class EmailVerificationResult
-    {
-        public bool Success { get; set; }
-        public string? Error { get; set; }
-        public string? Message { get; set; }
-        public string? VerificationToken { get; set; } // Temporary token for registration completion
-        public DateTime? ExpiresAt { get; set; }
-    }
+    //public class EmailVerificationResult
+    //{
+    //    public bool Success { get; set; }
+    //    public string? Error { get; set; }
+    //    public string? Message { get; set; }
+    //    public string? VerificationToken { get; set; } // Temporary token for registration completion
+    //    public DateTime? ExpiresAt { get; set; }
+    //}
 }

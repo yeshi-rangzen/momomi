@@ -1,171 +1,110 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Services.Interfaces;
-using System.Security.Claims;
 
 namespace MomomiAPI.Controllers
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize]
-    public class PhotosController : ControllerBase
+    public class PhotosController : BaseApiController
     {
-        private readonly IPhotoService _photoService;
-        private readonly ILogger<PhotosController> _logger;
+        private readonly IPhotoManagementService _photoManagementService;
+        private readonly IPhotoGalleryService _photoGalleryService;
 
-        public PhotosController(IPhotoService photoService, ILogger<PhotosController> logger)
+        public PhotosController(
+            IPhotoManagementService photoManagementService,
+            IPhotoGalleryService photoGalleryService,
+            ILogger<PhotosController> logger) : base(logger)
         {
-            _photoService = photoService;
-            _logger = logger;
+            _photoManagementService = photoManagementService;
+            _photoGalleryService = photoGalleryService;
         }
 
         /// <summary>
-        /// Upload a photo for the current user.
+        /// Upload a new photo for the current user
         /// </summary>
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
+        public async Task<ActionResult> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                if (file == null || file.Length == 0)
-                    return BadRequest(new { message = "No file uploaded" });
+            LogControllerAction(nameof(UploadPhoto), new { isPrimary, fileName = file?.FileName });
 
-                // Validate file type
-                var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp" };
-                if (!allowedTypes.Contains(file.ContentType)) // 5 MB limit
-                {
-                    return BadRequest(new { message = "Invalid file type" });
-                }
-
-                // Validate file size (5 MB limit)
-                if (file.Length > 5 * 1024 * 1024)
-                {
-                    return BadRequest(new { message = "File size exceeds 5 MB limit" });
-                }
-
-                var photo = await _photoService.UploadPhotoAsync(userId.Value, file, isPrimary);
-                if (photo == null)
-                    return BadRequest(new { message = "Failed to upload photo" });
-
-                return Ok(new { message = "Photo uploaded successfully", photo });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error uploading photo");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _photoManagementService.AddUserPhoto(userIdResult.Value, file, isPrimary);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
-        /// Get all photos for the current user.
+        /// Get all photos for the current user
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetUserPhotos()
+        public async Task<ActionResult> GetMyPhotos()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var photos = await _photoService.GetUserPhotosAsync(userId.Value);
-                return Ok(photos);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting user photos");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            LogControllerAction(nameof(GetMyPhotos));
+
+            var result = await _photoGalleryService.GetUserPhotoGallery(userIdResult.Value);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
-        /// Delete a photo
+        /// Get photo count for current user
+        /// </summary>
+        [HttpGet("count")]
+        public async Task<ActionResult> GetPhotoCount()
+        {
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(GetPhotoCount));
+
+            var result = await _photoGalleryService.GetPhotoCount(userIdResult.Value);
+            return HandleOperationResult(result);
+        }
+
+        /// <summary>
+        /// Delete a specific photo
         /// </summary>
         [HttpDelete("{photoId}")]
-        public async Task<IActionResult> DeletePhoto(Guid photoId)
+        public async Task<ActionResult> DeletePhoto(Guid photoId)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var success = await _photoService.DeletePhotoAsync(photoId, userId.Value);
-                if (!success)
-                    return NotFound(new { message = "Photo not found or you do not have permission to delete it" });
+            LogControllerAction(nameof(DeletePhoto), new { photoId });
 
-                return Ok(new { message = "Photo deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting photo {PhotoId}", photoId);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _photoManagementService.RemovePhoto(userIdResult.Value, photoId);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Set a photo as primary
         /// </summary>
-        [HttpPut("{photoId}/primary")]
-        public async Task<IActionResult> SetPrimaryPhoto(Guid photoId)
+        [HttpPut("{photoId}/set-primary")]
+        public async Task<ActionResult> SetPrimaryPhoto(Guid photoId)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var success = await _photoService.SetPrimaryPhotoAsync(photoId, userId.Value);
-                if (!success)
-                    return NotFound(new { message = "Photo not found or you do not have permission to set it as primary" });
+            LogControllerAction(nameof(SetPrimaryPhoto), new { photoId });
 
-                return Ok(new { message = "Primary photo set successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error setting primary photo {PhotoId}", photoId);
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _photoManagementService.SetPrimaryPhoto(userIdResult.Value, photoId);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Reorder photos
         /// </summary>
         [HttpPut("reorder")]
-        public async Task<IActionResult> ReorderPhotos([FromBody] List<Guid> photoIds)
+        public async Task<ActionResult> ReorderPhotos([FromBody] List<Guid> photoIds)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                if (photoIds == null || !photoIds.Any())
-                    return BadRequest(new { message = "No photo IDs provided" });
+            LogControllerAction(nameof(ReorderPhotos), new { photoCount = photoIds?.Count });
 
-                var success = await _photoService.ReorderPhotosAsync(userId.Value, photoIds);
-                if (!success)
-                    return BadRequest(new { message = "Failed to reorder photos" });
-
-                return Ok(new { message = "Photos reordered successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reordering photos");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
-        }
-
-        private Guid? GetCurrentUserId()
-        {
-            // Extract user ID from the JWT token or context
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-
-            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+            var result = await _photoManagementService.ReorderPhotos(userIdResult.Value, photoIds);
+            return HandleOperationResult(result);
         }
     }
 }
