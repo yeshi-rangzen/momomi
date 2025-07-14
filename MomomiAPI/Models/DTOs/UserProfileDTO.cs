@@ -10,15 +10,22 @@ namespace MomomiAPI.Models.DTOs
         public int Age { get; set; }
         public GenderType? Gender { get; set; }
         public string? Bio { get; set; }
-        public HeritageType? Heritage { get; set; }
-        public ReligionType? Religion { get; set; }
-        public List<string>? LanguagesSpoken { get; set; }
-        public string? EducationLevel { get; set; }
+        public List<HeritageType>? Heritage { get; set; }
+        public List<ReligionType>? Religion { get; set; }
+        public List<LanguageType>? LanguagesSpoken { get; set; }
+        public EducationLevelType? EducationLevel { get; set; }
         public string? Occupation { get; set; }
         public int? HeightCm { get; set; }
         public double? DistanceKm { get; set; }
         public bool EnableGlobalDiscovery { get; set; } = false;
         public bool IsDiscoverable { get; set; } = true;
+        public string? Hometown { get; set; }
+        public ChildrenStatusType? Children { get; set; }
+        public FamilyPlanType? FamilyPlan { get; set; }
+        public ViceFrequencyType? Drugs { get; set; }
+        public ViceFrequencyType? Smoking { get; set; }
+        public ViceFrequencyType? Marijuana { get; set; }
+        public ViceFrequencyType? Drinking { get; set; }
         public List<UserPhotoDTO> Photos { get; set; } = new();
         public bool IsVerified { get; set; }
         public DateTime LastActive { get; set; }

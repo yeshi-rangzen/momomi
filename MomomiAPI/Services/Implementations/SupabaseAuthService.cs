@@ -123,6 +123,89 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        public async Task<EmailVerificationResult> VerifyEmailOtpAsync(VerifyOtpRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Verifying email OTP for {Email}", request.Email);
+
+                // Check OTP attempt info
+                var otpAttemptKey = $"otp_attempt_{request.Email}";
+                var otpAttemptInfo = await _cacheService.GetAsync<OtpAttemptInfo>(otpAttemptKey);
+
+                if (otpAttemptInfo == null || otpAttemptInfo.ExpiresAt < DateTime.UtcNow)
+                {
+                    return new EmailVerificationResult { Success = false, Error = "OTP expired or not found." };
+                }
+
+                // Check if OTP is valid
+                if (otpAttemptInfo.AttemptCount >= 3)
+                {
+                    return new EmailVerificationResult { Success = false, Error = "Too many failed attempts. Please request a new OTP." };
+                }
+
+                // Verify the OTP using Supabase Auth (without creating session)
+                var verifyResponse = await _supabaseClient.Auth.VerifyOTP(request.Email, request.Otp, type: Constants.EmailOtpType.Email);
+
+                if (verifyResponse == null || verifyResponse?.User == null)
+                {
+                    // Increment attempt count if OTP is invalid
+                    otpAttemptInfo.AttemptCount++;
+                    await _cacheService.SetAsync(otpAttemptKey, otpAttemptInfo,
+                                                TimeSpan.FromMinutes((int)(otpAttemptInfo.ExpiresAt - DateTime.UtcNow).TotalMinutes));
+
+                    return new EmailVerificationResult
+                    {
+                        Success = false,
+                        Error = $"Invalid OTP. {3 - otpAttemptInfo.AttemptCount} attempts remaining."
+                    };
+                }
+
+                // Clear OTP attempt info on successful verification
+                await _cacheService.RemoveAsync(otpAttemptKey);
+
+                // Generate a temporary verification token for registration completion
+                var verificationToken = Guid.NewGuid().ToString();
+                var verificationKey = $"email_verified_{request.Email}_{verificationToken}";
+
+                // Store verification status for 10 minutes
+                await _cacheService.SetAsync(verificationKey, new
+                {
+                    Email = request.Email,
+                    SupabaseUserId = verifyResponse.User.Id,
+                    VerifiedAt = DateTime.UtcNow
+                }, TimeSpan.FromMinutes(10));
+
+                _logger.LogInformation("Email OTP verified successfully for {Email}", request.Email);
+
+                return new EmailVerificationResult
+                {
+                    Success = true,
+                    Message = "Email verified successfully. You can now complete your registration.",
+                    VerificationToken = verificationToken,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                };
+            }
+            catch (GotrueException ex)
+            {
+                _logger.LogError(ex, "Supabase error verifying email OTP for {Email}: {Message}", request.Email, ex.Message);
+                return new EmailVerificationResult
+                {
+                    Success = false,
+                    Error = "Invalid OTP or verification failed."
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error verifying email OTP for {Email}", request.Email);
+                return new EmailVerificationResult
+                {
+                    Success = false,
+                    Error = "An unexpected error occurred during verification."
+                };
+            }
+        }
+
         public async Task<AuthResult> VerifyOtpAndLoginAsync(LoginWithOtpRequest request)
         {
             try
@@ -218,7 +301,7 @@ namespace MomomiAPI.Services.Implementations
                 };
             }
         }
-        public async Task<AuthResult> RegisterWithOtpAsync(RegisterWithOtpRequest request)
+        public async Task<AuthResult> CompleteRegistrationAsync(CompleteRegistrationRequest request)
         {
             try
             {
@@ -237,67 +320,38 @@ namespace MomomiAPI.Services.Implementations
                     };
                 }
 
-                // Check OTP attempt info
-                var otpAttemptKey = $"otp_attempt_{request.Email}";
-                var otpAttemptInfo = await _cacheService.GetAsync<OtpAttemptInfo>(otpAttemptKey);
+                // Verify the verification token
+                var verificationKey = $"email_verified_{request.Email}_{request.VerificationToken}";
+                var verificationData = await _cacheService.GetAsync<dynamic>(verificationKey);
 
-                if (otpAttemptInfo == null)
+                if (verificationData == null)
                 {
                     return new AuthResult
                     {
                         Success = false,
-                        Error = "OTP not found or expired. Please request a new one."
+                        Error = "Invalid or expired verification token. Please verify your email again."
                     };
                 }
 
-                if (otpAttemptInfo.AttemptCount >= 3)
+                // Clear verification token (single use)
+                await _cacheService.RemoveAsync(verificationKey);
+
+                // Extract Supabase user ID from verification data
+                var supabaseUserId = verificationData.GetProperty("SupabaseUserId").GetString();
+                if (string.IsNullOrEmpty(supabaseUserId))
                 {
                     return new AuthResult
                     {
                         Success = false,
-                        Error = "Too many failed attempts. Please request a new OTP."
+                        Error = "Invalid verification data. Please try again."
                     };
                 }
-
-                if (DateTime.UtcNow > otpAttemptInfo.ExpiresAt)
-                {
-                    await _cacheService.RemoveAsync(otpAttemptKey);
-                    return new AuthResult
-                    {
-                        Success = false,
-                        Error = "OTP has expired. Please request a new one."
-                    };
-                }
-
-                // Verify OTP with Supabase
-                var verifyResponse = await _supabaseClient.Auth.VerifyOTP(
-                    email: request.Email,
-                    token: request.Otp,
-                    type: Constants.EmailOtpType.Email
-                );
-
-                if (verifyResponse?.User == null)
-                {
-                    // Increment attempt count
-                    otpAttemptInfo.AttemptCount++;
-                    await _cacheService.SetAsync(otpAttemptKey, otpAttemptInfo,
-                        TimeSpan.FromMinutes((int)(otpAttemptInfo.ExpiresAt - DateTime.UtcNow).TotalMinutes));
-
-                    return new AuthResult
-                    {
-                        Success = false,
-                        Error = $"Invalid OTP. {3 - otpAttemptInfo.AttemptCount} attempts remaining."
-                    };
-                }
-
-                // Clear OTP attempt info on successful verification
-                await _cacheService.RemoveAsync(otpAttemptKey);
 
                 // Create user in our database
                 var user = new User
                 {
                     Id = Guid.NewGuid(),
-                    SupabaseUid = Guid.Parse(verifyResponse.User.Id!),
+                    SupabaseUid = Guid.Parse(supabaseUserId),
                     Email = request.Email,
                     FirstName = request.FirstName,
                     LastName = request.LastName,
@@ -305,6 +359,14 @@ namespace MomomiAPI.Services.Implementations
                     Gender = request.Gender,
                     InterestedIn = request.InterestedIn,
                     PhoneNumber = request.PhoneNumber,
+
+                    // Optional fields provided during registration
+                    Bio = request.Bio,
+                    Hometown = request.Hometown,
+                    Heritage = request.Heritage,
+                    Religion = request.Religion,
+                    LanguagesSpoken = request.LanguagesSpoken,
+
                     CreatedAt = DateTime.UtcNow,
                     LastActive = DateTime.UtcNow,
                     IsActive = true
@@ -313,16 +375,25 @@ namespace MomomiAPI.Services.Implementations
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("User registered successfully: {Email}", request.Email);
+                // Generate our custom tokens
+                var accessToken = _jwtService.GenerateAccessToken(user);
+                var refreshToken = _jwtService.GenerateRefreshToken();
+                var refreshExpiry = DateTime.UtcNow.AddDays(30);
+
+                // Store refresh token
+                await _jwtService.StoreRefreshTokenAsync(user.Id, refreshToken, refreshExpiry);
+
+                _logger.LogInformation("User registration completed successfully: {Email}", request.Email);
 
                 return new AuthResult
                 {
                     Success = true,
-                    AccessToken = verifyResponse.AccessToken,
                     User = user,
-                    RefreshToken = verifyResponse.RefreshToken,
-                    ExpiresAt = verifyResponse.ExpiresAt()
+                    AccessToken = accessToken,
+                    RefreshToken = refreshToken,
+                    ExpiresAt = DateTime.UtcNow.AddHours(1)
                 };
+
             }
             catch (GotrueException ex)
             {

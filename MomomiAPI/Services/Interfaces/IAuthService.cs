@@ -7,8 +7,10 @@ namespace MomomiAPI.Services.Interfaces
     {
         // OTP-based authentication methods
         Task<OtpResult> SendOtpAsync(SendOtpRequest request);
+        Task<EmailVerificationResult> VerifyEmailOtpAsync(VerifyOtpRequest request);
+        Task<AuthResult> CompleteRegistrationAsync(CompleteRegistrationRequest request);
+
         Task<AuthResult> VerifyOtpAndLoginAsync(LoginWithOtpRequest request);
-        Task<AuthResult> RegisterWithOtpAsync(RegisterWithOtpRequest request);
         Task<OtpResult> ResendOtpAsync(ResendOtpRequest request);
 
         // Token and user management
@@ -38,5 +40,14 @@ namespace MomomiAPI.Services.Interfaces
         public string? Message { get; set; }
         public DateTime? ExpiresAt { get; set; }
         public int? RemainingAttempts { get; set; }
+    }
+
+    public class EmailVerificationResult
+    {
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+        public string? Message { get; set; }
+        public string? VerificationToken { get; set; } // Temporary token for registration completion
+        public DateTime? ExpiresAt { get; set; }
     }
 }

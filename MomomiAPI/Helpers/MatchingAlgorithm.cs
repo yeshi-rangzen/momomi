@@ -2,6 +2,7 @@
 using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 
 namespace MomomiAPI.Helpers
 {
@@ -24,7 +25,9 @@ namespace MomomiAPI.Helpers
         {
             try
             {
-                var currentUser = await _dbContext.Users.Include(u => u.Preferences)
+                var currentUser = await _dbContext.Users
+                    .Include(u => u.Preferences)
+                    .Include(u => u.Subscription)
                     .FirstOrDefaultAsync(u => u.Id == userId);
 
                 if (currentUser == null) return [];
@@ -43,7 +46,7 @@ namespace MomomiAPI.Helpers
                 // Calculate compatibility scores and rank
                 var rankedMatches = await RankMatchesByCulturalCompatibilityAsync(currentUser, potentialMatches);
 
-                return rankedMatches.Take(maxResults).ToList();
+                return [.. rankedMatches.Take(maxResults)];
             }
             catch (Exception ex)
             {
@@ -54,24 +57,22 @@ namespace MomomiAPI.Helpers
 
         public async Task<List<User>> GetFilteredCandidatesAsync(User currentUser, List<Guid> excludedUserIds)
         {
-            var query = _dbContext.Users.Include(u => u.Photos).Include(u => u.Preferences).Where(u => u.IsActive && u.IsDiscoverable && !excludedUserIds.Contains(u.Id));
+            var query = _dbContext.Users
+                .Include(u => u.Photos)
+                .Include(u => u.Preferences)
+                .Where(u => u.IsActive && u.IsDiscoverable && !excludedUserIds.Contains(u.Id));
 
-            // Basic filters
-            if (currentUser.InterestedIn.HasValue)
+            // MEMBER FILTERS (Available to all users - Free and Premium)
+            query = ApplyMemberFilters(query, currentUser);
+
+            // SUBSCRIBER FILTERS (Premium users only)
+            var isSubscriber = currentUser.Subscription?.SubscriptionType == SubscriptionType.Premium &&
+                currentUser.Subscription.IsActive &&
+                (!currentUser.Subscription.ExpiresAt.HasValue || currentUser.Subscription.ExpiresAt > DateTime.UtcNow);
+
+            if (isSubscriber)
             {
-                query = query.Where(u => u.Gender == currentUser.InterestedIn);
-            }
-
-            // Age filters
-            if (currentUser.DateOfBirth.HasValue)
-            {
-                var userAge = DateTime.UtcNow.Year - currentUser.DateOfBirth.Value.Year;
-                var minBirthYear = DateTime.UtcNow.Year - currentUser.MaxAge;
-                var maxBirthYear = DateTime.UtcNow.Year - currentUser.MinAge;
-
-                query = query.Where(u => u.DateOfBirth.HasValue &&
-                    u.DateOfBirth.Value.Year >= minBirthYear &&
-                    u.DateOfBirth.Value.Year <= maxBirthYear);
+                query = ApplySubscriberFilters(query, currentUser);
             }
 
             // Apply distance filter only if global discovery is disabled
@@ -103,6 +104,109 @@ namespace MomomiAPI.Helpers
             }
         }
 
+        private IQueryable<User> ApplyMemberFilters(IQueryable<User> query, User currentUser)
+        {
+            // Interested Gender Filters
+            if (currentUser.InterestedIn.HasValue)
+            {
+                query = query.Where(u => u.Gender == currentUser.InterestedIn);
+            }
+
+            // Age filters
+            if (currentUser.DateOfBirth.HasValue)
+            {
+                var minBirthYear = DateTime.UtcNow.Year - currentUser.MaxAge;
+                var maxBirthYear = DateTime.UtcNow.Year - currentUser.MinAge;
+
+                query = query.Where(u => u.DateOfBirth.HasValue &&
+                    u.DateOfBirth.Value.Year >= minBirthYear &&
+                    u.DateOfBirth.Value.Year <= maxBirthYear);
+            }
+
+            // Heritage filters (if user has preferences)
+            if (currentUser.Preferences?.PreferredHeritage != null && currentUser.Preferences.PreferredHeritage.Any())
+            {
+                query = query.Where(u => u.Heritage != null &&
+                    u.Heritage.Any(h => currentUser.Preferences.PreferredHeritage.Contains(h)));
+            }
+
+            // Religion filters (if user has preferences)
+            if (currentUser.Preferences?.PreferredReligions != null && currentUser.Preferences.PreferredReligions.Any())
+            {
+                query = query.Where(u => u.Religion != null &&
+                    u.Religion.Any(r => currentUser.Preferences.PreferredReligions.Contains(r)));
+            }
+
+            return query;
+        }
+
+        private IQueryable<User> ApplySubscriberFilters(IQueryable<User> query, User currentUser)
+        {
+            if (currentUser.Preferences == null) return query;
+
+            // Height filters
+            if (currentUser.Preferences.PreferredHeightMin.HasValue)
+            {
+                query = query.Where(u => u.HeightCm >= currentUser.Preferences.PreferredHeightMin);
+            }
+
+            if (currentUser.Preferences.PreferredHeightMax.HasValue)
+            {
+                query = query.Where(u => u.HeightCm <= currentUser.Preferences.PreferredHeightMax);
+            }
+
+            // Children status filters
+            if (currentUser.Preferences.PreferredChildren != null && currentUser.Preferences.PreferredChildren.Any())
+            {
+                query = query.Where(u => u.Children.HasValue &&
+                    currentUser.Preferences.PreferredChildren.Contains(u.Children.Value));
+            }
+
+            // Family plans filters
+            if (currentUser.Preferences.PreferredFamilyPlans != null && currentUser.Preferences.PreferredFamilyPlans.Any())
+            {
+                query = query.Where(u => u.FamilyPlan.HasValue &&
+                    currentUser.Preferences.PreferredFamilyPlans.Contains(u.FamilyPlan.Value));
+            }
+
+            // Drugs filters
+            if (currentUser.Preferences.PreferredDrugs != null && currentUser.Preferences.PreferredDrugs.Any())
+            {
+                query = query.Where(u => u.Drugs.HasValue &&
+                    currentUser.Preferences.PreferredDrugs.Contains(u.Drugs.Value));
+            }
+
+            // Smoking filters
+            if (currentUser.Preferences.PreferredSmoking != null && currentUser.Preferences.PreferredSmoking.Any())
+            {
+                query = query.Where(u => u.Smoking.HasValue &&
+                    currentUser.Preferences.PreferredSmoking.Contains(u.Smoking.Value));
+            }
+
+            // Marijuana filters
+            if (currentUser.Preferences.PreferredMarijuana != null && currentUser.Preferences.PreferredMarijuana.Any())
+            {
+                query = query.Where(u => u.Marijuana.HasValue &&
+                    currentUser.Preferences.PreferredMarijuana.Contains(u.Marijuana.Value));
+            }
+
+            // Drinking filters
+            if (currentUser.Preferences.PreferredDrinking != null && currentUser.Preferences.PreferredDrinking.Any())
+            {
+                query = query.Where(u => u.Drinking.HasValue &&
+                    currentUser.Preferences.PreferredDrinking.Contains(u.Drinking.Value));
+            }
+
+            // Education level filters
+            if (currentUser.Preferences.PreferredEducationLevels != null && currentUser.Preferences.PreferredEducationLevels.Any())
+            {
+                query = query.Where(u => u.EducationLevel.HasValue &&
+                    currentUser.Preferences.PreferredEducationLevels.Contains(u.EducationLevel.Value));
+            }
+
+            return query;
+        }
+
         private async Task<List<UserProfileDTO>> RankMatchesByCulturalCompatibilityAsync(
             User currentUser, List<User> candidates)
         {
@@ -127,6 +231,13 @@ namespace MomomiAPI.Helpers
                     EducationLevel = candidate.EducationLevel,
                     Occupation = candidate.Occupation,
                     HeightCm = candidate.HeightCm,
+                    Hometown = candidate.Hometown,
+                    Children = candidate.Children,
+                    FamilyPlan = candidate.FamilyPlan,
+                    Drugs = candidate.Drugs,
+                    Smoking = candidate.Smoking,
+                    Marijuana = candidate.Marijuana,
+                    Drinking = candidate.Drinking,
                     IsVerified = candidate.IsVerified,
                     LastActive = candidate.LastActive,
                     Photos = candidate.Photos.Select(p => new UserPhotoDTO

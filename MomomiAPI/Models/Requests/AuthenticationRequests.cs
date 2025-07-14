@@ -53,6 +53,48 @@ namespace MomomiAPI.Models.Requests
             public string? PhoneNumber { get; set; }
         }
 
+        public class CompleteRegistrationRequest
+        {
+            [Required]
+            [EmailAddress]
+            public string Email { get; set; } = string.Empty;
+
+            [Required]
+            public string VerificationToken { get; set; } = string.Empty;
+
+            [Required]
+            [MaxLength(100)]
+            public string FirstName { get; set; } = string.Empty;
+
+            [MaxLength(100)]
+            public string? LastName { get; set; }
+
+            [Required]
+            public DateTime DateOfBirth { get; set; }
+
+            [Required]
+            public GenderType Gender { get; set; }
+
+            [Required]
+            public GenderType InterestedIn { get; set; }
+
+            [Required]
+            public string Hometown { get; set; } = string.Empty;
+
+            [Required]
+            public List<HeritageType> Heritage { get; set; } = [];
+
+            [Required]
+            public List<ReligionType> Religion { get; set; } = [];
+
+            [Required]
+            public List<LanguageType> LanguagesSpoken { get; set; } = [];
+            public string Bio { get; set; } = String.Empty;
+
+            [Phone]
+            public string? PhoneNumber { get; set; }
+        }
+
         public class LoginWithOtpRequest
         {
             [Required]

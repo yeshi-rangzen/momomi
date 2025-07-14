@@ -167,6 +167,7 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        // TODO: refresh_token_{userId} might not be required
         public async Task<string?> GetStoredRefreshTokenAsync(Guid userId)
         {
             try

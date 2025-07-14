@@ -51,17 +51,17 @@ namespace MomomiAPI.Models.Entities
         public string? Bio { get; set; }
 
         [Column("heritage")]
-        public HeritageType? Heritage { get; set; }
+        public List<HeritageType>? Heritage { get; set; }
 
         [Column("religion")]
-        public ReligionType? Religion { get; set; }
+        public List<ReligionType>? Religion { get; set; }
 
         [Column("languages_spoken")]
-        public List<string>? LanguagesSpoken { get; set; }
+        public List<LanguageType>? LanguagesSpoken { get; set; }
 
         [Column("education_level")]
         [MaxLength(100)]
-        public string? EducationLevel { get; set; }
+        public EducationLevelType? EducationLevel { get; set; }
 
         [Column("occupation")]
         [MaxLength(100)]
@@ -69,6 +69,28 @@ namespace MomomiAPI.Models.Entities
 
         [Column("height_cm")]
         public int? HeightCm { get; set; }
+
+        [Column("hometown")]
+        [MaxLength(200)]
+        public string? Hometown { get; set; }
+
+        [Column("children")]
+        public ChildrenStatusType? Children { get; set; }
+
+        [Column("family_plan")]
+        public FamilyPlanType? FamilyPlan { get; set; }
+
+        [Column("drugs")]
+        public ViceFrequencyType? Drugs { get; set; }
+
+        [Column("smoking")]
+        public ViceFrequencyType? Smoking { get; set; }
+
+        [Column("drinking")]
+        public ViceFrequencyType? Drinking { get; set; }
+
+        [Column("marijuana")]
+        public ViceFrequencyType? Marijuana { get; set; }
 
         [Column("max_distance_km")]
         public int MaxDistanceKm { get; set; } = 50;

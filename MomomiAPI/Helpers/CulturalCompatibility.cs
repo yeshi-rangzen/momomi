@@ -26,22 +26,17 @@ namespace MomomiAPI.Helpers
 
             // Religion compatibility (20% weight)
             var religionScore = CalculateReligionCompatibility(user1, user2);
-            totalScore += religionScore * 0.20;
+            totalScore += religionScore * 0.25;
             factors++;
 
             // Language compatibility (20% weight)
             var languageScore = CalculateLanguageCompatibility(user1, user2);
-            totalScore += languageScore * 0.20;
-            factors++;
-
-            // Cultural importance alignment (15% weight)
-            var culturalScore = CalculateCulturalImportanceAlignment(user1, user2);
-            totalScore += culturalScore * 0.15;
+            totalScore += languageScore * 0.25;
             factors++;
 
             // Geographic/regional proximity (10% weight)
             var regionScore = CalculateRegionalCompatibility(user1, user2);
-            totalScore += regionScore * 0.10;
+            totalScore += regionScore * 0.15;
             factors++;
 
             return factors > 0 ? totalScore : 50.0;
@@ -49,13 +44,21 @@ namespace MomomiAPI.Helpers
 
         private static double CalculateHeritageCompatibility(User user1, User user2)
         {
-            // Perfect match if same heritage
-            if (user1.Heritage == user2.Heritage && user1.Heritage.HasValue)
+            // Handle both single and multiple heritage values
+            var user1Heritage = user1.Heritage ?? new List<HeritageType>();
+            var user2Heritage = user2.Heritage ?? new List<HeritageType>();
+
+            if (!user1Heritage.Any() || !user2Heritage.Any())
+                return 50.0; // Neutral if no heritage specified
+
+            // Perfect match if any heritage overlap
+            var commonHeritage = user1Heritage.Intersect(user2Heritage).ToList();
+            if (commonHeritage.Any())
                 return 100.0;
 
             // Check mutual preferences
-            var user1AcceptsUser2 = user1.Preferences?.PreferredHeritage?.Contains(user2.Heritage ?? HeritageType.Other) ?? false;
-            var user2AcceptsUser1 = user2.Preferences?.PreferredHeritage?.Contains(user1.Heritage ?? HeritageType.Other) ?? false;
+            var user1AcceptsUser2 = user1.Preferences?.PreferredHeritage?.Any(h => user2Heritage.Contains(h)) ?? false;
+            var user2AcceptsUser1 = user2.Preferences?.PreferredHeritage?.Any(h => user1Heritage.Contains(h)) ?? false;
 
             if (user1AcceptsUser2 && user2AcceptsUser1)
                 return 90.0;
@@ -65,7 +68,7 @@ namespace MomomiAPI.Helpers
 
             // Related heritage groups (e.g., Tibetan-Buddhist cultures)
             var relatedGroups = GetRelatedHeritageGroups();
-            if (AreHeritagesRelated(user1.Heritage, user2.Heritage, relatedGroups))
+            if (AreHeritagesRelated(user1Heritage, user2Heritage, relatedGroups))
                 return 60.0;
 
             return 30.0; // Different heritage, no preference match
@@ -73,21 +76,30 @@ namespace MomomiAPI.Helpers
 
         private static double CalculateReligionCompatibility(User user1, User user2)
         {
-            // Perfect match if same religion
-            if (user1.Religion == user2.Religion && user1.Religion.HasValue) return 100.0;
+            // Handle both single and multiple religion values
+            var user1Religion = user1.Religion ?? new List<ReligionType>();
+            var user2Religion = user2.Religion ?? new List<ReligionType>();
+
+            if (!user1Religion.Any() || !user2Religion.Any())
+                return 50.0; // Neutral if no religion specified
+
+            // Perfect match if any religion overlap
+            var commonReligion = user1Religion.Intersect(user2Religion).ToList();
+            if (commonReligion.Any())
+                return 100.0;
 
             // Check mutual preferences
-            var user1AcceptsUser2 = user1.Preferences?.PreferredReligions?.Contains(user2.Religion ?? ReligionType.Other) ?? false;
-            var user2AcceptsUser1 = user2.Preferences?.PreferredReligions?.Contains(user1.Religion ?? ReligionType.Other) ?? false;
+            var user1AcceptsUser2 = user1.Preferences?.PreferredReligions?.Any(r => user2Religion.Contains(r)) ?? false;
+            var user2AcceptsUser1 = user2.Preferences?.PreferredReligions?.Any(r => user1Religion.Contains(r)) ?? false;
 
             if (user1AcceptsUser2 && user2AcceptsUser1)
                 return 90.0;
             if (user1AcceptsUser2 || user2AcceptsUser1)
                 return 70.0;
 
-            // Compatibile religions (e.g., Buddhism and Hinduism)
-            var compatibleRelgions = GetCompatibleReligions();
-            if (AreReligionsCompatible(user1.Religion, user2.Religion, compatibleRelgions))
+            // Compatible religions (e.g., Buddhism and Hinduism)
+            var compatibleReligions = GetCompatibleReligions();
+            if (AreReligionsCompatible(user1Religion, user2Religion, compatibleReligions))
                 return 60.0;
 
             return 40.0; // Different religions, no preference match
@@ -98,84 +110,203 @@ namespace MomomiAPI.Helpers
             if (user1.LanguagesSpoken == null || user2.LanguagesSpoken == null)
                 return 50.0; // Neutral score if no languages specified
 
-            // Check for common languages
-            var commonLanguages = user1.LanguagesSpoken.Intersect(user2.LanguagesSpoken).Count();
-            var totalUniqueLanguages = user1.LanguagesSpoken.Union(user2.LanguagesSpoken).Count();
+            var commonLanguages = user1.LanguagesSpoken.Intersect(user2.LanguagesSpoken).ToList();
 
-            if (commonLanguages == 0)
+            if (!commonLanguages.Any())
                 return 20.0; // No common languages
 
-            return commonLanguages / totalUniqueLanguages * 100.0; // Percentage of common languages
+            var score = 0.0;
+
+            // Base score for having common languages (40 points)
+            score += 40.0;
+
+            // Bonus for each additional common language (up to 30 points)
+            score += Math.Min(30.0, (commonLanguages.Count - 1) * 10.0);
+
+            // Cultural language bonus (up to 30 points)
+            var culturalLanguages = GetCommonCulturalLanguages(user1.LanguagesSpoken, user2.LanguagesSpoken);
+            score += Math.Min(30.0, culturalLanguages.Count * 15.0);
+
+            // Regional language family bonus (up to 20 points)
+            var regionalFamilyBonus = CalculateRegionalLanguageFamilyBonus(commonLanguages);
+            score += Math.Min(20.0, regionalFamilyBonus);
+
+            // Language preference matching bonus (up to 10 points)
+            var preferenceBonus = CalculateLanguagePreferenceBonus(user1, user2);
+            score += Math.Min(10.0, preferenceBonus);
+
+            return Math.Min(100.0, score);
         }
 
-        private static double CalculateCulturalImportanceAlignment(User user1, User user2)
+        /// <summary>
+        /// Get culturally significant common languages
+        /// </summary>
+        private static List<LanguageType> GetCommonCulturalLanguages(List<LanguageType> languages1, List<LanguageType> languages2)
         {
-            // This would be expanded with actual regional data
-            var himalayanRegions = new Dictionary<HeritageType, string[]>
+            var culturalLanguages = new List<LanguageType>
             {
-                { HeritageType.Tibetan, new[] { "Tibet", "Ladakh", "Sikkim" } },
-                { HeritageType.Nepali, new[] { "Nepal", "Sikkim", "Darjeeling" } },
-                { HeritageType.Bhutanese, new[] { "Bhutan", "Sikkim" } },
-                { HeritageType.Ladakhi, new[] { "Ladakh", "Tibet" } },
-                { HeritageType.Sikkimese, new[] { "Sikkim", "Nepal", "Bhutan" } }
+                // Major Tibetan language family
+                LanguageType.Tibetan, LanguageType.Ladakhi, LanguageType.SpitiBhoti, LanguageType.Dzongkha,
+                LanguageType.Bhutia, LanguageType.Monpa, 
+                //LanguageType.Sherdukpen,
+                
+                // Nepali language family
+                LanguageType.Nepali, 
+                //LanguageType.Tamang, LanguageType.Gurung, LanguageType.Sherpa,
+                //LanguageType.Limbu, LanguageType.Rai, LanguageType.Magar, LanguageType.Thakali, LanguageType.Newar,
+                
+                // Northeast Indian languages
+                LanguageType.Nyishi,
+                //LanguageType.Meiteilon, LanguageType.Mizo, LanguageType.Bodo, LanguageType.Karbi,
+                //LanguageType.Ao, LanguageType.Angami, LanguageType.Konyak, 
+                //LanguageType.Adi, LanguageType.Apatani, LanguageType.Mishmi,
+                
+                // Other significant regional languages
+                LanguageType.Lepcha, LanguageType.Kinnauri,
+                //LanguageType.Balti, 
             };
 
-            if (user1.Heritage == user2.Heritage)
-                return 100.0;
+            return languages1.Intersect(languages2).Where(lang => culturalLanguages.Contains(lang)).ToList();
+        }
 
-            // Check if regions are adjacent or culturally connected
-            if (himalayanRegions.ContainsKey(user1.Heritage ?? HeritageType.Other) &&
-                himalayanRegions.ContainsKey(user2.Heritage ?? HeritageType.Other))
+        /// <summary>
+        /// Calculate bonus for language family relationships
+        /// </summary>
+        private static double CalculateRegionalLanguageFamilyBonus(List<LanguageType> commonLanguages)
+        {
+            var languageFamilies = new Dictionary<string, List<LanguageType>>
             {
-                var regions1 = himalayanRegions[user1.Heritage ?? HeritageType.Other];
-                var regions2 = himalayanRegions[user2.Heritage ?? HeritageType.Other];
+                ["Tibetic"] = new() {
+                    LanguageType.Tibetan, LanguageType.Ladakhi, LanguageType.SpitiBhoti,
+                    LanguageType.Dzongkha, LanguageType.Bhutia, LanguageType.Nyishi, 
+                    //LanguageType.Balti
+                },
+                //["Tamangic"] = new() {
+                //    LanguageType.Tamang, LanguageType.Gurung, LanguageType.Thakali
+                //},
+                //["Kiranti"] = new() {
+                //    LanguageType.Limbu, LanguageType.Rai
+                //},
+                //["Kuki-Chin"] = new() {
+                //    LanguageType.Mizo, LanguageType.Kuki, LanguageType.Chin, LanguageType.Hmar,
+                //    LanguageType.Zou, LanguageType.Paite, LanguageType.Thadou
+                //},
+                //["Naga"] = new() {
+                //    LanguageType.Ao, LanguageType.Angami, LanguageType.Konyak, LanguageType.Lotha,
+                //    LanguageType.Sema, LanguageType.Phom, LanguageType.Chang, LanguageType.Chakhesang
+                //},
+                //["Tani"] = new() {
+                //    LanguageType.Nyishi, LanguageType.Adi, LanguageType.Apatani, LanguageType.Tagin
+                //},
+                //["Bodo-Garo"] = new() {
+                //    LanguageType.Bodo, LanguageType.Dimasa, LanguageType.Karbi, LanguageType.Tiwa
+                //}
+            };
 
-                if (regions1.Intersect(regions2).Any())
-                    return 80.0;
+            var bonus = 0.0;
+            foreach (var family in languageFamilies.Values)
+            {
+                var familyMatches = commonLanguages.Intersect(family).Count();
+                if (familyMatches > 1)
+                {
+                    bonus += 10.0; // Bonus for sharing multiple languages from the same family
+                }
+                else if (familyMatches == 1)
+                {
+                    bonus += 5.0; // Smaller bonus for sharing one language from a family
+                }
             }
 
-            return 50.0; // Neutral score if no strong cultural alignment
+            return bonus;
+        }
+
+        /// <summary>
+        /// Calculate bonus for matching language preferences
+        /// </summary>
+        private static double CalculateLanguagePreferenceBonus(User user1, User user2)
+        {
+            var bonus = 0.0;
+
+            // Check if user1's spoken languages match user2's preferences
+            if (user2.Preferences?.LanguagePreference != null && user1.LanguagesSpoken != null)
+            {
+                var user1MatchesUser2Prefs = user1.LanguagesSpoken.Intersect(user2.Preferences.LanguagePreference).Any();
+                if (user1MatchesUser2Prefs) bonus += 5.0;
+            }
+
+            // Check if user2's spoken languages match user1's preferences
+            if (user1.Preferences?.LanguagePreference != null && user2.LanguagesSpoken != null)
+            {
+                var user2MatchesUser1Prefs = user2.LanguagesSpoken.Intersect(user1.Preferences.LanguagePreference).Any();
+                if (user2MatchesUser1Prefs) bonus += 5.0;
+            }
+
+            return bonus;
         }
 
         private static double CalculateRegionalCompatibility(User user1, User user2)
         {
-            // This would be expanded with actual regional data
+            // Enhanced regional mapping for Himalayan/Northeast regions
             var himalayanRegions = new Dictionary<HeritageType, string[]>
             {
-                { HeritageType.Tibetan, new[] { "Tibet", "Ladakh", "Sikkim" } },
-                { HeritageType.Nepali, new[] { "Nepal", "Sikkim", "Darjeeling" } },
-                { HeritageType.Bhutanese, new[] { "Bhutan", "Sikkim" } },
-                { HeritageType.Ladakhi, new[] { "Ladakh", "Tibet" } },
-                { HeritageType.Sikkimese, new[] { "Sikkim", "Nepal", "Bhutan" } }
+                { HeritageType.Tibetan, new[] { "Tibet", "Ladakh", "Sikkim", "Bhutan" } },
+                { HeritageType.Nepali, new[] { "Nepal", "Sikkim", "Darjeeling", "Bhutan" } },
+                { HeritageType.Bhutanese, new[] { "Bhutan", "Sikkim", "Arunachal" } },
+                { HeritageType.Ladakhi, new[] { "Ladakh", "Tibet", "Himachal" } },
+                { HeritageType.Sikkimese, new[] { "Sikkim", "Nepal", "Bhutan", "Darjeeling" } },
+                { HeritageType.Arunachali, new[] { "Arunachal", "Assam", "Bhutan", "Tibet" } },
+                //{ HeritageType.Assamese, new[] { "Assam", "Arunachal", "Nagaland", "Meghalaya" } },
+                //{ HeritageType.Naga, new[] { "Nagaland", "Manipur", "Assam", "Arunachal" } },
+                //{ HeritageType.Manipuri, new[] { "Manipur", "Nagaland", "Mizoram", "Assam" } },
+                //{ HeritageType.Mizo, new[] { "Mizoram", "Manipur", "Tripura", "Assam" } }
             };
 
-            if (user1.Heritage == user2.Heritage)
+            var user1Heritage = user1.Heritage ?? new List<HeritageType>();
+            var user2Heritage = user2.Heritage ?? new List<HeritageType>();
+
+            if (!user1Heritage.Any() || !user2Heritage.Any())
+                return 50.0;
+
+            // Direct heritage match
+            if (user1Heritage.Intersect(user2Heritage).Any())
                 return 100.0;
 
-            // Check if regions are adjacent or culturally connected
-            if (himalayanRegions.ContainsKey(user1.Heritage ?? HeritageType.Other) &&
-                himalayanRegions.ContainsKey(user2.Heritage ?? HeritageType.Other))
+            // Check regional connections
+            var maxRegionalScore = 0.0;
+            foreach (var h1 in user1Heritage)
             {
-                var regions1 = himalayanRegions[user1.Heritage ?? HeritageType.Other];
-                var regions2 = himalayanRegions[user2.Heritage ?? HeritageType.Other];
+                foreach (var h2 in user2Heritage)
+                {
+                    if (himalayanRegions.ContainsKey(h1) && himalayanRegions.ContainsKey(h2))
+                    {
+                        var regions1 = himalayanRegions[h1];
+                        var regions2 = himalayanRegions[h2];
 
-                if (regions1.Intersect(regions2).Any())
-                    return 80.0;
+                        var commonRegions = regions1.Intersect(regions2).Count();
+                        var regionalScore = Math.Min(80.0, commonRegions * 20.0);
+                        maxRegionalScore = Math.Max(maxRegionalScore, regionalScore);
+                    }
+                }
             }
 
-            return 50.0;
+            return Math.Max(50.0, maxRegionalScore);
         }
 
         private static Dictionary<HeritageType, List<HeritageType>> GetRelatedHeritageGroups()
         {
             return new Dictionary<HeritageType, List<HeritageType>>
             {
-                { HeritageType.Tibetan, new List<HeritageType> { HeritageType.Ladakhi, HeritageType.Bhutanese } },
-                { HeritageType.Nepali, new List<HeritageType> { HeritageType.Sikkimese } },
-                { HeritageType.Bhutanese, new List<HeritageType> { HeritageType.Tibetan, HeritageType.Sikkimese } },
-                { HeritageType.Ladakhi, new List<HeritageType> { HeritageType.Tibetan } },
-                { HeritageType.Naga, new List<HeritageType> { HeritageType.Manipuri, HeritageType.Assamese } },
-                { HeritageType.Manipuri, new List<HeritageType> { HeritageType.Naga, HeritageType.Mizo } }
+                { HeritageType.Tibetan, new List<HeritageType> { HeritageType.Ladakhi, HeritageType.Bhutanese, HeritageType.Sikkimese } },
+                { HeritageType.Nepali, new List<HeritageType> { HeritageType.Sikkimese, HeritageType.Bhutanese } },
+                { HeritageType.Bhutanese, new List<HeritageType> { HeritageType.Tibetan, HeritageType.Sikkimese, HeritageType.Arunachali } },
+                { HeritageType.Ladakhi, new List<HeritageType> { HeritageType.Tibetan, 
+                    //HeritageType.Himachali 
+                } },
+                //{ HeritageType.Naga, new List<HeritageType> { HeritageType.Manipuri, HeritageType.Assamese, HeritageType.Arunachali } },
+                //{ HeritageType.Manipuri, new List<HeritageType> { HeritageType.Naga, HeritageType.Mizo, HeritageType.Assamese } },
+                { HeritageType.Arunachali, new List<HeritageType> { 
+                    //HeritageType.Assamese, 
+                    HeritageType.Tibetan, HeritageType.Bhutanese } }
             };
         }
 
@@ -192,22 +323,36 @@ namespace MomomiAPI.Helpers
             };
         }
 
-        private static bool AreHeritagesRelated(HeritageType? heritage1, HeritageType? heritage2,
-            Dictionary<HeritageType, List<HeritageType>> relatedGroups)
+        private static bool AreHeritagesRelated(List<HeritageType> heritage1, List<HeritageType> heritage2,
+             Dictionary<HeritageType, List<HeritageType>> relatedGroups)
         {
-            if (!heritage1.HasValue || !heritage2.HasValue) return false;
-
-            return relatedGroups.ContainsKey(heritage1.Value) &&
-                   relatedGroups[heritage1.Value].Contains(heritage2.Value);
+            foreach (var h1 in heritage1)
+            {
+                foreach (var h2 in heritage2)
+                {
+                    if (relatedGroups.ContainsKey(h1) && relatedGroups[h1].Contains(h2))
+                        return true;
+                    if (relatedGroups.ContainsKey(h2) && relatedGroups[h2].Contains(h1))
+                        return true;
+                }
+            }
+            return false;
         }
 
-        private static bool AreReligionsCompatible(ReligionType? religion1, ReligionType? religion2,
+        private static bool AreReligionsCompatible(List<ReligionType> religion1, List<ReligionType> religion2,
             Dictionary<ReligionType, List<ReligionType>> compatibleReligions)
         {
-            if (!religion1.HasValue || !religion2.HasValue) return false;
-
-            return compatibleReligions.ContainsKey(religion1.Value) &&
-                   compatibleReligions[religion1.Value].Contains(religion2.Value);
+            foreach (var r1 in religion1)
+            {
+                foreach (var r2 in religion2)
+                {
+                    if (compatibleReligions.ContainsKey(r1) && compatibleReligions[r1].Contains(r2))
+                        return true;
+                    if (compatibleReligions.ContainsKey(r2) && compatibleReligions[r2].Contains(r1))
+                        return true;
+                }
+            }
+            return false;
         }
     }
 }

@@ -15,17 +15,44 @@ namespace MomomiAPI.Models.Entities
         [Required]
         public Guid UserId { get; set; }
 
+        // MEMBER FILTERS (Free tier - available to all users
+
         [Column("preferred_heritage")]
         public List<HeritageType>? PreferredHeritage { get; set; }
 
         [Column("preferred_religions")]
         public List<ReligionType>? PreferredReligions { get; set; }
 
-        [Column("cultural_importance_level")]
-        public int CulturalImportanceLevel { get; set; } = 5; // 1-10 scale
-
         [Column("language_preference")]
-        public List<string>? LanguagePreference { get; set; }
+        public List<LanguageType>? LanguagePreference { get; set; }
+
+        // SUBSCRIBER FILTERS (Paid tier - available to premium users)
+        [Column("preferred_height_min")]
+        public int? PreferredHeightMin { get; set; } // in cm
+
+        [Column("preferred_height_max")]
+        public int? PreferredHeightMax { get; set; } // in cm
+
+        [Column("preferred_children")]
+        public List<ChildrenStatusType>? PreferredChildren { get; set; }
+
+        [Column("preferred_family_plans")]
+        public List<FamilyPlanType>? PreferredFamilyPlans { get; set; }
+
+        [Column("preferred_drugs")]
+        public List<ViceFrequencyType>? PreferredDrugs { get; set; }
+
+        [Column("preferred_smoking")]
+        public List<ViceFrequencyType>? PreferredSmoking { get; set; }
+
+        [Column("preferred_drinking")]
+        public List<ViceFrequencyType>? PreferredDrinking { get; set; }
+
+        [Column("preferred_marijuana")]
+        public List<ViceFrequencyType>? PreferredMarijuana { get; set; }
+
+        [Column("preferred_education_levels")]
+        public List<EducationLevelType>? PreferredEducationLevels { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

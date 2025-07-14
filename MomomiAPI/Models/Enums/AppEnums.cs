@@ -11,18 +11,24 @@ namespace MomomiAPI.Models.Enums
     public enum HeritageType
     {
         Arunachali,
-        Assamese,
+        //Assamese,
+        //Bodo,
         Bhutanese,
-        Himachali,
+        //Himachali,
         Ladakhi,
-        Manipuri,
-        Mizo,
-        Naga,
+        Lepcha,
+        //Manipuri,
+        //Mizo,
+        Monpa,
+        //Naga,
         Nepali,
+        Sherpa,
         Sikkimese,
+        //Tani,
         Tibetan,
-        Tripuri,
-        Uttarakhandi,
+        //Tripuri,
+        //Uttarakhandi,
+        //KukiChin,
         Other
     }
     public enum ReligionType
@@ -37,6 +43,38 @@ namespace MomomiAPI.Models.Enums
         Islam,
         Spiritual,
         Other
+    }
+
+    public enum ChildrenStatusType
+    {
+        DontHaveChildren,
+        HaveChildren,
+        PreferNotToSay
+    }
+
+    public enum FamilyPlanType
+    {
+        DontWantChildren,
+        WantChildren,
+        OpenToChildren,
+        NotSure,
+        PreferNotToSay
+    }
+
+    public enum ViceFrequencyType
+    {
+        Yes,
+        No,
+        Sometimes,
+        PreferNotToSay
+    }
+
+    public enum EducationLevelType
+    {
+        SecondarySchool,
+        Undergrad,
+        Postgrad,
+        PreferNotToSay
     }
 
     public enum SubscriptionType
@@ -67,5 +105,103 @@ namespace MomomiAPI.Models.Enums
         Message,
         SuperLike,
         ProfileView
+    }
+
+    public enum LanguageType
+    {
+        English,
+        Hindi,
+
+        // 🏔️ Ladakh (UT)
+        Ladakhi,
+        //Balti,
+        //Shina,
+        //Urdu,
+
+        // 🏔️ Himachal Pradesh
+        Kinnauri,
+        Lahauli,
+        SpitiBhoti,
+        Tibetan,
+        //PahariDialects,
+
+        // 🏔️ Uttarakhand
+        //Jad,
+        //Byangsi,
+        //Chaudangsi,
+        //Rangkas,
+
+        // 🏔️ Sikkim
+        Bhutia,
+        Lepcha,
+        Nepali,
+
+        // 🌿 Arunachal Pradesh
+        //Adi,
+        //Apatani,
+        Nyishi,
+        //Mishmi,
+        //Tagin,
+        Monpa,
+        //Sherdukpen,
+        //Nocte,
+        //Wancho,
+
+        // 🌿 Nagaland
+        //Ao,
+        //Sema,
+        //Lotha,
+        //Angami,
+        //Chakhesang,
+        //Konyak,
+        //Phom,
+        //Chang,
+        //Nagamese,
+
+        // 🌿 Manipur
+        //Meiteilon,
+        //Tangkhul,
+        //Mao,
+        //Paite,
+        //Thadou,
+        //Hmar,
+        //Zou,
+        //Kuki,
+        //Chin,
+
+        // 🌿 Mizoram
+        //Mizo,
+        //Lai,
+        //Mara,
+
+        // 🌿 Assam (Hill Tribes)
+        //Bodo,
+        //Dimasa,
+        //Karbi,
+        //Tiwa,
+        //Mising,
+        //Rabha,
+
+        // 🏔️ Nepal
+        //Tamang,
+        //Gurung,
+        //Sherpa,
+        //Limbu,
+        //Rai,
+        //Magar,
+        //Thakali,
+        //Newar,
+
+        // 🏔️ Bhutan
+        Dzongkha,
+        //Sharchhopkha,
+        //LhotshampaDialects,
+        //Brokpa,
+
+        // Common languages
+        //Assamese,
+        //Bengali,
+        //Sanskrit,
+        Other
     }
 }

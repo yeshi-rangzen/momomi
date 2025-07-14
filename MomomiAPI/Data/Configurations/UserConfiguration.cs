@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 
 namespace MomomiAPI.Data.Configurations
 {
@@ -46,11 +47,65 @@ namespace MomomiAPI.Data.Configurations
             builder.Property(u => u.InterestedIn)
                 .HasConversion<string>();
 
-            builder.Property(u => u.Heritage)
+            builder.Property(u => u.Children)
                 .HasConversion<string>();
 
-            builder.Property(u => u.Religion)
+            builder.Property(u => u.FamilyPlan)
                 .HasConversion<string>();
+
+            builder.Property(u => u.Drugs)
+                .HasConversion<string>();
+
+            builder.Property(u => u.Smoking)
+                .HasConversion<string>();
+
+            builder.Property(u => u.Marijuana)
+                .HasConversion<string>();
+
+            builder.Property(u => u.Drinking)
+                .HasConversion<string>();
+
+            builder.Property(u => u.EducationLevel)
+                .HasConversion<string>();
+
+            builder.Property(u => u.Heritage)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                    ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => Enum.Parse<HeritageType>(x.Trim(), true)).ToList()
+                    : new List<HeritageType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<HeritageType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(u => u.Religion)
+               .HasConversion(
+                   v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                   v => !string.IsNullOrEmpty(v)
+                       ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                           .Select(x => Enum.Parse<ReligionType>(x)).ToList()
+                       : new List<ReligionType>()
+               )
+               .Metadata.SetValueComparer(new ValueComparer<List<ReligionType>>(
+                   (c1, c2) => c1!.SequenceEqual(c2!),
+                   c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                   c => c.ToList()));
+
+            builder.Property(u => u.LanguagesSpoken)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<LanguageType>(x)).ToList()
+                        : new List<LanguageType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<LanguageType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
 
             // Configure EnableGlobalDiscovery column
             builder.Property(u => u.EnableGlobalDiscovery)
@@ -63,14 +118,6 @@ namespace MomomiAPI.Data.Configurations
                 .HasColumnName("is_discoverable")
                 .HasDefaultValue(true)
                 .IsRequired();
-
-            // Configure JSON column for languages with value comparer
-            builder.Property(u => u.LanguagesSpoken)
-                .HasColumnType("text[]")
-                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
-                    (c1, c2) => c1!.SequenceEqual(c2!),
-                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                    c => c.ToList()));
 
             // Configure relationships - Photos
             builder.HasMany(u => u.Photos)

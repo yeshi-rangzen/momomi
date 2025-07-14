@@ -16,7 +16,6 @@ namespace MomomiAPI.Data.Configurations
                 .IsUnique()
                 .HasDatabaseName("idx_user_preferences_user_id");
 
-            // Configure enum arrays as JSON
             // Configure enum arrays with proper value comparers
             builder.Property(up => up.PreferredHeritage)
                 .HasConversion(
@@ -45,8 +44,106 @@ namespace MomomiAPI.Data.Configurations
                     c => c.ToList()));
 
             builder.Property(up => up.LanguagePreference)
-                .HasColumnType("text[]")
-                .Metadata.SetValueComparer(new ValueComparer<List<string>>(
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<LanguageType>(x)).ToList()
+                        : new List<LanguageType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<LanguageType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            // SUBSCRIBER FILTER CONFIGURATIONS
+            builder.Property(up => up.PreferredChildren)
+                .HasConversion(
+                    v => v != null ? String.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<ChildrenStatusType>(x)).ToList()
+                            : new List<ChildrenStatusType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<ChildrenStatusType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(up => up.PreferredFamilyPlans)
+               .HasConversion(
+                   v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                   v => !string.IsNullOrEmpty(v)
+                       ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                           .Select(x => Enum.Parse<FamilyPlanType>(x)).ToList()
+                       : new List<FamilyPlanType>()
+               )
+               .Metadata.SetValueComparer(new ValueComparer<List<FamilyPlanType>>(
+                   (c1, c2) => c1!.SequenceEqual(c2!),
+                   c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                   c => c.ToList()));
+
+            builder.Property(up => up.PreferredDrugs)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<ViceFrequencyType>(x)).ToList()
+                        : new List<ViceFrequencyType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<ViceFrequencyType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(up => up.PreferredSmoking)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<ViceFrequencyType>(x)).ToList()
+                        : new List<ViceFrequencyType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<ViceFrequencyType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(up => up.PreferredMarijuana)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<ViceFrequencyType>(x)).ToList()
+                        : new List<ViceFrequencyType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<ViceFrequencyType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(up => up.PreferredDrinking)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<ViceFrequencyType>(x)).ToList()
+                        : new List<ViceFrequencyType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<ViceFrequencyType>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()));
+
+            builder.Property(up => up.PreferredEducationLevels)
+                .HasConversion(
+                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
+                    v => !string.IsNullOrEmpty(v)
+                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x => Enum.Parse<EducationLevelType>(x)).ToList()
+                        : new List<EducationLevelType>()
+                )
+                .Metadata.SetValueComparer(new ValueComparer<List<EducationLevelType>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
                     c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                     c => c.ToList()));

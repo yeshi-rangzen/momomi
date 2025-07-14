@@ -51,12 +51,44 @@ namespace MomomiAPI.Controllers
             }
         }
 
+        ///<sumary>
+        /// Verify OTP for email address (used during registration process)
+        /// </sumary>
+        [HttpPost("verify-email-otp")]
+        [EnableRateLimiting("AuthPolicy")]
+        public async Task<IActionResult> VerifyEmailOtp([FromBody] VerifyOtpRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
+
+                var result = await _authService.VerifyEmailOtpAsync(request);
+
+                if (!result.Success)
+                    return BadRequest(new { message = result.Error });
+
+                return Ok(new
+                {
+                    message = result.Message,
+                    emailVerified = true,
+                    verificationToken = result.VerificationToken // Temporary token for registration completion
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error verifying email OTP for {Email}", request.Email);
+                return StatusCode(500, new { message = "Internal server error" });
+            }
+        }
+
+
         /// <summary>
         /// Register a new user with OTP verification
         /// </summary>
-        [HttpPost("register")]
+        [HttpPost("complete-register")]
         [EnableRateLimiting("AuthPolicy")]
-        public async Task<IActionResult> Register([FromBody] RegisterWithOtpRequest request)
+        public async Task<IActionResult> Register([FromBody] CompleteRegistrationRequest request)
         {
             try
             {
@@ -68,7 +100,7 @@ namespace MomomiAPI.Controllers
                 if (age < 18)
                     return BadRequest(new { message = "You must be at least 18 years old to register" });
 
-                var result = await _authService.RegisterWithOtpAsync(request);
+                var result = await _authService.CompleteRegistrationAsync(request);
 
                 if (!result.Success)
                     return BadRequest(new { message = result.Error });
@@ -89,6 +121,16 @@ namespace MomomiAPI.Controllers
                         accessToken = result.AccessToken,
                         refreshToken = result.RefreshToken,
                         expiresAt = result.ExpiresAt
+                    },
+                    nextSteps = new
+                    {
+                        message = "Complete your profile to start discovering matches",
+                        actions = new[]
+                        {
+                            "Add profile photos",
+                            "Complete bio and preferences",
+                            "Set location for local discovery"
+                        }
                     }
                 });
             }

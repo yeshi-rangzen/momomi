@@ -4,6 +4,7 @@ using MomomiAPI.Data;
 using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
@@ -93,6 +94,13 @@ namespace MomomiAPI.Services.Implementations
                     EducationLevel = user.EducationLevel,
                     Occupation = user.Occupation,
                     HeightCm = user.HeightCm,
+                    Hometown = user.Hometown,
+                    Children = user.Children,
+                    FamilyPlan = user.FamilyPlan,
+                    Drugs = user.Drugs,
+                    Smoking = user.Smoking,
+                    Marijuana = user.Marijuana,
+                    Drinking = user.Drinking,
                     EnableGlobalDiscovery = user.EnableGlobalDiscovery,
                     IsVerified = user.IsVerified,
                     LastActive = user.LastActive,
@@ -131,17 +139,17 @@ namespace MomomiAPI.Services.Implementations
                 if (!string.IsNullOrEmpty(request.Bio))
                     user.Bio = request.Bio;
 
-                if (request.Heritage.HasValue)
-                    user.Heritage = request.Heritage.Value;
+                if (request.Heritage != null)
+                    user.Heritage = request.Heritage;
 
-                if (request.Religion.HasValue)
-                    user.Religion = request.Religion.Value;
+                if (request.Religion != null)
+                    user.Religion = request.Religion;
 
                 if (request.LanguagesSpoken != null)
                     user.LanguagesSpoken = request.LanguagesSpoken;
 
-                if (!string.IsNullOrEmpty(request.EducationLevel))
-                    user.EducationLevel = request.EducationLevel;
+                if (request.EducationLevel.HasValue)
+                    user.EducationLevel = request.EducationLevel.Value;
 
                 if (!string.IsNullOrEmpty(request.Occupation))
                     user.Occupation = request.Occupation;
@@ -167,6 +175,27 @@ namespace MomomiAPI.Services.Implementations
                 if (request.EnableGlobalDiscovery.HasValue)
                     user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
 
+                if (!string.IsNullOrEmpty(request.Hometown))
+                    user.Hometown = request.Hometown;
+
+                if (request.Children.HasValue)
+                    user.Children = request.Children.Value;
+
+                if (request.FamilyPlan.HasValue)
+                    user.FamilyPlan = request.FamilyPlan.Value;
+
+                if (request.Drugs.HasValue)
+                    user.Drugs = request.Drugs.Value;
+
+                if (request.Smoking.HasValue)
+                    user.Smoking = request.Smoking.Value;
+
+                if (request.Marijuana.HasValue)
+                    user.Marijuana = request.Marijuana.Value;
+
+                if (request.Drinking.HasValue)
+                    user.Drinking = request.Drinking.Value;
+
                 // Update or create preferences
                 if (user.Preferences == null)
                 {
@@ -176,17 +205,51 @@ namespace MomomiAPI.Services.Implementations
                         CreatedAt = DateTime.UtcNow,
                     };
                 }
+
+                // MEMBER FILTER PREFERENCES (Available to all users)
                 if (request.PreferredHeritage != null)
                     user.Preferences.PreferredHeritage = request.PreferredHeritage;
 
                 if (request.PreferredReligions != null)
                     user.Preferences.PreferredReligions = request.PreferredReligions;
 
-                if (request.CulturalImportanceLevel.HasValue)
-                    user.Preferences.CulturalImportanceLevel = request.CulturalImportanceLevel.Value;
-
                 if (request.LanguagePreference != null)
                     user.Preferences.LanguagePreference = request.LanguagePreference;
+
+                // SUBSCRIBER FILTER PREFERENCES (Only for premium users)
+                var isSubscriber = user.Subscription?.SubscriptionType == SubscriptionType.Premium &&
+                                  user.Subscription.IsActive &&
+                                  (!user.Subscription.ExpiresAt.HasValue || user.Subscription.ExpiresAt > DateTime.UtcNow);
+
+                if (isSubscriber)
+                {
+                    if (request.PreferredHeightMin.HasValue)
+                        user.Preferences.PreferredHeightMin = request.PreferredHeightMin.Value;
+
+                    if (request.PreferredHeightMax.HasValue)
+                        user.Preferences.PreferredHeightMax = request.PreferredHeightMax.Value;
+
+                    if (request.PreferredChildren != null)
+                        user.Preferences.PreferredChildren = request.PreferredChildren;
+
+                    if (request.PreferredFamilyPlans != null)
+                        user.Preferences.PreferredFamilyPlans = request.PreferredFamilyPlans;
+
+                    if (request.PreferredDrugs != null)
+                        user.Preferences.PreferredDrugs = request.PreferredDrugs;
+
+                    if (request.PreferredSmoking != null)
+                        user.Preferences.PreferredSmoking = request.PreferredSmoking;
+
+                    if (request.PreferredMarijuana != null)
+                        user.Preferences.PreferredMarijuana = request.PreferredMarijuana;
+
+                    if (request.PreferredDrinking != null)
+                        user.Preferences.PreferredDrinking = request.PreferredDrinking;
+
+                    if (request.PreferredEducationLevels != null)
+                        user.Preferences.PreferredEducationLevels = request.PreferredEducationLevels;
+                }
 
                 user.UpdatedAt = DateTime.UtcNow;
                 user.Preferences.UpdatedAt = DateTime.UtcNow;
@@ -315,6 +378,13 @@ namespace MomomiAPI.Services.Implementations
                 EducationLevel = user.EducationLevel,
                 Occupation = user.Occupation,
                 HeightCm = user.HeightCm,
+                Hometown = user.Hometown,
+                Children = user.Children,
+                FamilyPlan = user.FamilyPlan,
+                Drugs = user.Drugs,
+                Smoking = user.Smoking,
+                Marijuana = user.Marijuana,
+                Drinking = user.Drinking,
                 DistanceKm = distance,
                 EnableGlobalDiscovery = user.EnableGlobalDiscovery,
                 IsVerified = user.IsVerified,
