@@ -14,20 +14,22 @@ namespace MomomiAPI.Models.Enums
         //Assamese,
         //Bodo,
         Bhutanese,
-        //Himachali,
+        Himachali,
+        //Kinners,
         Ladakhi,
-        Lepcha,
+        //Lepcha,
         //Manipuri,
         //Mizo,
-        Monpa,
+        //Monpa,
         //Naga,
         Nepali,
-        Sherpa,
+        //Sherpa,
         Sikkimese,
+        //Spitian,
         //Tani,
         Tibetan,
         //Tripuri,
-        //Uttarakhandi,
+        Uttarakhandi,
         //KukiChin,
         Other
     }
@@ -91,6 +93,7 @@ namespace MomomiAPI.Models.Enums
 
     public enum ReportReason
     {
+        Block,
         Inappropriate,
         Spam,
         FakeProfile,
@@ -114,7 +117,7 @@ namespace MomomiAPI.Models.Enums
 
         // 🏔️ Ladakh (UT)
         Ladakhi,
-        //Balti,
+        Balti,
         //Shina,
         //Urdu,
 
@@ -126,26 +129,27 @@ namespace MomomiAPI.Models.Enums
         //PahariDialects,
 
         // 🏔️ Uttarakhand
-        //Jad,
-        //Byangsi,
-        //Chaudangsi,
-        //Rangkas,
+        Jad,
+        Byangsi,
+        Chaudangsi,
+        Rangkas,
 
         // 🏔️ Sikkim
-        Bhutia,
+        Bhoti,
+        Drenjongke,
         Lepcha,
         Nepali,
 
         // 🌿 Arunachal Pradesh
-        //Adi,
-        //Apatani,
+        Adi,
+        Apatani,
         Nyishi,
-        //Mishmi,
-        //Tagin,
+        Mishmi,
+        Tagin,
         Monpa,
-        //Sherdukpen,
-        //Nocte,
-        //Wancho,
+        Sherdukpen,
+        Nocte,
+        Wancho,
 
         // 🌿 Nagaland
         //Ao,
@@ -183,20 +187,28 @@ namespace MomomiAPI.Models.Enums
         //Rabha,
 
         // 🏔️ Nepal
-        //Tamang,
-        //Gurung,
-        //Sherpa,
-        //Limbu,
-        //Rai,
-        //Magar,
-        //Thakali,
-        //Newar,
+        Tamang,
+        Gurung,
+        Sherpa,
+        Lhomi,
+        Limbu,
+        Rai,
+        Magar,
+        Thakali,
+        Manangba,
+        Newar,
+        Walungge,
+        Dolpo,
+        Tsumke,
 
         // 🏔️ Bhutan
         Dzongkha,
-        //Sharchhopkha,
-        //LhotshampaDialects,
-        //Brokpa,
+        Tshangla,
+        Sharchhopkha,
+        LhotshampaDialects,
+        Brokpa,
+        Layakha,
+        Khengkha,
 
         // Common languages
         //Assamese,

@@ -12,20 +12,20 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
-        private readonly IBlockingService _blockingService;
+        private readonly IReportingService _reportingService;
         private readonly MatchingAlgorithm _matchingAlgorithm;
         private readonly ILogger<UserDiscoveryService> _logger;
 
         public UserDiscoveryService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            IBlockingService blockingService,
+            IReportingService reportingService,
             MatchingAlgorithm matchingAlgorithm,
             ILogger<UserDiscoveryService> logger)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
-            _blockingService = blockingService;
+            _reportingService = reportingService;
             _matchingAlgorithm = matchingAlgorithm;
             _logger = logger;
         }
@@ -138,8 +138,8 @@ namespace MomomiAPI.Services.Implementations
 
             foreach (var user in users)
             {
-                var isBlocked = await _blockingService.IsUserBlockedAsync(userId, user.Id);
-                if (!isBlocked)
+                var isReported = await _reportingService.IsUserReportedAsync(userId, user.Id);
+                if (!isReported.Data)
                 {
                     filteredUsers.Add(user);
                 }

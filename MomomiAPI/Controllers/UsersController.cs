@@ -1,185 +1,149 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
+using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
-using System.Security.Claims;
 
 namespace MomomiAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class UsersController : ControllerBase
+    public class UsersController : BaseApiController
     {
         private readonly IUserService _userService;
-        private readonly ILogger<UsersController> _logger;
 
-        public UsersController(IUserService userService, ILogger<UsersController> logger)
+        public UsersController(IUserService userService, ILogger<UsersController> logger) : base(logger)
         {
             _userService = userService;
-            _logger = logger;
         }
 
         /// <summary>
         /// Get current user's profile
         /// </summary>
         [HttpGet("profile")]
-        public async Task<IActionResult> GetProfile()
+        public async Task<ActionResult<UserProfileDTO>> GetProfile()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var profile = await _userService.GetUserProfileAsync(userId.Value);
-                if (profile == null)
-                    return NotFound();
+            LogControllerAction(nameof(GetProfile));
 
-                return Ok(profile);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting user profile");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _userService.GetUserProfileAsync(userIdResult.Value);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Update current user's profile
         /// </summary> 
         [HttpPut("profile")]
-        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+        public async Task<ActionResult<UserProfileDTO>> UpdateProfile([FromBody] UpdateProfileRequest request)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(UpdateProfile));
 
-                var success = await _userService.UpdateUserProfileAsync(userId.Value, request);
-                if (!success)
-                    return BadRequest(new { message = "Failed to update profile" });
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                var updatedProfile = await _userService.GetUserProfileAsync(userId.Value);
-                return Ok(updatedProfile);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating user profile");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _userService.UpdateUserProfileAsync(userIdResult.Value, request);
+            if (!result.Success)
+                return HandleOperationResult(result);
+
+            // Get updated profile
+            var updatedProfileResult = await _userService.GetUserProfileAsync(userIdResult.Value);
+            return HandleOperationResult(updatedProfileResult);
         }
 
         /// <summary>
         /// Toggle global discovery mode
         /// </summary>
         [HttpPut("discovery-mode")]
-        public async Task<IActionResult> UpdateDiscoveryMode([FromBody] DiscoveryModeRequest request)
+        public async Task<ActionResult> UpdateDiscoveryMode([FromBody] DiscoveryModeRequest request)
         {
-            try
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(UpdateDiscoveryMode), new { request.EnableGlobalDiscovery });
+
+            var updateRequest = new UpdateProfileRequest
             {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+                EnableGlobalDiscovery = request.EnableGlobalDiscovery
+            };
 
-                var updateRequest = new UpdateProfileRequest
-                {
-                    EnableGlobalDiscovery = request.EnableGlobalDiscovery
-                };
+            var result = await _userService.UpdateUserProfileAsync(userIdResult.Value, updateRequest);
+            if (!result.Success)
+                return HandleOperationResult(result);
 
-                var success = await _userService.UpdateUserProfileAsync(userId.Value, updateRequest);
-                if (!success)
-                    return BadRequest(new { message = "Failed to update discovery mode" });
-
-                return Ok(new
-                {
-                    message = request.EnableGlobalDiscovery ?
-                        "Global discovery enabled. You can now discover profiles worldwide." :
-                        "Location-based discovery enabled. Showing profiles within your specified distance.",
-                    enableGlobalDiscovery = request.EnableGlobalDiscovery
-                });
-            }
-            catch (Exception ex)
+            return Ok(new
             {
-                _logger.LogError(ex, "Error updating discovery mode");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+                message = request.EnableGlobalDiscovery ?
+                    "Global discovery enabled. You can now discover profiles worldwide." :
+                    "Location-based discovery enabled. Showing profiles within your specified distance.",
+                data = new { enableGlobalDiscovery = request.EnableGlobalDiscovery }
+            });
         }
 
         /// <summary>
         /// Toggle profile discovery visibility
         /// </summary>
         [HttpPut("discovery-visibility")]
-        public async Task<IActionResult> UpdateDiscoveryVisibility([FromBody] UpdateDiscoveryVisibilityRequest request)
+        public async Task<ActionResult> UpdateDiscoveryVisibility([FromBody] UpdateDiscoveryVisibilityRequest request)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var success = await _userService.UpdateDiscoveryStatusAsync(userId.Value, request.IsDiscoverable);
-                if (!success)
-                    return BadRequest(new { message = "Failed to update discovery visibility" });
+            LogControllerAction(nameof(UpdateDiscoveryVisibility), new { request.IsDiscoverable });
 
-                return Ok(new
-                {
-                    message = request.IsDiscoverable ?
-                        "Your profile is now visible to other users" :
-                        "Your profile is now hidden from discovery",
-                    isDiscoverable = request.IsDiscoverable
-                });
-            }
-            catch (Exception ex)
+            var result = await _userService.UpdateDiscoveryStatusAsync(userIdResult.Value, request.IsDiscoverable);
+            if (!result.Success)
+                return HandleOperationResult(result);
+
+            return Ok(new
             {
-                _logger.LogError(ex, "Error updating discovery visibility");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+                message = request.IsDiscoverable ?
+                    "Your profile is now visible to other users" :
+                    "Your profile is now hidden from discovery",
+                data = new { isDiscoverable = request.IsDiscoverable }
+            });
         }
 
         /// <summary>
         /// Get nearby users for discovery
         /// </summary>
         [HttpGet("nearby")]
-        public async Task<IActionResult> GetNearbyUsers([FromQuery] int maxDistance = 50)
+        public async Task<ActionResult<List<UserProfileDTO>>> GetNearbyUsers([FromQuery] int maxDistance = 50)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var nearbyUsers = await _userService.GetNearbyUsersAsync(userId.Value, maxDistance);
-                return Ok(nearbyUsers);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting nearby users");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            LogControllerAction(nameof(GetNearbyUsers), new { maxDistance });
+
+            var result = await _userService.GetNearbyUsersAsync(userIdResult.Value, maxDistance);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Get current user's discovery settings
         /// </summary>
         [HttpGet("discovery-settings")]
-        public async Task<IActionResult> GetDiscoverySettings()
+        public async Task<ActionResult<User>> GetDiscoverySettings()
         {
-            try
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(GetDiscoverySettings));
+
+            var userResult = await _userService.GetUserByIdAsync(userIdResult.Value);
+            if (!userResult.Success)
+                return HandleOperationResult(userResult);
+
+            var user = userResult.Data!;
+            return Ok(new
             {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
-
-                var user = await _userService.GetUserByIdAsync(userId.Value);
-                if (user == null)
-                    return NotFound();
-
-                return Ok(new
+                data = new
                 {
                     enableGlobalDiscovery = user.EnableGlobalDiscovery,
                     isDiscoverable = user.IsDiscoverable,
@@ -187,70 +151,38 @@ namespace MomomiAPI.Controllers
                     minAge = user.MinAge,
                     maxAge = user.MaxAge,
                     hasLocation = user.Latitude.HasValue && user.Longitude.HasValue
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting discovery settings");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+                }
+            });
         }
 
         /// <summary>
         /// Delete user account and all associated data
         /// </summary>
         [HttpDelete("delete-account")]
-        public async Task<IActionResult> DeleteAccount()
+        public async Task<ActionResult> DeleteAccount()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var success = await _userService.DeleteUserAsync(userId.Value);
-                if (!success)
-                    return BadRequest(new { message = "Failed to delete account" });
+            LogControllerAction(nameof(DeleteAccount));
 
-                return Ok(new { message = "Account deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting user account");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var result = await _userService.DeleteUserAsync(userIdResult.Value);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Deactivate current user's account
         /// </summary>
         [HttpDelete("deactivate")]
-        public async Task<IActionResult> DeactivateAccount()
+        public async Task<ActionResult> DeactivateAccount()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
 
-                var success = await _userService.DeactivateUserAsync(userId.Value);
-                if (!success)
-                    return BadRequest(new { message = "Failed to deactivate account" });
+            LogControllerAction(nameof(DeactivateAccount));
 
-                return Ok(new { message = "Account deactivated successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deactivating user account");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
-        }
-
-        private Guid? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-
-            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+            var result = await _userService.DeactivateUserAsync(userIdResult.Value);
+            return HandleOperationResult(result);
         }
     }
 }

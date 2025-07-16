@@ -12,7 +12,7 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ISubscriptionService _subscriptionService;
-        private readonly IBlockingService _blockingService;
+        private readonly IReportingService _reportingService;
         private readonly IMatchManagementService _matchManagementService;
         private readonly IPushNotificationService _pushNotificationService;
         private readonly ICacheInvalidation _cacheInvalidation;
@@ -21,7 +21,7 @@ namespace MomomiAPI.Services.Implementations
         public UserInteractionService(
             MomomiDbContext dbContext,
             ISubscriptionService subscriptionService,
-            IBlockingService blockingService,
+            IReportingService reportingService,
             IMatchManagementService matchManagementService,
             IPushNotificationService pushNotificationService,
             ICacheInvalidation cacheInvalidation,
@@ -29,7 +29,7 @@ namespace MomomiAPI.Services.Implementations
         {
             _dbContext = dbContext;
             _subscriptionService = subscriptionService;
-            _blockingService = blockingService;
+            _reportingService = reportingService;
             _matchManagementService = matchManagementService;
             _pushNotificationService = pushNotificationService;
             _cacheInvalidation = cacheInvalidation;
@@ -52,9 +52,9 @@ namespace MomomiAPI.Services.Implementations
                     return LikeResult.LimitReached($"You've reached your daily {limitType} limit.", usageLimits);
                 }
 
-                // Check if users are blocked
-                var isBlocked = await _blockingService.IsUserBlockedAsync(likerId, likedId);
-                if (isBlocked)
+                // Check if user is reported
+                var isReported = await _reportingService.IsUserReportedAsync(likerId, likedId);
+                if (isReported.Data)
                 {
                     return LikeResult.UserBlocked();
                 }

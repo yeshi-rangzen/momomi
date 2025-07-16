@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
@@ -21,7 +22,7 @@ namespace MomomiAPI.Controllers
         /// Upload a new photo for the current user
         /// </summary>
         [HttpPost("upload")]
-        public async Task<ActionResult> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
+        public async Task<ActionResult<UserPhotoDTO>> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -36,7 +37,7 @@ namespace MomomiAPI.Controllers
         /// Get all photos for the current user
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult> GetMyPhotos()
+        public async Task<ActionResult<List<UserPhotoDTO>>> GetMyPhotos()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -51,7 +52,7 @@ namespace MomomiAPI.Controllers
         /// Get photo count for current user
         /// </summary>
         [HttpGet("count")]
-        public async Task<ActionResult> GetPhotoCount()
+        public async Task<ActionResult<int>> GetPhotoCount()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;

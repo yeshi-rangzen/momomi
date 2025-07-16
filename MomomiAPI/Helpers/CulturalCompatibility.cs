@@ -24,19 +24,19 @@ namespace MomomiAPI.Helpers
             totalScore += heritageScore * 0.30;
             factors++;
 
-            // Religion compatibility (20% weight)
+            // Religion compatibility (25% weight)
             var religionScore = CalculateReligionCompatibility(user1, user2);
             totalScore += religionScore * 0.25;
             factors++;
 
-            // Language compatibility (20% weight)
+            // Language compatibility (25% weight)
             var languageScore = CalculateLanguageCompatibility(user1, user2);
             totalScore += languageScore * 0.25;
             factors++;
 
-            // Geographic/regional proximity (10% weight)
+            // Geographic/regional proximity (20% weight)
             var regionScore = CalculateRegionalCompatibility(user1, user2);
-            totalScore += regionScore * 0.15;
+            totalScore += regionScore * 0.25;
             factors++;
 
             return factors > 0 ? totalScore : 50.0;
@@ -139,6 +139,7 @@ namespace MomomiAPI.Helpers
         }
 
         /// <summary>
+        /// TODO: currently incomplete business logic
         /// Get culturally significant common languages
         /// </summary>
         private static List<LanguageType> GetCommonCulturalLanguages(List<LanguageType> languages1, List<LanguageType> languages2)
@@ -147,23 +148,23 @@ namespace MomomiAPI.Helpers
             {
                 // Major Tibetan language family
                 LanguageType.Tibetan, LanguageType.Ladakhi, LanguageType.SpitiBhoti, LanguageType.Dzongkha,
-                LanguageType.Bhutia, LanguageType.Monpa, 
-                //LanguageType.Sherdukpen,
+                LanguageType.Bhoti, LanguageType.Monpa,
+                LanguageType.Sherdukpen,
                 
                 // Nepali language family
-                LanguageType.Nepali, 
-                //LanguageType.Tamang, LanguageType.Gurung, LanguageType.Sherpa,
-                //LanguageType.Limbu, LanguageType.Rai, LanguageType.Magar, LanguageType.Thakali, LanguageType.Newar,
+                LanguageType.Nepali,
+                LanguageType.Tamang, LanguageType.Gurung, LanguageType.Sherpa,
+                LanguageType.Limbu, LanguageType.Rai, LanguageType.Magar, LanguageType.Thakali, LanguageType.Newar,
                 
                 // Northeast Indian languages
                 LanguageType.Nyishi,
                 //LanguageType.Meiteilon, LanguageType.Mizo, LanguageType.Bodo, LanguageType.Karbi,
                 //LanguageType.Ao, LanguageType.Angami, LanguageType.Konyak, 
-                //LanguageType.Adi, LanguageType.Apatani, LanguageType.Mishmi,
+                LanguageType.Adi, LanguageType.Apatani, LanguageType.Mishmi,
                 
                 // Other significant regional languages
                 LanguageType.Lepcha, LanguageType.Kinnauri,
-                //LanguageType.Balti, 
+                LanguageType.Balti,
             };
 
             return languages1.Intersect(languages2).Where(lang => culturalLanguages.Contains(lang)).ToList();
@@ -178,15 +179,15 @@ namespace MomomiAPI.Helpers
             {
                 ["Tibetic"] = new() {
                     LanguageType.Tibetan, LanguageType.Ladakhi, LanguageType.SpitiBhoti,
-                    LanguageType.Dzongkha, LanguageType.Bhutia, LanguageType.Nyishi, 
+                    LanguageType.Dzongkha, LanguageType.Bhoti, LanguageType.Nyishi, 
                     //LanguageType.Balti
                 },
-                //["Tamangic"] = new() {
-                //    LanguageType.Tamang, LanguageType.Gurung, LanguageType.Thakali
-                //},
-                //["Kiranti"] = new() {
-                //    LanguageType.Limbu, LanguageType.Rai
-                //},
+                ["Tamangic"] = new() {
+                    LanguageType.Tamang, LanguageType.Gurung, LanguageType.Thakali
+                },
+                ["Kiranti"] = new() {
+                    LanguageType.Limbu, LanguageType.Rai
+                },
                 //["Kuki-Chin"] = new() {
                 //    LanguageType.Mizo, LanguageType.Kuki, LanguageType.Chin, LanguageType.Hmar,
                 //    LanguageType.Zou, LanguageType.Paite, LanguageType.Thadou
@@ -195,9 +196,9 @@ namespace MomomiAPI.Helpers
                 //    LanguageType.Ao, LanguageType.Angami, LanguageType.Konyak, LanguageType.Lotha,
                 //    LanguageType.Sema, LanguageType.Phom, LanguageType.Chang, LanguageType.Chakhesang
                 //},
-                //["Tani"] = new() {
-                //    LanguageType.Nyishi, LanguageType.Adi, LanguageType.Apatani, LanguageType.Tagin
-                //},
+                ["Tani"] = new() {
+                    LanguageType.Nyishi, LanguageType.Adi, LanguageType.Apatani, LanguageType.Tagin
+                },
                 //["Bodo-Garo"] = new() {
                 //    LanguageType.Bodo, LanguageType.Dimasa, LanguageType.Karbi, LanguageType.Tiwa
                 //}

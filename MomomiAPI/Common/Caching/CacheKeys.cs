@@ -16,6 +16,7 @@
             public static readonly TimeSpan RefreshToken = TimeSpan.FromDays(30);
             public static readonly TimeSpan TokenBlacklist = TimeSpan.FromHours(24);
             public static readonly TimeSpan UserOnlineStatus = TimeSpan.FromMinutes(5);
+            public static readonly TimeSpan BlockedUsers = TimeSpan.FromMinutes(15);
         }
 
         // User-related cache keys

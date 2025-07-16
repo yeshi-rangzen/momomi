@@ -2,120 +2,102 @@
 using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
-using System.Security.Claims;
 
 namespace MomomiAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class MessagesController : ControllerBase
+    public class MessagesController : BaseApiController
     {
         private readonly IMessageService _messageService;
-        private readonly ILogger<MessagesController> _logger;
 
         public MessagesController(IMessageService messageService, ILogger<MessagesController> logger)
+            : base(logger)
         {
             _messageService = messageService;
-            _logger = logger;
         }
 
         /// <summary>
         /// Get user's conversations
         /// </summary>
         [HttpGet("conversations")]
-        public async Task<IActionResult> GetConversations()
+        public async Task<ActionResult> GetConversations()
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                var conversations = await _messageService.GetUserConversationsAsync(userId.Value);
-                return Ok(conversations);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversations");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            LogControllerAction(nameof(GetConversations), new { userIdResult.Value });
+
+            var conversationsResult = await _messageService.GetUserConversationsAsync(userIdResult.Value);
+            if (!conversationsResult.Success)
+                return BadRequest(new { message = "Failed to retrieve conversations." });
+
+            return Ok(conversationsResult);
+
         }
 
         /// <summary>
         /// Get specific conversation details
         /// </summary>
         [HttpGet("conversations/{conversationId}")]
-        public async Task<IActionResult> GetConversation(Guid conversationId)
+        public async Task<ActionResult> GetConversation(Guid conversationId)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                var conversation = await _messageService.GetConversationAsync(userId.Value, conversationId);
-                if (conversation == null)
-                    return NotFound(new { message = "Conversation not found" });
+            LogControllerAction(nameof(GetConversation), new { userIdResult.Value });
 
-                return Ok(conversation);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversation");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var conversationsResult = await _messageService.GetConversationAsync(userIdResult.Value, conversationId);
+            if (!conversationsResult.Success)
+                return BadRequest(new { message = "Failed retrieve conversation." });
+
+            return Ok(conversationsResult);
+
         }
 
         /// <summary>
         /// Get messages in a conversation
         /// </summary>
         [HttpGet("conversations/{conversationId}/messages")]
-        public async Task<IActionResult> GetConversationMessages(Guid conversationId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+        public async Task<ActionResult> GetConversationMessages(Guid conversationId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                var messages = await _messageService.GetConversationMessagesAsync(userId.Value, conversationId, page, pageSize);
+            LogControllerAction(nameof(GetConversationMessages), new { userIdResult.Value });
 
-                return Ok(new { messages, page, pageSize, hasMore = messages.Count == pageSize });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting conversation messages");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var messagesResult = await _messageService.GetConversationMessagesAsync(userIdResult.Value, conversationId, page, pageSize);
+
+            if (!messagesResult.Success)
+                return BadRequest(new { message = "Failed retrieve conversation." });
+
+            return Ok(new { messagesResult.Data, page, pageSize, hasMore = messagesResult.Data?.Count == pageSize });
         }
 
         /// <summary>
         /// Send a message in a conversation
         /// </summary>
         [HttpPost("send")]
-        public async Task<IActionResult> SendMessage([FromBody] SendMessageRequest request)
+        public async Task<ActionResult> SendMessage([FromBody] SendMessageRequest request)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            LogControllerAction(nameof(SendMessage), new { userIdResult.Value });
 
-                var message = await _messageService.SendMessageAsync(userId.Value, request);
-                if (message == null)
-                    return BadRequest(new { message = "Failed to send message" });
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-                return Ok(message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending message");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var messageResult = await _messageService.SendMessageAsync(userIdResult.Value, request);
+            if (!messageResult.Success)
+                return BadRequest(new { message = "Failed to send message." });
+
+            return Ok(messageResult);
         }
 
         /// <summary>
@@ -124,23 +106,17 @@ namespace MomomiAPI.Controllers
         [HttpPut("conversations/{conversationId}/read")]
         public async Task<IActionResult> MarkMessagesAsRead(Guid conversationId)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                var success = await _messageService.MarkMessagesAsReadAsync(userId.Value, conversationId);
-                if (!success)
-                    return NotFound(new { message = "Failed to mark messages as read" });
+            LogControllerAction(nameof(SendMessage), new { userIdResult.Value });
 
-                return Ok(new { message = "Messages marked as read" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error marking messages as read");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
+            var messeageReadResult = await _messageService.MarkMessagesAsReadAsync(userIdResult.Value, conversationId);
+            if (!messeageReadResult.Success)
+                return NotFound(new { message = "Failed to mark messages as read" });
+
+            return Ok(new { message = "Messages marked as read" });
         }
 
         /// <summary>
@@ -149,30 +125,18 @@ namespace MomomiAPI.Controllers
         [HttpDelete("{messageId}")]
         public async Task<IActionResult> DeleteMessages(Guid messageId)
         {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (userId == null)
-                    return Unauthorized();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null)
+                return userIdResult.Result;
 
-                var success = await _messageService.DeleteMessageAsync(userId.Value, messageId);
-                if (!success)
-                    return NotFound(new { message = "Message not found or permission denied" });
+            LogControllerAction(nameof(SendMessage), new { userIdResult.Value });
 
-                return Ok(new { message = "Message deleted successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting message");
-                return StatusCode(500, new { message = "Internal server error" });
-            }
-        }
+            var deleteResult = await _messageService.DeleteMessageAsync(userIdResult.Value, messageId);
+            if (!deleteResult.Success)
+                return NotFound(new { message = "Message not found or permission denied" });
 
-        private Guid? GetCurrentUserId()
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            return Ok(new { message = "Message deleted successfully" });
 
-            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }
 }

@@ -39,7 +39,7 @@ namespace MomomiAPI.Extensions
             services.AddScoped<ISubscriptionService, SubscriptionService>();
 
             // Safety services
-            services.AddScoped<IBlockingService, BlockingService>();
+            services.AddScoped<IReportingService, ReportingService>();
 
             // Notification services
             services.AddScoped<IPushNotificationService, PushNotificationService>();

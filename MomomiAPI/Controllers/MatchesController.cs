@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
@@ -18,7 +19,7 @@ namespace MomomiAPI.Controllers
         /// Get current user's matches
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult> GetUserMatches()
+        public async Task<ActionResult<List<MatchDTO>>> GetUserMatches()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;

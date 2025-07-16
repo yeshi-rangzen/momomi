@@ -81,7 +81,9 @@ namespace MomomiAPI.Hubs
                 await Clients.Group($"conversation_{conversationId}").SendAsync("ReceiveMessage", messageDto);
 
                 // Send notification to the other user if they're not in the conversation
-                var conversation = await _messageService.GetConversationAsync(userId.Value, Guid.Parse(conversationId));
+                var conversationResult = await _messageService.GetConversationAsync(userId.Value, Guid.Parse(conversationId));
+                var conversation = conversationResult.Data;
+
                 if (conversation != null)
                 {
                     var isOtherUserOnline = await _cacheService.ExistsAsync($"user_online_{conversation.OtherUserId}");

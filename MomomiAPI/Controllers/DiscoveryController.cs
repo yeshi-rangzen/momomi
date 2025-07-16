@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
@@ -18,7 +19,7 @@ namespace MomomiAPI.Controllers
         /// Discover users for swiping based on user preferences
         /// </summary>
         [HttpGet("users")]
-        public async Task<ActionResult> DiscoverUsersForSwiping([FromQuery] int count = 10)
+        public async Task<ActionResult<List<UserProfileDTO>>> DiscoverUsersForSwiping([FromQuery] int count = 10)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -33,7 +34,7 @@ namespace MomomiAPI.Controllers
         /// Discover users globally (ignoring location)
         /// </summary>
         [HttpGet("users/global")]
-        public async Task<ActionResult> DiscoverUsersGlobally([FromQuery] int count = 10)
+        public async Task<ActionResult<List<UserProfileDTO>>> DiscoverUsersGlobally([FromQuery] int count = 10)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -48,7 +49,7 @@ namespace MomomiAPI.Controllers
         /// Discover users locally within specified distance
         /// </summary>
         [HttpGet("users/local")]
-        public async Task<ActionResult> DiscoverUsersLocally([FromQuery] int count = 10, [FromQuery] int maxDistance = 50)
+        public async Task<ActionResult<List<UserProfileDTO>>> DiscoverUsersLocally([FromQuery] int count = 10, [FromQuery] int maxDistance = 50)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;

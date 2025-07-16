@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MomomiAPI.Common.Results;
+using MomomiAPI.Models.Entities;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
 
@@ -142,7 +143,7 @@ namespace MomomiAPI.Controllers
         [HttpPost("refresh-token")]
         [EnableRateLimiting("AuthPolicy")]
         [AllowAnonymous]
-        public async Task<ActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+        public async Task<ActionResult<LoginResult>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             LogControllerAction(nameof(RefreshToken));
 
@@ -170,7 +171,7 @@ namespace MomomiAPI.Controllers
         /// Get current user information
         /// </summary>
         [HttpGet("me")]
-        public async Task<ActionResult> GetCurrentUser()
+        public async Task<ActionResult<User>> GetCurrentUser()
         {
             LogControllerAction(nameof(GetCurrentUser));
 

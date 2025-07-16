@@ -224,15 +224,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     if (Guid.TryParse(userIdClaim, out var userId))
                     {
                         // Validate user exists and is active
-                        var user = await userService.GetUserByIdAsync(userId);
-                        if (user == null)
+                        var userResult = await userService.GetUserByIdAsync(userId);
+                        if (userResult.Data == null)
                         {
                             logger.LogWarning("Token valid but user not found: {UserId}", userId);
                             context.Fail("User not found");
                             return;
                         }
 
-                        if (!user.IsActive)
+                        if (!userResult.Data.IsActive)
                         {
                             logger.LogWarning("Token valid but user is inactive: {UserId}", userId);
                             context.Fail("User account is inactive");
