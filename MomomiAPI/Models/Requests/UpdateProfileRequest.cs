@@ -19,7 +19,8 @@ namespace MomomiAPI.Models.Requests
         public int? MinAge { get; set; }
         public int? MaxAge { get; set; }
         public bool? EnableGlobalDiscovery { get; set; }
-
+        public bool? IsGloballyDiscoverable { get; set; }
+        public bool? IsDiscoverable { get; set; }
         public string? Hometown { get; set; }
         public ChildrenStatusType? Children { get; set; }
         public FamilyPlanType? FamilyPlan { get; set; }

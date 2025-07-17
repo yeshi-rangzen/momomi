@@ -107,6 +107,9 @@ namespace MomomiAPI.Models.Entities
         [Column("is_discoverable")]
         public bool IsDiscoverable { get; set; } = true;
 
+        [Column("is_globally_discoverable")]
+        public bool IsGloballyDiscoverable { get; set; } = true;
+
         [Column("push_token")]
         [MaxLength(500)]
         public string? PushToken { get; set; }

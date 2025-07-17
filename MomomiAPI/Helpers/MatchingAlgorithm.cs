@@ -3,6 +3,7 @@ using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
+using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Helpers
 {
@@ -10,11 +11,13 @@ namespace MomomiAPI.Helpers
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ILogger<MatchingAlgorithm> _logger;
+        private readonly IReportingService _reportingService;
 
-        public MatchingAlgorithm(MomomiDbContext dbContext, ILogger<MatchingAlgorithm> logger)
+        public MatchingAlgorithm(MomomiDbContext dbContext, ILogger<MatchingAlgorithm> logger, IReportingService reportingService)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _reportingService = reportingService;
         }
 
         /// <summary>
@@ -38,6 +41,13 @@ namespace MomomiAPI.Helpers
                     .Select(ul => ul.LikedUserId)
                     .ToListAsync();
 
+                // Get users that have been blocked or reported by current user
+                var reportedUsers = await _reportingService.GetUserReportsAsync(userId);
+                foreach (var reportedUser in reportedUsers.Data)
+                {
+                    excludedUserIds.Add(reportedUser.Id); // Exclude reported user
+                }
+
                 excludedUserIds.Add(userId); // Exclude current user
 
                 // Get potential matches based on preferences
@@ -60,7 +70,11 @@ namespace MomomiAPI.Helpers
             var query = _dbContext.Users
                 .Include(u => u.Photos)
                 .Include(u => u.Preferences)
-                .Where(u => u.IsActive && u.IsDiscoverable && !excludedUserIds.Contains(u.Id));
+                .Where(u => u.IsActive
+                    && u.IsDiscoverable
+                    && !excludedUserIds.Contains(u.Id)
+                    && u.IsGloballyDiscoverable == currentUser.EnableGlobalDiscovery // Show only profiles that has enabled global discovery
+                );
 
             // MEMBER FILTERS (Available to all users - Free and Premium)
             query = ApplyMemberFilters(query, currentUser);

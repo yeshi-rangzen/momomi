@@ -18,6 +18,7 @@ namespace MomomiAPI.Models.DTOs
         public int? HeightCm { get; set; }
         public double? DistanceKm { get; set; }
         public bool EnableGlobalDiscovery { get; set; } = false;
+        public bool IsGloballyDiscoverable { get; set; } = false;
         public bool IsDiscoverable { get; set; } = true;
         public string? Hometown { get; set; }
         public ChildrenStatusType? Children { get; set; }

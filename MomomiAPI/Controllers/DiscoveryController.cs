@@ -27,10 +27,11 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(DiscoverUsersForSwiping), new { count });
 
             var result = await _userDiscoveryService.FindUsersForSwiping(userIdResult.Value, count);
-            return HandleOperationResult(result);
+            return HandleAuthResult(result); // Why use handleAuthResult?
         }
 
         /// <summary>
+        /// TODO: Possible deletion as this can be handled in DisoverUsersForSwiping
         /// Discover users globally (ignoring location)
         /// </summary>
         [HttpGet("users/global")]
@@ -46,6 +47,7 @@ namespace MomomiAPI.Controllers
         }
 
         /// <summary>
+        /// TODO: Possible deletion as this can be handled in DisoverUsersForSwiping
         /// Discover users locally within specified distance
         /// </summary>
         [HttpGet("users/local")]

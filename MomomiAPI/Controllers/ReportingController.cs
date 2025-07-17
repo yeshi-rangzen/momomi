@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 
@@ -34,27 +35,23 @@ namespace MomomiAPI.Controllers
             if (userIdResult.Value == request.UserId)
                 return BadRequest(new { message = "You cannot report yourself" });
 
-            var reportResult = await _reportingService.ReportUserAsync(userIdResult.Value, request.UserId, request.Reason, request.Description);
-
-            if (!reportResult.Success)
-                return BadRequest(new { message = "Failed to report user or user already reported" });
-
-            return Ok(new { message = "User reported successfully. Thank you for helping keep our community safe." });
+            var result = await _reportingService.ReportUserAsync(userIdResult.Value, request.UserId, request.Reason, request.Description);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Get user's reports
         /// </summary>
         [HttpGet("my-reports")]
-        public async Task<ActionResult> GetMyReports()
+        public async Task<ActionResult<List<UserReportDTO>>> GetMyReports()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(GetMyReports));
 
-            var reports = await _reportingService.GetUserReportsAsync(userIdResult.Value);
-            return Ok(new { data = reports });
+            var result = await _reportingService.GetUserReportsAsync(userIdResult.Value);
+            return HandleOperationResult(result);
         }
 
     }

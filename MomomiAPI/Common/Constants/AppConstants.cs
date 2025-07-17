@@ -48,6 +48,7 @@
             public const int DefaultMaxAge = 35;
             public const bool DefaultGlobalDiscovery = true;
             public const bool DefaultIsDiscoverable = true;
+            public const bool DefaultIsGloballyDiscoverable = false;
             public const bool DefaultNotificationsEnabled = true;
         }
     }

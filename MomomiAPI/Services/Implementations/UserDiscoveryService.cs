@@ -34,6 +34,11 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
+                if (count < 1 || count > 50)
+                {
+                    return (DiscoveryResult)DiscoveryResult.Failed("Count must be between 1 and 50.");
+                }
+
                 var currentUser = await _dbContext.Users
                     .Include(u => u.Preferences)
                     .FirstOrDefaultAsync(u => u.Id == userId);
@@ -59,6 +64,11 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
+                if (count < 1 || count > 50)
+                {
+                    return (DiscoveryResult)DiscoveryResult.Failed("Count must be between 1 and 50.");
+                }
+
                 var cacheKey = CacheKeys.Discovery.GlobalResults(userId, count);
                 var cachedUsers = await _cacheService.GetAsync<List<UserProfileDTO>>(cacheKey);
 
@@ -70,14 +80,11 @@ namespace MomomiAPI.Services.Implementations
 
                 var discoveryUsers = await _matchingAlgorithm.GetPotentialMatchesAsync(userId, count);
 
-                // Filter out blocked users
-                var filteredUsers = await FilterBlockedUsers(userId, discoveryUsers);
-
                 // Cache results
-                await _cacheService.SetAsync(cacheKey, filteredUsers, CacheKeys.Duration.DiscoveryResults);
+                await _cacheService.SetAsync(cacheKey, discoveryUsers, CacheKeys.Duration.DiscoveryResults);
 
-                _logger.LogInformation("Found {Count} global users for user {UserId}", filteredUsers.Count, userId);
-                return DiscoveryResult.Success(filteredUsers, "global", count, false);
+                _logger.LogInformation("Found {Count} global users for user {UserId}", discoveryUsers.Count, userId);
+                return DiscoveryResult.Success(discoveryUsers, "global", count, false);
             }
             catch (Exception ex)
             {
@@ -90,9 +97,24 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
+                if (count < 1 || count > 50)
+                {
+                    return (DiscoveryResult)DiscoveryResult.Failed("Count must be between 1 and 50.");
+                }
+
+                if (maxDistanceKm < 1 || maxDistanceKm > 200)
+                {
+                    return (DiscoveryResult)DiscoveryResult.Failed("Distance must be between 1 and 200 km.");
+                }
+
                 var currentUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
 
-                if (currentUser?.Latitude == null || currentUser.Longitude == null)
+                if (currentUser == null)
+                {
+                    return DiscoveryResult.UserNotFound();
+                }
+
+                if (currentUser.Latitude == null || currentUser.Longitude == null)
                 {
                     return DiscoveryResult.LocationRequired();
                 }
@@ -114,38 +136,19 @@ namespace MomomiAPI.Services.Implementations
                     .Take(count)
                     .ToList();
 
-                // Filter out blocked users
-                var filteredUsers = await FilterBlockedUsers(userId, localUsers);
-
                 // Cache results
-                await _cacheService.SetAsync(cacheKey, filteredUsers, CacheKeys.Duration.DiscoveryResults);
+                await _cacheService.SetAsync(cacheKey, localUsers, CacheKeys.Duration.DiscoveryResults);
 
                 _logger.LogInformation("Found {Count} local users within {Distance}km for user {UserId}",
-                    filteredUsers.Count, maxDistanceKm, userId);
+                    localUsers.Count, maxDistanceKm, userId);
 
-                return DiscoveryResult.Success(filteredUsers, "local", count, false);
+                return DiscoveryResult.Success(localUsers, "local", count, false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error finding local users for user {UserId}", userId);
                 return (DiscoveryResult)DiscoveryResult.Failed("Unable to find nearby users. Please try again.");
             }
-        }
-
-        private async Task<List<UserProfileDTO>> FilterBlockedUsers(Guid userId, List<UserProfileDTO> users)
-        {
-            var filteredUsers = new List<UserProfileDTO>();
-
-            foreach (var user in users)
-            {
-                var isReported = await _reportingService.IsUserReportedAsync(userId, user.Id);
-                if (!isReported.Data)
-                {
-                    filteredUsers.Add(user);
-                }
-            }
-
-            return filteredUsers;
         }
     }
 }

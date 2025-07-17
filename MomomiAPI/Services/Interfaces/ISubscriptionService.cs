@@ -1,19 +1,20 @@
-﻿using MomomiAPI.Models.DTOs;
+﻿using MomomiAPI.Common.Results;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Enums;
 
 namespace MomomiAPI.Services.Interfaces
 {
     public interface ISubscriptionService
     {
-        Task<SubscriptionStatusDTO> GetUserSubscriptionAsync(Guid userId);
-        Task<bool> UpgradeToPremiumAsync(Guid userId, int durationMonths = 1);
-        Task<bool> CancelSubscriptionAsync(Guid userId);
-        Task<UsageLimitsDTO> GetUsageLimitsAsync(Guid userId);
-        Task<bool> CanUserLikeAsync(Guid userId, LikeType likeType = LikeType.Regular);
-        bool CanUserMatchAsync(Guid userId);
-        Task<bool> RecordLikeUsageAsync(Guid userId, LikeType likeType);
-        Task<bool> RecordAdWatchedAsync(Guid userId);
-        Task<bool> ResetDailyLimitsAsync(Guid userId);
-        Task<bool> ResetWeeklyLimitsAsync(Guid userId);
+        Task<OperationResult<SubscriptionStatusDTO>> GetUserSubscriptionAsync(Guid userId);
+        Task<OperationResult> UpgradeToPremiumAsync(Guid userId, int durationMonths = 1);
+        Task<OperationResult> CancelSubscriptionAsync(Guid userId);
+        Task<OperationResult<UsageLimitsDTO>> GetUsageLimitsAsync(Guid userId);
+        Task<OperationResult<bool>> CanUserLikeAsync(Guid userId, LikeType likeType = LikeType.Regular);
+        OperationResult<bool> CanUserMatchAsync(Guid userId);
+        Task<OperationResult> RecordLikeUsageAsync(Guid userId, LikeType likeType);
+        Task<OperationResult> RecordAdWatchedAsync(Guid userId);
+        Task<OperationResult> ResetDailyLimitsAsync(Guid userId);
+        Task<OperationResult> ResetWeeklyLimitsAsync(Guid userId);
     }
 }

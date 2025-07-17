@@ -44,17 +44,29 @@ namespace MomomiAPI.Services.Implementations
                     likerId, interestType, likedId);
 
                 // Check if user can like based on subscription limits
-                var canLike = await _subscriptionService.CanUserLikeAsync(likerId, interestType);
-                if (!canLike)
+                var canLikeResult = await _subscriptionService.CanUserLikeAsync(likerId, interestType);
+                if (!canLikeResult.Success)
                 {
-                    var usageLimits = await _subscriptionService.GetUsageLimitsAsync(likerId);
+                    return (LikeResult)LikeResult.Failed("Unable to check like permissions.");
+                }
+
+                if (!canLikeResult.Data)
+                {
+                    var usageLimitsResult = await _subscriptionService.GetUsageLimitsAsync(likerId);
+                    var usageLimits = usageLimitsResult.Success ? usageLimitsResult.Data : null;
                     var limitType = interestType == LikeType.SuperLike ? "super likes" : "likes";
                     return LikeResult.LimitReached($"You've reached your daily {limitType} limit.", usageLimits);
                 }
 
                 // Check if user is reported
-                var isReported = await _reportingService.IsUserReportedAsync(likerId, likedId);
-                if (isReported.Data)
+                var isReportedResult = await _reportingService.IsUserReportedAsync(likerId, likedId);
+                if (!isReportedResult.Success)
+                {
+                    _logger.LogWarning("Unable to check report status for user {LikerId} and {LikedId}", likerId, likedId);
+                    return (LikeResult)LikeResult.Failed("Unable to verify user status.");
+                }
+
+                if (isReportedResult.Data)
                 {
                     return LikeResult.UserBlocked();
                 }
@@ -90,7 +102,11 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserLikes.Add(like);
 
                 // Record usage
-                await _subscriptionService.RecordLikeUsageAsync(likerId, interestType);
+                var recordUsageResult = await _subscriptionService.RecordLikeUsageAsync(likerId, interestType);
+                if (!recordUsageResult.Success)
+                {
+                    _logger.LogWarning("Failed to record like usage for user {LikerId}", likerId);
+                }
 
                 // Check for match
                 var matchResult = await _matchManagementService.CheckForNewMatch(likerId, likedId);
@@ -124,7 +140,8 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 // Get updated usage limits
-                var updatedLimits = await _subscriptionService.GetUsageLimitsAsync(likerId);
+                var updatedLimitsResult = await _subscriptionService.GetUsageLimitsAsync(likerId);
+                var updatedLimits = updatedLimitsResult.Success ? updatedLimitsResult.Data : null;
 
                 return isMatch
                     ? LikeResult.MatchCreated(updatedLimits)
@@ -178,7 +195,9 @@ namespace MomomiAPI.Services.Implementations
                 await _cacheInvalidation.InvalidateUserDiscovery(dismisserId);
 
                 _logger.LogDebug("User {DismisserId} successfully dismissed user {DismissedId}", dismisserId, dismissedId);
-                return OperationResult.Successful();
+                return OperationResult.Successful()
+                                    .WithMetadata("dismissed_user_id", dismissedId)
+                                    .WithMetadata("dismissed_at", DateTime.UtcNow);
             }
             catch (Exception ex)
             {
@@ -226,7 +245,9 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("User {UserId} successfully undid last swipe on user {TargetUserId}",
                     userId, lastSwipe.LikedUserId);
 
-                return OperationResult.Successful().WithMetadata("undone_user_id", lastSwipe.LikedUserId);
+                return OperationResult.Successful()
+                                    .WithMetadata("undone_user_id", lastSwipe.LikedUserId)
+                                    .WithMetadata("undone_at", DateTime.UtcNow);
             }
             catch (Exception ex)
             {

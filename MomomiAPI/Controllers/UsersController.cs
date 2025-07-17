@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Models.DTOs;
-using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 
@@ -74,16 +73,7 @@ namespace MomomiAPI.Controllers
             };
 
             var result = await _userService.UpdateUserProfileAsync(userIdResult.Value, updateRequest);
-            if (!result.Success)
-                return HandleOperationResult(result);
-
-            return Ok(new
-            {
-                message = request.EnableGlobalDiscovery ?
-                    "Global discovery enabled. You can now discover profiles worldwide." :
-                    "Location-based discovery enabled. Showing profiles within your specified distance.",
-                data = new { enableGlobalDiscovery = request.EnableGlobalDiscovery }
-            });
+            return HandleOperationResult(result);
         }
 
         /// <summary>
@@ -98,16 +88,7 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(UpdateDiscoveryVisibility), new { request.IsDiscoverable });
 
             var result = await _userService.UpdateDiscoveryStatusAsync(userIdResult.Value, request.IsDiscoverable);
-            if (!result.Success)
-                return HandleOperationResult(result);
-
-            return Ok(new
-            {
-                message = request.IsDiscoverable ?
-                    "Your profile is now visible to other users" :
-                    "Your profile is now hidden from discovery",
-                data = new { isDiscoverable = request.IsDiscoverable }
-            });
+            return HandleOperationResult(result);
         }
 
         /// <summary>
@@ -129,7 +110,7 @@ namespace MomomiAPI.Controllers
         /// Get current user's discovery settings
         /// </summary>
         [HttpGet("discovery-settings")]
-        public async Task<ActionResult<User>> GetDiscoverySettings()
+        public async Task<ActionResult<object>> GetDiscoverySettings()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -141,18 +122,17 @@ namespace MomomiAPI.Controllers
                 return HandleOperationResult(userResult);
 
             var user = userResult.Data!;
-            return Ok(new
+            var discoverySettings = new
             {
-                data = new
-                {
-                    enableGlobalDiscovery = user.EnableGlobalDiscovery,
-                    isDiscoverable = user.IsDiscoverable,
-                    maxDistanceKm = user.MaxDistanceKm,
-                    minAge = user.MinAge,
-                    maxAge = user.MaxAge,
-                    hasLocation = user.Latitude.HasValue && user.Longitude.HasValue
-                }
-            });
+                enableGlobalDiscovery = user.EnableGlobalDiscovery,
+                isDiscoverable = user.IsDiscoverable,
+                maxDistanceKm = user.MaxDistanceKm,
+                minAge = user.MinAge,
+                maxAge = user.MaxAge,
+                hasLocation = user.Latitude.HasValue && user.Longitude.HasValue
+            };
+
+            return Ok(new { data = discoverySettings });
         }
 
         /// <summary>

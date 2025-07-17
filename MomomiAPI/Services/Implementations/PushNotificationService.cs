@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
@@ -24,17 +25,32 @@ namespace MomomiAPI.Services.Implementations
             _httpClient = httpClient;
         }
 
-        public async Task<bool> SendNotificationAsync(Guid userId, string title, string message, NotificationType type, object? data = null)
+        public async Task<OperationResult> SendNotificationAsync(Guid userId, string title, string message, NotificationType type, object? data = null)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    return OperationResult.ValidationFailure("Notification title cannot be empty.");
+                }
+
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    return OperationResult.ValidationFailure("Notification message cannot be empty.");
+                }
+
                 // Check if user has notifications enabled
                 var user = await _dbContext.Users.FindAsync(userId);
-                if (user == null || !user.NotificationsEnabled)
+                if (user == null)
+                {
+                    return OperationResult.NotFound("User not found.");
+                }
+                if (!user.NotificationsEnabled)
                 {
                     _logger.LogDebug("Notifications disabled for user {UserId}", userId);
-                    return false;
+                    return OperationResult.BusinessRuleViolation("User has disabled notifications.");
                 }
+
 
                 // Create notification record
                 var notification = new PushNotification
@@ -52,29 +68,37 @@ namespace MomomiAPI.Services.Implementations
                 // Send push notification if user has a push token
                 if (!string.IsNullOrEmpty(user.PushToken))
                 {
-                    await SendPushNotificationAsync(user.PushToken, title, message, data);
-                    notification.IsSent = true;
-                    notification.SentAt = DateTime.UtcNow;
+                    var pushResult = await SendPushNotificationAsync(user.PushToken, title, message, data);
+                    if (pushResult.Success)
+                    {
+                        notification.IsSent = true;
+                        notification.SentAt = DateTime.UtcNow;
+                    }
                 }
 
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Notification sent to user {UserId}: {Title}", userId, title);
-                return true;
+                return OperationResult.Successful()
+                    .WithMetadata("notification_id", notification.Id)
+                    .WithMetadata("sent_at", notification.SentAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending notification to user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to send notification.");
             }
         }
 
-        public async Task<bool> SendMatchNotificationAsync(Guid userId, Guid matchedUserId)
+        public async Task<OperationResult> SendMatchNotificationAsync(Guid userId, Guid matchedUserId)
         {
             try
             {
                 var matchedUser = await _dbContext.Users.FindAsync(matchedUserId);
-                if (matchedUser == null) return false;
+                if (matchedUser == null)
+                {
+                    return OperationResult.NotFound("Matched user not found.");
+                }
 
                 var title = "🎉 New Match!";
                 var message = $"You and {matchedUser.FirstName} liked each other!";
@@ -90,16 +114,19 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending match notification to user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to send match notification.");
             }
         }
 
-        public async Task<bool> SendSuperLikeNotificationAsync(Guid userId, Guid superLikerUserId)
+        public async Task<OperationResult> SendSuperLikeNotificationAsync(Guid userId, Guid superLikerUserId)
         {
             try
             {
                 var superLiker = await _dbContext.Users.FindAsync(superLikerUserId);
-                if (superLiker == null) return false;
+                if (superLiker == null)
+                {
+                    return OperationResult.NotFound("Super liker user not found.");
+                }
 
                 var title = "⭐ Super Like!";
                 var message = $"{superLiker.FirstName} super liked you!";
@@ -115,16 +142,24 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending super like notification to user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to send super like notification.");
             }
         }
 
-        public async Task<bool> SendMessageNotificationAsync(Guid userId, Guid senderId, string messagePreview)
+        public async Task<OperationResult> SendMessageNotificationAsync(Guid userId, Guid senderId, string messagePreview)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(messagePreview))
+                {
+                    return OperationResult.ValidationFailure("Message preview cannot be empty.");
+                }
+
                 var sender = await _dbContext.Users.FindAsync(senderId);
-                if (sender == null) return false;
+                if (sender == null)
+                {
+                    return OperationResult.NotFound("Sender user not found.");
+                }
 
                 var title = $"Message from {sender.FirstName}";
                 var message = messagePreview.Length > 50 ? messagePreview[..50] + "..." : messagePreview;
@@ -140,14 +175,24 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending message notification to user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to send message notification.");
             }
         }
 
-        public async Task<List<NotificationDTO>> GetUserNotificationsAsync(Guid userId, int page = 1, int pageSize = 20)
+        public async Task<OperationResult<List<NotificationDTO>>> GetUserNotificationsAsync(Guid userId, int page = 1, int pageSize = 20)
         {
             try
             {
+                if (page < 1)
+                {
+                    return OperationResult<List<NotificationDTO>>.ValidationFailure("Page must be greater than 0.");
+                }
+
+                if (pageSize < 1 || pageSize > 100)
+                {
+                    return OperationResult<List<NotificationDTO>>.ValidationFailure("Page size must be between 1 and 100.");
+                }
+
                 var notifications = await _dbContext.PushNotifications
                     .Where(pn => pn.UserId == userId)
                     .OrderByDescending(pn => pn.CreatedAt)
@@ -166,38 +211,44 @@ namespace MomomiAPI.Services.Implementations
                     })
                     .ToListAsync();
 
-                return notifications;
+                return OperationResult<List<NotificationDTO>>.Successful(notifications)
+                   .WithMetadata("page", page)
+                   .WithMetadata("page_size", pageSize);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting notifications for user {UserId}", userId);
-                return [];
+                return OperationResult<List<NotificationDTO>>.Failed("Unable to retrieve notifications.");
             }
         }
 
-        public async Task<bool> MarkNotificationAsReadAsync(Guid notificationId, Guid userId)
+        public async Task<OperationResult> MarkNotificationAsReadAsync(Guid notificationId, Guid userId)
         {
             try
             {
                 var notification = await _dbContext.PushNotifications
                     .FirstOrDefaultAsync(pn => pn.Id == notificationId && pn.UserId == userId);
 
-                if (notification == null) return false;
+                if (notification == null)
+                {
+                    return OperationResult.NotFound("Notification not found.");
+                }
 
                 notification.IsRead = true;
                 notification.ReadAt = DateTime.UtcNow;
 
                 await _dbContext.SaveChangesAsync();
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("read_at", notification.ReadAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking notification {NotificationId} as read for user {UserId}", notificationId, userId);
-                return false;
+                return OperationResult.Failed("Unable to mark notification as read.");
             }
         }
 
-        public async Task<bool> MarkAllNotificationsAsReadAsync(Guid userId)
+        public async Task<OperationResult> MarkAllNotificationsAsReadAsync(Guid userId)
         {
             try
             {
@@ -205,42 +256,60 @@ namespace MomomiAPI.Services.Implementations
                     .Where(pn => pn.UserId == userId && !pn.IsRead)
                     .ToListAsync();
 
+                if (!unreadNotifications.Any())
+                {
+                    return OperationResult.BusinessRuleViolation("No unread notifications found.");
+                }
+
+                var readAt = DateTime.UtcNow;
                 foreach (var notification in unreadNotifications)
                 {
                     notification.IsRead = true;
-                    notification.ReadAt = DateTime.UtcNow;
+                    notification.ReadAt = readAt;
                 }
 
                 await _dbContext.SaveChangesAsync();
-                return true;
+                return OperationResult.Successful()
+                    .WithMetadata("notifications_marked", unreadNotifications.Count)
+                    .WithMetadata("read_at", readAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking all notifications as read for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to mark all notifications as read.");
             }
         }
 
-        public async Task<int> GetUnreadNotificationCountAsync(Guid userId)
+        public async Task<OperationResult<int>> GetUnreadNotificationCountAsync(Guid userId)
         {
             try
             {
-                return await _dbContext.PushNotifications
-                    .CountAsync(pn => pn.UserId == userId && !pn.IsRead);
+                var count = await _dbContext.PushNotifications
+                   .CountAsync(pn => pn.UserId == userId && !pn.IsRead);
+
+                return OperationResult<int>.Successful(count);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting unread notification count for user {UserId}", userId);
-                return 0;
+                return OperationResult<int>.Failed("Unable to get unread notification count.");
             }
         }
 
-        public async Task<bool> UpdateUserPushTokenAsync(Guid userId, string pushToken)
+        public async Task<OperationResult> UpdateUserPushTokenAsync(Guid userId, string pushToken)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(pushToken))
+                {
+                    return OperationResult.ValidationFailure("Push token cannot be empty.");
+                }
+
                 var user = await _dbContext.Users.FindAsync(userId);
-                if (user == null) return false;
+                if (user == null)
+                {
+                    return OperationResult.NotFound("User not found.");
+                }
 
                 user.PushToken = pushToken;
                 user.UpdatedAt = DateTime.UtcNow;
@@ -248,21 +317,25 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Updated push token for user {UserId}", userId);
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("updated_at", user.UpdatedAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating push token for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to update push token.");
             }
         }
 
-        public async Task<bool> EnableNotificationsAsync(Guid userId, bool enabled)
+        public async Task<OperationResult> EnableNotificationsAsync(Guid userId, bool enabled)
         {
             try
             {
                 var user = await _dbContext.Users.FindAsync(userId);
-                if (user == null) return false;
+                if (user == null)
+                {
+                    return OperationResult.NotFound("User not found.");
+                }
 
                 user.NotificationsEnabled = enabled;
                 user.UpdatedAt = DateTime.UtcNow;
@@ -271,16 +344,18 @@ namespace MomomiAPI.Services.Implementations
 
                 _logger.LogInformation("Set notifications {Status} for user {UserId}",
                     enabled ? "enabled" : "disabled", userId);
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("notifications_enabled", enabled)
+                                    .WithMetadata("updated_at", user.UpdatedAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating notification settings for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to update notification settings.");
             }
         }
 
-        private async Task<bool> SendPushNotificationAsync(string pushToken, string title, string message, object? data = null)
+        private async Task<OperationResult> SendPushNotificationAsync(string pushToken, string title, string message, object? data = null)
         {
             try
             {
@@ -305,18 +380,18 @@ namespace MomomiAPI.Services.Implementations
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogDebug("Push notification sent successfully to token {Token}", pushToken[..8] + "...");
-                    return true;
+                    return OperationResult.Successful();
                 }
                 else
                 {
                     _logger.LogWarning("Failed to send push notification. Status: {StatusCode}", response.StatusCode);
-                    return false;
+                    return OperationResult.Failed($"Push notification failed with status: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending push notification to token {Token}", pushToken[..8] + "...");
-                return false;
+                return OperationResult.Failed("Push notification delivery failed.");
             }
         }
     }

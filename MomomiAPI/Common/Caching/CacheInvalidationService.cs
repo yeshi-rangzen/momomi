@@ -5,9 +5,9 @@ namespace MomomiAPI.Common.Caching
     public class CacheInvalidationService : ICacheInvalidation
     {
         private readonly ICacheService _cacheService;
-        private readonly ILogger _logger;
+        private readonly ILogger<CacheInvalidationService> _logger;
 
-        public CacheInvalidationService(ICacheService cacheService, ILogger logger)
+        public CacheInvalidationService(ICacheService cacheService, ILogger<CacheInvalidationService> logger)
         {
             _cacheService = cacheService;
             _logger = logger;

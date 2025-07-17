@@ -88,6 +88,7 @@ namespace MomomiAPI.Services.Implementations
                     LanguagesSpoken = request.LanguagesSpoken,
                     EnableGlobalDiscovery = AppConstants.DefaultValues.DefaultGlobalDiscovery,
                     IsDiscoverable = AppConstants.DefaultValues.DefaultIsDiscoverable,
+                    IsGloballyDiscoverable = AppConstants.DefaultValues.DefaultIsGloballyDiscoverable,
                     NotificationsEnabled = AppConstants.DefaultValues.DefaultNotificationsEnabled,
                     MaxDistanceKm = AppConstants.DefaultValues.DefaultMaxDistance,
                     MinAge = AppConstants.DefaultValues.DefaultMinAge,

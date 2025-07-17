@@ -489,6 +489,12 @@ namespace MomomiAPI.Services.Implementations
             if (request.EnableGlobalDiscovery.HasValue)
                 user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
 
+            if (request.IsGloballyDiscoverable.HasValue)
+                user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
+
+            if (request.IsDiscoverable.HasValue)
+                user.IsDiscoverable = request.IsDiscoverable.Value;
+
             if (!string.IsNullOrEmpty(request.Hometown))
                 user.Hometown = request.Hometown;
 
@@ -643,6 +649,7 @@ namespace MomomiAPI.Services.Implementations
                 DistanceKm = distance,
                 EnableGlobalDiscovery = user.EnableGlobalDiscovery,
                 IsDiscoverable = user.IsDiscoverable,
+                IsGloballyDiscoverable = user.IsGloballyDiscoverable,
                 IsVerified = user.IsVerified,
                 LastActive = user.LastActive,
                 Photos = user.Photos?.Select(p => new UserPhotoDTO

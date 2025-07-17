@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
@@ -18,7 +19,7 @@ namespace MomomiAPI.Services.Implementations
             _logger = logger;
         }
 
-        public async Task<SubscriptionStatusDTO> GetUserSubscriptionAsync(Guid userId)
+        public async Task<OperationResult<SubscriptionStatusDTO>> GetUserSubscriptionAsync(Guid userId)
         {
             try
             {
@@ -51,7 +52,7 @@ namespace MomomiAPI.Services.Implementations
                     await _dbContext.SaveChangesAsync();
                 }
 
-                return new SubscriptionStatusDTO
+                var result = new SubscriptionStatusDTO
                 {
                     SubscriptionType = subscription.SubscriptionType,
                     IsActive = subscription.IsActive,
@@ -60,22 +61,25 @@ namespace MomomiAPI.Services.Implementations
                     DaysRemaining = subscription.ExpiresAt.HasValue ?
                         Math.Max(0, (int)(subscription.ExpiresAt.Value - DateTime.UtcNow).TotalDays) : null
                 };
+
+                return OperationResult<SubscriptionStatusDTO>.Successful(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting subscription for user {UserId}", userId);
-                return new SubscriptionStatusDTO
-                {
-                    SubscriptionType = SubscriptionType.Free,
-                    IsActive = true
-                };
+                return OperationResult<SubscriptionStatusDTO>.Failed("Unable to retrieve subscription status.");
             }
         }
 
-        public async Task<bool> UpgradeToPremiumAsync(Guid userId, int durationMonths = 1)
+        public async Task<OperationResult> UpgradeToPremiumAsync(Guid userId, int durationMonths = 1)
         {
             try
             {
+                if (durationMonths < 1 || durationMonths > 12)
+                {
+                    return OperationResult.ValidationFailure("Duration must be between 1 and 12 months.");
+                }
+
                 var subscription = await _dbContext.UserSubscriptions
                     .FirstOrDefaultAsync(s => s.UserId == userId);
 
@@ -104,53 +108,73 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("User {UserId} upgraded to Premium for {Months} months", userId, durationMonths);
-                return true;
+                return OperationResult.Successful()
+                    .WithMetadata("subscription_type", SubscriptionType.Premium)
+                    .WithMetadata("expires_at", subscription.ExpiresAt);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error upgrading user {UserId} to premium", userId);
-                return false;
+                return OperationResult.Failed("Unable to upgrade subscription. Please try again.");
             }
         }
 
-        public async Task<bool> CancelSubscriptionAsync(Guid userId)
+        public async Task<OperationResult> CancelSubscriptionAsync(Guid userId)
         {
             try
             {
                 var subscription = await _dbContext.UserSubscriptions
                     .FirstOrDefaultAsync(s => s.UserId == userId);
 
-                if (subscription != null)
+                if (subscription == null)
                 {
-                    subscription.SubscriptionType = SubscriptionType.Free;
-                    subscription.ExpiresAt = null;
-                    subscription.UpdatedAt = DateTime.UtcNow;
-
-                    await _dbContext.SaveChangesAsync();
-
-                    _logger.LogInformation("User {UserId} cancelled premium subscription", userId);
+                    return OperationResult.NotFound("No subscription found for this user.");
                 }
 
-                return true;
+                if (subscription.SubscriptionType == SubscriptionType.Free)
+                {
+                    return OperationResult.BusinessRuleViolation("User is already on a free plan.");
+                }
+
+                subscription.SubscriptionType = SubscriptionType.Free;
+                subscription.ExpiresAt = null;
+                subscription.UpdatedAt = DateTime.UtcNow;
+
+                await _dbContext.SaveChangesAsync();
+
+                _logger.LogInformation("User {UserId} cancelled premium subscription", userId);
+
+                return OperationResult.Successful()
+                    .WithMetadata("cancelled_at", DateTime.UtcNow);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error cancelling subscription for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to cancel subscription. Please try again.");
             }
         }
 
-        public async Task<UsageLimitsDTO> GetUsageLimitsAsync(Guid userId)
+        public async Task<OperationResult<UsageLimitsDTO>> GetUsageLimitsAsync(Guid userId)
         {
             try
             {
-                var subscription = await GetUserSubscriptionAsync(userId);
+                var subscriptionResult = await GetUserSubscriptionAsync(userId);
+                if (!subscriptionResult.Success)
+                {
+                    return OperationResult<UsageLimitsDTO>.Failed("Unable to retrieve subscription information.");
+                }
+
+                var subscription = subscriptionResult.Data!;
                 var usageLimit = await GetOrCreateUsageLimitAsync(userId);
 
                 // Reset daily limits if needed
                 if (usageLimit.LastResetDate.Date < DateTime.UtcNow.Date)
                 {
-                    await ResetDailyLimitsAsync(userId);
+                    var resetResult = await ResetDailyLimitsAsync(userId);
+                    if (!resetResult.Success)
+                    {
+                        return OperationResult<UsageLimitsDTO>.Failed("Unable to reset daily limits.");
+                    }
                     usageLimit = await GetOrCreateUsageLimitAsync(userId);
                 }
 
@@ -158,11 +182,15 @@ namespace MomomiAPI.Services.Implementations
                 var weekStart = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek + 1);
                 if (usageLimit.LastWeeklyReset.Date < weekStart)
                 {
-                    await ResetWeeklyLimitsAsync(userId);
+                    var resetResult = await ResetWeeklyLimitsAsync(userId);
+                    if (!resetResult.Success)
+                    {
+                        return OperationResult<UsageLimitsDTO>.Failed("Unable to reset weekly limits.");
+                    }
                     usageLimit = await GetOrCreateUsageLimitAsync(userId);
                 }
 
-                return new UsageLimitsDTO
+                var result = new UsageLimitsDTO
                 {
                     SubscriptionType = subscription.SubscriptionType,
 
@@ -177,11 +205,10 @@ namespace MomomiAPI.Services.Implementations
                     SuperLikesUsedThisWeek = usageLimit.SuperLikesUsedThisWeek,
                     MaxSuperLikesPerWeek = GetMaxSuperLikesPerWeek(subscription.SubscriptionType),
 
-                    //Match limits - now unlimited for all users
-
-                    MatchesCount = 0, // Always 0 since unlimited
-                    MaxMatches = int.MaxValue, // Unlimited
-                    RemainingMatches = int.MaxValue, // Unlimited
+                    // Match limits - now unlimited for all users
+                    MatchesCount = 0,
+                    MaxMatches = int.MaxValue,
+                    RemainingMatches = int.MaxValue,
 
                     // Ads
                     AdsWatchedToday = usageLimit.AdsWatchedToday,
@@ -190,46 +217,55 @@ namespace MomomiAPI.Services.Implementations
                     // Calculated remaining
                     RemainingLikes = Math.Max(0, GetMaxLikesPerDay(subscription.SubscriptionType) - usageLimit.LikesUsedToday + usageLimit.BonusLikesFromAds),
                     RemainingSuperLikes = subscription.SubscriptionType == SubscriptionType.Premium ?
-                        Math.Max(0, GetMaxSuperLikesPerDay(subscription.SubscriptionType) - usageLimit.SuperLikesUsedToday) :
-                        Math.Max(0, GetMaxSuperLikesPerWeek(subscription.SubscriptionType) - usageLimit.SuperLikesUsedThisWeek),
+                                        Math.Max(0, GetMaxSuperLikesPerDay(subscription.SubscriptionType) - usageLimit.SuperLikesUsedToday) :
+                                        Math.Max(0, GetMaxSuperLikesPerWeek(subscription.SubscriptionType) - usageLimit.SuperLikesUsedThisWeek),
                     RemainingAds = Math.Max(0, GetMaxAdsPerDay(subscription.SubscriptionType) - usageLimit.AdsWatchedToday)
                 };
+
+                return OperationResult<UsageLimitsDTO>.Successful(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting usage limits for user {UserId}", userId);
-                return new UsageLimitsDTO { SubscriptionType = SubscriptionType.Free };
+                return OperationResult<UsageLimitsDTO>.Failed("Unable to retrieve usage limits.");
             }
         }
 
-        public async Task<bool> CanUserLikeAsync(Guid userId, LikeType likeType = LikeType.Regular)
+        public async Task<OperationResult<bool>> CanUserLikeAsync(Guid userId, LikeType likeType = LikeType.Regular)
         {
             try
             {
-                var usageLimits = await GetUsageLimitsAsync(userId);
+                var usageLimitsResult = await GetUsageLimitsAsync(userId);
+                if (!usageLimitsResult.Success)
+                {
+                    return OperationResult<bool>.Failed("Unable to check usage limits.");
+                }
+
+                var usageLimits = usageLimitsResult.Data!;
 
                 if (likeType == LikeType.Regular)
                 {
-                    return usageLimits.RemainingLikes > 0;
+                    return OperationResult<bool>.Successful(usageLimits.RemainingLikes > 0);
                 }
                 else // SuperLike
                 {
-                    return usageLimits.RemainingSuperLikes > 0;
+                    return OperationResult<bool>.Successful(usageLimits.RemainingSuperLikes > 0);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error checking if user {UserId} can like", userId);
-                return false;
+                return OperationResult<bool>.Failed("Unable to check like permissions.");
             }
         }
 
-        public bool CanUserMatchAsync(Guid userId)
+        public OperationResult<bool> CanUserMatchAsync(Guid userId)
         {
-            return true; // Currently all users can match, no limits enforced
+            // Currently all users can match, no limits enforced
+            return OperationResult<bool>.Successful(true);
         }
 
-        public async Task<bool> RecordLikeUsageAsync(Guid userId, LikeType likeType)
+        public async Task<OperationResult> RecordLikeUsageAsync(Guid userId, LikeType likeType)
         {
             try
             {
@@ -256,29 +292,42 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogDebug("Recorded {LikeType} usage for user {UserId}", likeType, userId);
-                return true;
+                return OperationResult.Successful()
+                    .WithMetadata("like_type", likeType)
+                    .WithMetadata("recorded_at", DateTime.UtcNow);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error recording like usage for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to record like usage.");
             }
         }
 
-        public async Task<bool> RecordAdWatchedAsync(Guid userId)
+        public async Task<OperationResult> RecordAdWatchedAsync(Guid userId)
         {
             try
             {
                 var usageLimit = await GetOrCreateUsageLimitAsync(userId);
-                var subscription = await GetUserSubscriptionAsync(userId);
+                var subscriptionResult = await GetUserSubscriptionAsync(userId);
+
+                if (!subscriptionResult.Success)
+                {
+                    return OperationResult.Failed("Unable to verify subscription status.");
+                }
+
+                var subscription = subscriptionResult.Data!;
 
                 // Only free users can watch ads
                 if (subscription.SubscriptionType != SubscriptionType.Free)
-                    return false;
+                {
+                    return OperationResult.BusinessRuleViolation("Premium users cannot watch ads for bonus likes.");
+                }
 
                 // Check if user has reached daily ad limit
                 if (usageLimit.AdsWatchedToday >= GetMaxAdsPerDay(SubscriptionType.Free))
-                    return false;
+                {
+                    return OperationResult.BusinessRuleViolation("Daily ad limit reached.");
+                }
 
                 usageLimit.AdsWatchedToday++;
                 usageLimit.BonusLikesFromAds++;
@@ -287,16 +336,18 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("User {UserId} watched ad and earned bonus like", userId);
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("bonus_likes_earned", 1)
+                                    .WithMetadata("ads_watched_today", usageLimit.AdsWatchedToday);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error recording ad watched for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to record ad view.");
             }
         }
 
-        public async Task<bool> ResetDailyLimitsAsync(Guid userId)
+        public async Task<OperationResult> ResetDailyLimitsAsync(Guid userId)
         {
             try
             {
@@ -312,16 +363,17 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogDebug("Reset daily limits for user {UserId}", userId);
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("reset_date", DateTime.UtcNow.Date);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error resetting daily limits for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to reset daily limits.");
             }
         }
 
-        public async Task<bool> ResetWeeklyLimitsAsync(Guid userId)
+        public async Task<OperationResult> ResetWeeklyLimitsAsync(Guid userId)
         {
             try
             {
@@ -334,12 +386,13 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 _logger.LogDebug("Reset weekly limits for user {UserId}", userId);
-                return true;
+                return OperationResult.Successful()
+                                    .WithMetadata("reset_date", DateTime.UtcNow.Date);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error resetting weekly limits for user {UserId}", userId);
-                return false;
+                return OperationResult.Failed("Unable to reset weekly limits.");
             }
         }
 
