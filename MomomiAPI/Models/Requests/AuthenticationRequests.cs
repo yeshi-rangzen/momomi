@@ -23,36 +23,6 @@ namespace MomomiAPI.Models.Requests
             public string Otp { get; set; } = string.Empty;
         }
 
-        public class RegisterWithOtpRequest
-        {
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; } = string.Empty;
-
-            [Required]
-            [StringLength(6, MinimumLength = 6)]
-            public string Otp { get; set; } = string.Empty;
-
-            [Required]
-            [MaxLength(100)]
-            public string FirstName { get; set; } = string.Empty;
-
-            [MaxLength(100)]
-            public string? LastName { get; set; }
-
-            [Required]
-            public DateTime DateOfBirth { get; set; }
-
-            [Required]
-            public GenderType Gender { get; set; }
-
-            [Required]
-            public GenderType InterestedIn { get; set; }
-
-            [Phone]
-            public string? PhoneNumber { get; set; }
-        }
-
         public class CompleteRegistrationRequest
         {
             [Required]

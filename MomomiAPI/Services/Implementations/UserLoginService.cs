@@ -3,6 +3,7 @@ using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Models;
 using MomomiAPI.Services.Interfaces;
 using Supabase.Gotrue;
 
@@ -38,15 +39,17 @@ namespace MomomiAPI.Services.Implementations
 
                 // Check OTP attempt info
                 var otpAttemptKey = CacheKeys.Authentication.OtpAttempt(email);
-                var otpAttemptInfo = await _cacheService.GetAsync<dynamic>(otpAttemptKey);
+                var otpAttemptInfo = await _cacheService.GetAsync<OtpAttemptInfo>(otpAttemptKey);
 
                 if (otpAttemptInfo == null)
                 {
                     return LoginResult.InvalidCredentials();
                 }
 
-                var expiresAt = otpAttemptInfo.GetProperty("ExpiresAt").GetDateTime();
-                var attemptCount = otpAttemptInfo.GetProperty("AttemptCount").GetInt32();
+                //var expiresAt = otpAttemptInfo.GetProperty("ExpiresAt").GetDateTime();
+                //var attemptCount = otpAttemptInfo.GetProperty("AttemptCount").GetInt32();
+                var expiresAt = otpAttemptInfo.ExpiresAt;
+                var attemptCount = otpAttemptInfo.AttemptCount;
 
                 if (expiresAt < DateTime.UtcNow)
                 {
@@ -64,13 +67,14 @@ namespace MomomiAPI.Services.Implementations
                 if (verifyResponse?.User == null)
                 {
                     // Increment attempt count
-                    var updatedAttemptInfo = new
-                    {
-                        Email = email,
-                        AttemptCount = attemptCount + 1,
-                        SentAt = otpAttemptInfo.GetProperty("SentAt").GetDateTime(),
-                        ExpiresAt = expiresAt
-                    };
+                    //var updatedAttemptInfo = new
+                    //{
+                    //    Email = email,
+                    //    AttemptCount = attemptCount + 1,
+                    //    SentAt = otpAttemptInfo.GetProperty("SentAt").GetDateTime(),
+                    //    ExpiresAt = expiresAt
+                    //};
+                    var updatedAttemptInfo = new OtpAttemptInfo(email, attemptCount + 1, otpAttemptInfo.SentAt, expiresAt);
 
                     await _cacheService.SetAsync(otpAttemptKey, updatedAttemptInfo,
                         TimeSpan.FromMinutes((expiresAt - DateTime.UtcNow).TotalMinutes));

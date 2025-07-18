@@ -6,7 +6,7 @@
     "version": "v1"
   },
   "paths": {
-    "/api/Auth/send-otp": {
+    "/api/Auth/send-verification-code": {
       "post": {
         "tags": [
           "Auth"
@@ -26,6 +26,54 @@
             "application/*+json": {
               "schema": {
                 "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/verify-email-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
               }
             }
           }
@@ -46,24 +94,41 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterWithOtpRequest"
+                "$ref": "#/components/schemas/CompleteRegistrationRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterWithOtpRequest"
+                "$ref": "#/components/schemas/CompleteRegistrationRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/RegisterWithOtpRequest"
+                "$ref": "#/components/schemas/CompleteRegistrationRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -94,12 +159,29 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/Auth/resend-otp": {
+    "/api/Auth/resend-verification-code": {
       "post": {
         "tags": [
           "Auth"
@@ -125,7 +207,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -187,7 +286,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              }
+            }
           }
         }
       }
@@ -211,128 +327,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Auth/revoke-sessions": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Blocking/block": {
-      "post": {
-        "tags": [
-          "Blocking"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BlockUserRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BlockUserRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/BlockUserRequest"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
               }
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Blocking/unblock/{userId}": {
-      "post": {
-        "tags": [
-          "Blocking"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Blocking/blocked-users": {
-      "get": {
-        "tags": [
-          "Blocking"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Blocking/report": {
-      "post": {
-        "tags": [
-          "Blocking"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReportUserRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReportUserRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReportUserRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Blocking/my-reports": {
-      "get": {
-        "tags": [
-          "Blocking"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -368,10 +380,10 @@
         }
       }
     },
-    "/api/Matching/discovery": {
+    "/api/Discovery/users": {
       "get": {
         "tags": [
-          "Matching"
+          "Discovery"
         ],
         "parameters": [
           {
@@ -386,15 +398,148 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/Matching/like/{userId}": {
+    "/api/Discovery/users/global": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "parameters": [
+          {
+            "name": "count",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Discovery/users/local": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "parameters": [
+          {
+            "name": "count",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          },
+          {
+            "name": "maxDistance",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Interactions/users/{userId}/like": {
       "post": {
         "tags": [
-          "Matching"
+          "Interactions"
         ],
         "parameters": [
           {
@@ -402,7 +547,8 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -432,10 +578,10 @@
         }
       }
     },
-    "/api/Matching/pass/{userId}": {
+    "/api/Interactions/users/{userId}/pass": {
       "post": {
         "tags": [
-          "Matching"
+          "Interactions"
         ],
         "parameters": [
           {
@@ -455,10 +601,10 @@
         }
       }
     },
-    "/api/Matching/matches": {
-      "get": {
+    "/api/Interactions/undo-last-swipe": {
+      "post": {
         "tags": [
-          "Matching"
+          "Interactions"
         ],
         "responses": {
           "200": {
@@ -467,10 +613,48 @@
         }
       }
     },
-    "/api/Matching/unmatch/{userId}": {
+    "/api/Matches": {
+      "get": {
+        "tags": [
+          "Matches"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Matches/{userId}": {
       "delete": {
         "tags": [
-          "Matching"
+          "Matches"
         ],
         "parameters": [
           {
@@ -497,7 +681,33 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -520,7 +730,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -561,7 +788,33 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MessageDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -592,7 +845,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -670,7 +940,33 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -682,7 +978,27 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
           }
         }
       }
@@ -821,7 +1137,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -833,7 +1166,65 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserPhotoDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserPhotoDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserPhotoDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Photos/count": {
+      "get": {
+        "tags": [
+          "Photos"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
           }
         }
       }
@@ -861,7 +1252,7 @@
         }
       }
     },
-    "/api/Photos/{photoId}/primary": {
+    "/api/Photos/{photoId}/set-primary": {
       "put": {
         "tags": [
           "Photos"
@@ -927,6 +1318,75 @@
         }
       }
     },
+    "/api/Reporting/report": {
+      "post": {
+        "tags": [
+          "Reporting"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Reporting/my-reports": {
+      "get": {
+        "tags": [
+          "Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserReportDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserReportDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserReportDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Subscription/status": {
       "get": {
         "tags": [
@@ -934,7 +1394,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -946,7 +1423,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageLimitsDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageLimitsDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageLimitsDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -1013,7 +1507,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              }
+            }
           }
         }
       },
@@ -1042,7 +1553,24 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -1127,7 +1655,33 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserProfileDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1171,20 +1725,170 @@
   },
   "components": {
     "schemas": {
-      "BlockUserRequest": {
+      "ChildrenStatusType": {
+        "enum": [
+          "DontHaveChildren",
+          "HaveChildren",
+          "PreferNotToSay"
+        ],
+        "type": "string"
+      },
+      "CompleteRegistrationRequest": {
         "required": [
-          "userId"
+          "dateOfBirth",
+          "email",
+          "firstName",
+          "gender",
+          "heritage",
+          "hometown",
+          "interestedIn",
+          "languagesSpoken",
+          "religion",
+          "verificationToken"
         ],
         "type": "object",
         "properties": {
-          "userId": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "verificationToken": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "firstName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "hometown": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            }
+          },
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            }
+          },
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            }
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "format": "tel",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Conversation": {
+        "required": [
+          "user1Id",
+          "user2Id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
             "type": "string",
             "format": "uuid"
           },
-          "reason": {
-            "maxLength": 500,
+          "user1Id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user2Id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user1": {
+            "$ref": "#/components/schemas/User"
+          },
+          "user2": {
+            "$ref": "#/components/schemas/User"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "otherUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "otherUserName": {
             "type": "string",
             "nullable": true
+          },
+          "otherUserPhoto": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastMessage": {
+            "$ref": "#/components/schemas/MessageDTO"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isActive": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -1198,6 +1902,67 @@
         },
         "additionalProperties": false
       },
+      "EducationLevelType": {
+        "enum": [
+          "SecondarySchool",
+          "Undergrad",
+          "Postgrad",
+          "PreferNotToSay"
+        ],
+        "type": "string"
+      },
+      "EmailVerificationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "data": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true
+          },
+          "remainingAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FamilyPlanType": {
+        "enum": [
+          "DontWantChildren",
+          "WantChildren",
+          "OpenToChildren",
+          "NotSure",
+          "PreferNotToSay"
+        ],
+        "type": "string"
+      },
       "GenderType": {
         "enum": [
           "Male",
@@ -1210,18 +1975,64 @@
       "HeritageType": {
         "enum": [
           "Arunachali",
-          "Assamese",
           "Bhutanese",
           "Himachali",
           "Ladakhi",
-          "Manipuri",
-          "Mizo",
-          "Naga",
           "Nepali",
           "Sikkimese",
           "Tibetan",
-          "Tripuri",
           "Uttarakhandi",
+          "Other"
+        ],
+        "type": "string"
+      },
+      "LanguageType": {
+        "enum": [
+          "English",
+          "Hindi",
+          "Ladakhi",
+          "Balti",
+          "Kinnauri",
+          "Lahauli",
+          "SpitiBhoti",
+          "Tibetan",
+          "Jad",
+          "Byangsi",
+          "Chaudangsi",
+          "Rangkas",
+          "Bhoti",
+          "Drenjongke",
+          "Lepcha",
+          "Nepali",
+          "Adi",
+          "Apatani",
+          "Nyishi",
+          "Mishmi",
+          "Tagin",
+          "Monpa",
+          "Sherdukpen",
+          "Nocte",
+          "Wancho",
+          "Tamang",
+          "Gurung",
+          "Sherpa",
+          "Lhomi",
+          "Limbu",
+          "Rai",
+          "Magar",
+          "Thakali",
+          "Manangba",
+          "Newar",
+          "Walungge",
+          "Dolpo",
+          "Tsumke",
+          "Dzongkha",
+          "Tshangla",
+          "Sharchhopkha",
+          "LhotshampaDialects",
+          "Brokpa",
+          "Layakha",
+          "Khengkha",
           "Other"
         ],
         "type": "string"
@@ -1249,6 +2060,51 @@
         },
         "additionalProperties": false
       },
+      "LoginResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/User"
+          },
+          "accessToken": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginWithOtpRequest": {
         "required": [
           "email",
@@ -1269,6 +2125,252 @@
         },
         "additionalProperties": false
       },
+      "MatchDTO": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "primaryPhoto": {
+            "type": "string",
+            "nullable": true
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "matchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastMessage": {
+            "$ref": "#/components/schemas/MessageDTO"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isFromSuperLike": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Message": {
+        "required": [
+          "content",
+          "conversationId",
+          "senderId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "messageType": {
+            "maxLength": 20,
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/User"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderName": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageType": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotificationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "notificationType": {
+            "$ref": "#/components/schemas/NotificationType"
+          },
+          "data": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotificationType": {
+        "enum": [
+          "Match",
+          "Message",
+          "SuperLike",
+          "ProfileView"
+        ],
+        "type": "string"
+      },
+      "PushNotification": {
+        "required": [
+          "message",
+          "title",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "notificationType": {
+            "$ref": "#/components/schemas/NotificationType"
+          },
+          "data": {
+            "type": "string",
+            "nullable": true
+          },
+          "isSent": {
+            "type": "boolean"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshTokenRequest": {
         "required": [
           "refreshToken"
@@ -1282,51 +2384,47 @@
         },
         "additionalProperties": false
       },
-      "RegisterWithOtpRequest": {
-        "required": [
-          "dateOfBirth",
-          "email",
-          "firstName",
-          "gender",
-          "interestedIn",
-          "otp"
-        ],
+      "RegistrationResult": {
         "type": "object",
         "properties": {
-          "email": {
-            "minLength": 1,
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorMessage": {
             "type": "string",
-            "format": "email"
+            "nullable": true,
+            "readOnly": true
           },
-          "otp": {
-            "maxLength": 6,
-            "minLength": 6,
-            "type": "string"
-          },
-          "firstName": {
-            "maxLength": 100,
-            "minLength": 1,
-            "type": "string"
-          },
-          "lastName": {
-            "maxLength": 100,
+          "errorCode": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "readOnly": true
           },
-          "dateOfBirth": {
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/User"
+          },
+          "accessToken": {
             "type": "string",
-            "format": "date-time"
+            "nullable": true,
+            "readOnly": true
           },
-          "gender": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "interestedIn": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "phoneNumber": {
+          "refreshToken": {
             "type": "string",
-            "format": "tel",
-            "nullable": true
+            "nullable": true,
+            "readOnly": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -1348,6 +2446,7 @@
       },
       "ReportReason": {
         "enum": [
+          "Block",
           "Inappropriate",
           "Spam",
           "FakeProfile",
@@ -1431,6 +2530,39 @@
         },
         "additionalProperties": false
       },
+      "SubscriptionStatusDTO": {
+        "type": "object",
+        "properties": {
+          "subscriptionType": {
+            "$ref": "#/components/schemas/SubscriptionType"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "daysRemaining": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubscriptionType": {
+        "enum": [
+          "Free",
+          "Premium"
+        ],
+        "type": "string"
+      },
       "SubscriptionUpgradeRequest": {
         "type": "object",
         "properties": {
@@ -1490,22 +2622,36 @@
             "type": "string",
             "nullable": true
           },
+          "hometown": {
+            "type": "string",
+            "nullable": true
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
           "heritage": {
-            "$ref": "#/components/schemas/HeritageType"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
           },
           "religion": {
-            "$ref": "#/components/schemas/ReligionType"
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
           },
           "languagesSpoken": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/LanguageType"
             },
             "nullable": true
           },
           "educationLevel": {
-            "type": "string",
-            "nullable": true
+            "$ref": "#/components/schemas/EducationLevelType"
           },
           "occupation": {
             "type": "string",
@@ -1545,6 +2691,32 @@
             "type": "boolean",
             "nullable": true
           },
+          "isGloballyDiscoverable": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isDiscoverable": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildrenStatusType"
+          },
+          "familyPlan": {
+            "$ref": "#/components/schemas/FamilyPlanType"
+          },
+          "drugs": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "smoking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "marijuana": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
           "preferredHeritage": {
             "type": "array",
             "items": {
@@ -1559,15 +2731,69 @@
             },
             "nullable": true
           },
-          "culturalImportanceLevel": {
+          "languagePreference": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "preferredHeightMin": {
             "type": "integer",
             "format": "int32",
             "nullable": true
           },
-          "languagePreference": {
+          "preferredHeightMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredChildren": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ChildrenStatusType"
+            },
+            "nullable": true
+          },
+          "preferredFamilyPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FamilyPlanType"
+            },
+            "nullable": true
+          },
+          "preferredDrugs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredSmoking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredMarijuana": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredDrinking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredEducationLevels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationLevelType"
             },
             "nullable": true
           }
@@ -1587,6 +2813,928 @@
           }
         },
         "additionalProperties": false
+      },
+      "UsageLimitsDTO": {
+        "type": "object",
+        "properties": {
+          "subscriptionType": {
+            "$ref": "#/components/schemas/SubscriptionType"
+          },
+          "likesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLikesPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingLikes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bonusLikesFromAds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "superLikesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxSuperLikesPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "superLikesUsedThisWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxSuperLikesPerWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingSuperLikes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxMatches": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingMatches": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adsWatchedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAdsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingAds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "User": {
+        "required": [
+          "email",
+          "supabaseUid"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supabaseUid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phoneNumber": {
+            "maxLength": 20,
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "educationLevel": {
+            "$ref": "#/components/schemas/EducationLevelType"
+          },
+          "occupation": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "hometown": {
+            "maxLength": 200,
+            "type": "string",
+            "nullable": true
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildrenStatusType"
+          },
+          "familyPlan": {
+            "$ref": "#/components/schemas/FamilyPlanType"
+          },
+          "drugs": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "smoking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "marijuana": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "maxDistanceKm": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enableGlobalDiscovery": {
+            "type": "boolean"
+          },
+          "isDiscoverable": {
+            "type": "boolean"
+          },
+          "isGloballyDiscoverable": {
+            "type": "boolean"
+          },
+          "pushToken": {
+            "maxLength": 500,
+            "type": "string",
+            "nullable": true
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "lastActive": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhoto"
+            },
+            "nullable": true
+          },
+          "likesGiven": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserLike"
+            },
+            "nullable": true
+          },
+          "likesReceived": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserLike"
+            },
+            "nullable": true
+          },
+          "conversationsAsUser1": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "nullable": true
+          },
+          "conversationsAsUser2": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "nullable": true
+          },
+          "messagesSent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "nullable": true
+          },
+          "reportsMade": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserReport"
+            },
+            "nullable": true
+          },
+          "reportsReceived": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserReport"
+            },
+            "nullable": true
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UserPreference"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/UserSubscription"
+          },
+          "usageLimit": {
+            "$ref": "#/components/schemas/UserUsageLimit"
+          },
+          "blocksMade": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserBlock"
+            },
+            "nullable": true
+          },
+          "blocksReceived": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserBlock"
+            },
+            "nullable": true
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PushNotification"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserBlock": {
+        "required": [
+          "blockedUserId",
+          "blockerUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockerUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blockedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "maxLength": 500,
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blockerUser": {
+            "$ref": "#/components/schemas/User"
+          },
+          "blockedUser": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserLike": {
+        "required": [
+          "likedUserId",
+          "likerUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "likerUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "likedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isLike": {
+            "type": "boolean"
+          },
+          "likeType": {
+            "$ref": "#/components/schemas/LikeType"
+          },
+          "isMatch": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "likerUser": {
+            "$ref": "#/components/schemas/User"
+          },
+          "likedUser": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserPhoto": {
+        "required": [
+          "cloudinaryPublicId",
+          "url",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cloudinaryPublicId": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "url": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "photoOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserPhotoDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "photoOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserPreference": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "preferredHeritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "preferredReligions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "languagePreference": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "preferredHeightMin": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredHeightMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredChildren": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChildrenStatusType"
+            },
+            "nullable": true
+          },
+          "preferredFamilyPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FamilyPlanType"
+            },
+            "nullable": true
+          },
+          "preferredDrugs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredSmoking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredDrinking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredMarijuana": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredEducationLevels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationLevelType"
+            },
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserProfileDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "educationLevel": {
+            "$ref": "#/components/schemas/EducationLevelType"
+          },
+          "occupation": {
+            "type": "string",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "enableGlobalDiscovery": {
+            "type": "boolean"
+          },
+          "isGloballyDiscoverable": {
+            "type": "boolean"
+          },
+          "isDiscoverable": {
+            "type": "boolean"
+          },
+          "hometown": {
+            "type": "string",
+            "nullable": true
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildrenStatusType"
+          },
+          "familyPlan": {
+            "$ref": "#/components/schemas/FamilyPlanType"
+          },
+          "drugs": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "smoking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "marijuana": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "lastActive": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReport": {
+        "required": [
+          "reportedId",
+          "reporterId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reporterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportedId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "maxLength": 20,
+            "type": "string",
+            "nullable": true
+          },
+          "adminNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/User"
+          },
+          "reported": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReportDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportedUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryPhoto": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserSubscription": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subscriptionType": {
+            "$ref": "#/components/schemas/SubscriptionType"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserUsageLimit": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "likesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "superLikesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "superLikesUsedThisWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adsWatchedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bonusLikesFromAds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastResetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastWeeklyReset": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerifyOtpRequest": {
+        "required": [
+          "email",
+          "otp"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "otp": {
+            "maxLength": 6,
+            "minLength": 6,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ViceFrequencyType": {
+        "enum": [
+          "Yes",
+          "No",
+          "Sometimes",
+          "PreferNotToSay"
+        ],
+        "type": "string"
       }
     },
     "securitySchemes": {

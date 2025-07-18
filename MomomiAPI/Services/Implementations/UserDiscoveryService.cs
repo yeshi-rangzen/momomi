@@ -12,20 +12,17 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
-        private readonly IReportingService _reportingService;
         private readonly MatchingAlgorithm _matchingAlgorithm;
         private readonly ILogger<UserDiscoveryService> _logger;
 
         public UserDiscoveryService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            IReportingService reportingService,
             MatchingAlgorithm matchingAlgorithm,
             ILogger<UserDiscoveryService> logger)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
-            _reportingService = reportingService;
             _matchingAlgorithm = matchingAlgorithm;
             _logger = logger;
         }

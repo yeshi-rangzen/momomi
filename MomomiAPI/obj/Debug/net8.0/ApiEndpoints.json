@@ -1,7 +1,7 @@
 [
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "CheckEmail",
+    "Method": "CheckEmailRegistration",
     "RelativePath": "api/Auth/check-email",
     "HttpMethod": "POST",
     "IsController": true,
@@ -17,7 +17,7 @@
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "Login",
+    "Method": "LoginUser",
     "RelativePath": "api/Auth/login",
     "HttpMethod": "POST",
     "IsController": true,
@@ -29,11 +29,21 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.LoginResult",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "Logout",
+    "Method": "LogoutUser",
     "RelativePath": "api/Auth/logout",
     "HttpMethod": "POST",
     "IsController": true,
@@ -49,7 +59,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.Entities.User",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
@@ -65,11 +85,21 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.LoginResult",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "Register",
+    "Method": "RegisterUser",
     "RelativePath": "api/Auth/register",
     "HttpMethod": "POST",
     "IsController": true,
@@ -77,16 +107,26 @@
     "Parameters": [
       {
         "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.AuthenticationRequests\u002BRegisterWithOtpRequest",
+        "Type": "MomomiAPI.Models.Requests.AuthenticationRequests\u002BCompleteRegistrationRequest",
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.RegistrationResult",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "ResendOtp",
-    "RelativePath": "api/Auth/resend-otp",
+    "Method": "ResendVerificationCode",
+    "RelativePath": "api/Auth/resend-verification-code",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -97,22 +137,22 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.EmailVerificationResult",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "RevokeSessions",
-    "RelativePath": "api/Auth/revoke-sessions",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.AuthController",
-    "Method": "SendOtp",
-    "RelativePath": "api/Auth/send-otp",
+    "Method": "SendVerificationCode",
+    "RelativePath": "api/Auth/send-verification-code",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -123,71 +163,29 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.EmailVerificationResult",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.BlockingController",
-    "Method": "BlockUser",
-    "RelativePath": "api/Blocking/block",
+    "ContainingType": "MomomiAPI.Controllers.AuthController",
+    "Method": "VerifyEmailCode",
+    "RelativePath": "api/Auth/verify-email-code",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
         "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.BlockUserRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.BlockingController",
-    "Method": "GetBlockedUsers",
-    "RelativePath": "api/Blocking/blocked-users",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.BlockingController",
-    "Method": "GetMyReports",
-    "RelativePath": "api/Blocking/my-reports",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.BlockingController",
-    "Method": "ReportUser",
-    "RelativePath": "api/Blocking/report",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.ReportUserRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.BlockingController",
-    "Method": "UnblockUser",
-    "RelativePath": "api/Blocking/unblock/{userId}",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "userId",
-        "Type": "System.Guid",
+        "Type": "MomomiAPI.Models.Requests.AuthenticationRequests\u002BVerifyOtpRequest",
         "IsRequired": true
       }
     ],
@@ -210,9 +208,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.MatchingController",
-    "Method": "GetDiscoveryUsers",
-    "RelativePath": "api/Matching/discovery",
+    "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
+    "Method": "DiscoverUsersForSwiping",
+    "RelativePath": "api/Discovery/users",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -223,43 +221,110 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.MatchingController",
-    "Method": "LikeUser",
-    "RelativePath": "api/Matching/like/{userId}",
-    "HttpMethod": "POST",
+    "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
+    "Method": "DiscoverUsersGlobally",
+    "RelativePath": "api/Discovery/users/global",
+    "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.LikeUserRequest",
-        "IsRequired": true
-      },
-      {
-        "Name": "userId",
-        "Type": "",
-        "IsRequired": true
+        "Name": "count",
+        "Type": "System.Int32",
+        "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.MatchingController",
-    "Method": "GetMatches",
-    "RelativePath": "api/Matching/matches",
+    "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
+    "Method": "DiscoverUsersLocally",
+    "RelativePath": "api/Discovery/users/local",
     "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "count",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "maxDistance",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.InteractionsController",
+    "Method": "UndoLastSwipe",
+    "RelativePath": "api/Interactions/undo-last-swipe",
+    "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [],
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.MatchingController",
-    "Method": "PassUser",
-    "RelativePath": "api/Matching/pass/{userId}",
+    "ContainingType": "MomomiAPI.Controllers.InteractionsController",
+    "Method": "ExpressInterestInUser",
+    "RelativePath": "api/Interactions/users/{userId}/like",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      },
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.LikeUserRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.InteractionsController",
+    "Method": "DismissUser",
+    "RelativePath": "api/Interactions/users/{userId}/pass",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -273,9 +338,29 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.MatchingController",
-    "Method": "UnmatchUser",
-    "RelativePath": "api/Matching/unmatch/{userId}",
+    "ContainingType": "MomomiAPI.Controllers.MatchesController",
+    "Method": "GetUserMatches",
+    "RelativePath": "api/Matches",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.MatchDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.MatchesController",
+    "Method": "RemoveMatch",
+    "RelativePath": "api/Matches/{userId}",
     "HttpMethod": "DELETE",
     "IsController": true,
     "Order": 0,
@@ -312,7 +397,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.ConversationDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.MessagesController",
@@ -328,7 +423,17 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.ConversationDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.MessagesController",
@@ -354,7 +459,17 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.MessageDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.MessagesController",
@@ -386,7 +501,17 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.MessageDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.NotificationsController",
@@ -407,7 +532,17 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.NotificationDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.NotificationsController",
@@ -475,17 +610,37 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Int32",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.PhotosController",
-    "Method": "GetUserPhotos",
+    "Method": "GetMyPhotos",
     "RelativePath": "api/Photos",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserPhotoDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.PhotosController",
@@ -506,7 +661,7 @@
   {
     "ContainingType": "MomomiAPI.Controllers.PhotosController",
     "Method": "SetPrimaryPhoto",
-    "RelativePath": "api/Photos/{photoId}/primary",
+    "RelativePath": "api/Photos/{photoId}/set-primary",
     "HttpMethod": "PUT",
     "IsController": true,
     "Order": 0,
@@ -518,6 +673,26 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.PhotosController",
+    "Method": "GetPhotoCount",
+    "RelativePath": "api/Photos/count",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Int32",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.PhotosController",
@@ -554,6 +729,52 @@
         "IsRequired": false
       }
     ],
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UserPhotoDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.ReportingController",
+    "Method": "GetMyReports",
+    "RelativePath": "api/Reporting/my-reports",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserReportDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.ReportingController",
+    "Method": "ReportUser",
+    "RelativePath": "api/Reporting/report",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.ReportUserRequest",
+        "IsRequired": true
+      }
+    ],
     "ReturnTypes": []
   },
   {
@@ -574,7 +795,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.SubscriptionStatusDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
@@ -600,7 +831,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UsageLimitsDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.SubscriptionController",
@@ -688,7 +929,17 @@
         "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.UsersController",
@@ -698,7 +949,17 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.UsersController",
@@ -714,6 +975,16 @@
         "IsRequired": true
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   }
 ]

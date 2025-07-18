@@ -48,6 +48,10 @@ namespace MomomiAPI.Controllers
         {
             if (result.Success)
             {
+                if (result is LikeResult likeResult)
+                {
+                    return Ok(new { data = likeResult, message = "Operation completed successfully", metadata = result.Metadata });
+                }
                 return Ok(new { message = "Operation completed successfully", metadata = result.Metadata });
             }
 

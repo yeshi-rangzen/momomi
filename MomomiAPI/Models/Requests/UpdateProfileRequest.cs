@@ -7,6 +7,8 @@ namespace MomomiAPI.Models.Requests
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Bio { get; set; }
+        public string? Hometown { get; set; }
+        public GenderType? InterestedIn { get; set; }
         public List<HeritageType>? Heritage { get; set; }
         public List<ReligionType>? Religion { get; set; }
         public List<LanguageType>? LanguagesSpoken { get; set; }
@@ -21,7 +23,6 @@ namespace MomomiAPI.Models.Requests
         public bool? EnableGlobalDiscovery { get; set; }
         public bool? IsGloballyDiscoverable { get; set; }
         public bool? IsDiscoverable { get; set; }
-        public string? Hometown { get; set; }
         public ChildrenStatusType? Children { get; set; }
         public FamilyPlanType? FamilyPlan { get; set; }
         public ViceFrequencyType? Drugs { get; set; }

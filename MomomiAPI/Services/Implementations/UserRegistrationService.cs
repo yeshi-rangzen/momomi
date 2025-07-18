@@ -2,6 +2,7 @@
 using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Models;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
@@ -52,7 +53,7 @@ namespace MomomiAPI.Services.Implementations
 
                 // Verify the verification token
                 var verificationKey = CacheKeys.Authentication.EmailVerification(request.Email, request.VerificationToken);
-                var verificationData = await _cacheService.GetAsync<dynamic>(verificationKey);
+                var verificationData = await _cacheService.GetAsync<RegisterVerificationData>(verificationKey);
 
                 if (verificationData == null)
                 {
@@ -63,7 +64,7 @@ namespace MomomiAPI.Services.Implementations
                 await _cacheService.RemoveAsync(verificationKey);
 
                 // Extract Supabase user ID from verification data
-                var supabaseUserId = verificationData.GetProperty("SupabaseUserId").GetString();
+                var supabaseUserId = verificationData.SupabaseUserId;
                 if (string.IsNullOrEmpty(supabaseUserId))
                 {
                     return RegistrationResult.InvalidVerificationToken();
@@ -116,7 +117,7 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during registration for {Email}", request.Email);
-                return (RegistrationResult)RegistrationResult.Failed("Registration failed. Please try again.");
+                return RegistrationResult.Failed(ex.Message);
             }
         }
     }

@@ -3,6 +3,7 @@ using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Models;
 using MomomiAPI.Services.Interfaces;
 using Supabase.Gotrue;
 
@@ -61,13 +62,7 @@ namespace MomomiAPI.Services.Implementations
                 // Store OTP attempt info for validation
                 var otpAttemptKey = CacheKeys.Authentication.OtpAttempt(email);
                 var expiresAt = DateTime.UtcNow.AddMinutes(10);
-                var otpAttemptInfo = new
-                {
-                    Email = email,
-                    AttemptCount = 0,
-                    SentAt = DateTime.UtcNow,
-                    ExpiresAt = expiresAt,
-                };
+                var otpAttemptInfo = new OtpAttemptInfo(email, 0, DateTime.UtcNow, expiresAt);
 
                 await _cacheService.SetAsync(otpAttemptKey, otpAttemptInfo, CacheKeys.Duration.OtpAttempt);
 
@@ -81,7 +76,7 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending verification code to {Email}", email);
-                return (EmailVerificationResult)EmailVerificationResult.Failed("Failed to send verification code. Please try again.");
+                return EmailVerificationResult.Failed("Failed to send verification code. Please try again.");
             }
         }
 
@@ -93,15 +88,17 @@ namespace MomomiAPI.Services.Implementations
 
                 // Check OTP attempt info
                 var otpAttemptKey = CacheKeys.Authentication.OtpAttempt(email);
-                var otpAttemptInfo = await _cacheService.GetAsync<dynamic>(otpAttemptKey);
+                var otpAttemptInfo = await _cacheService.GetAsync<OtpAttemptInfo>(otpAttemptKey);
 
                 if (otpAttemptInfo == null)
                 {
                     return EmailVerificationResult.CodeExpired();
                 }
 
-                var expiresAt = otpAttemptInfo.GetProperty("ExpiresAt").GetDateTime();
-                var attemptCount = otpAttemptInfo.GetProperty("AttemptCount").GetInt32();
+                //var expiresAt = otpAttemptInfo.GetProperty("ExpiresAt").GetDateTime();
+                var expiresAt = otpAttemptInfo.ExpiresAt;
+                var attemptCount = otpAttemptInfo.AttemptCount;
+                //var attemptCount = otpAttemptInfo.GetProperty("AttemptCount").GetInt32();
 
                 if (expiresAt < DateTime.UtcNow)
                 {
@@ -119,13 +116,7 @@ namespace MomomiAPI.Services.Implementations
                 if (verifyResponse?.User == null)
                 {
                     // Increment attempt count
-                    var updatedAttemptInfo = new
-                    {
-                        Email = email,
-                        AttemptCount = attemptCount + 1,
-                        SentAt = otpAttemptInfo.GetProperty("SentAt").GetDateTime(),
-                        ExpiresAt = expiresAt
-                    };
+                    var updatedAttemptInfo = new OtpAttemptInfo(email, attemptCount + 1, otpAttemptInfo.SentAt, expiresAt);
 
                     await _cacheService.SetAsync(otpAttemptKey, updatedAttemptInfo,
                                             TimeSpan.FromMinutes((expiresAt - DateTime.UtcNow).TotalMinutes));
@@ -141,12 +132,9 @@ namespace MomomiAPI.Services.Implementations
                 var verificationKey = CacheKeys.Authentication.EmailVerification(email, verificationToken);
                 var verificationExpiresAt = DateTime.UtcNow.AddMinutes(10);
 
-                await _cacheService.SetAsync(verificationKey, new
-                {
-                    Email = email,
-                    SupabaseUserId = verifyResponse.User.Id,
-                    VerifiedAt = DateTime.UtcNow
-                }, CacheKeys.Duration.EmailVerification);
+                await _cacheService.SetAsync(verificationKey,
+                    new RegisterVerificationData(email, verifyResponse.User.Id, DateTime.UtcNow),
+                    CacheKeys.Duration.EmailVerification);
 
                 return EmailVerificationResult.CodeVerifiedSuccessfully(verificationToken, verificationExpiresAt);
             }
@@ -165,12 +153,13 @@ namespace MomomiAPI.Services.Implementations
 
                 // Check if there's an existing OTP attempt
                 var otpAttemptKey = CacheKeys.Authentication.OtpAttempt(email);
-                var otpAttemptInfo = await _cacheService.GetAsync<dynamic>(otpAttemptKey);
+                var otpAttemptInfo = await _cacheService.GetAsync<OtpAttemptInfo>(otpAttemptKey);
 
                 // Implement cooldown period (30 seconds between resend requests)
                 if (otpAttemptInfo != null)
                 {
-                    var sentAt = otpAttemptInfo.GetProperty("SentAt").GetDateTime();
+                    var sentAt = otpAttemptInfo.SentAt;
+                    //var sentAt = otpAttemptInfo.GetProperty("SentAt").GetDateTime();
                     var cooldownEnd = sentAt.AddSeconds(30);
 
                     if (DateTime.UtcNow < cooldownEnd)

@@ -28,6 +28,8 @@ namespace MomomiAPI.Common.Results
 
         public static EmailVerificationResult CodeExpired()
             => new(false, null, "Verification code has expired. Please request a new one.", null, 0);
+        public static EmailVerificationResult Failed(string message)
+           => new(false, null, $"Failed with error message: {message}", null, 0);
     }
 
     public class LoginResult : OperationResult<User>
@@ -82,5 +84,8 @@ namespace MomomiAPI.Common.Results
 
         public static RegistrationResult UnderageUser()
             => new(false, null, "You must be at least 18 years old to register.", null, null, null);
+
+        public static RegistrationResult Failed(string errorMessage)
+            => new(false, null, $"Registration Failed: {errorMessage}", null, null, null);
     }
 }

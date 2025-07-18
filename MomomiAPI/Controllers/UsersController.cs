@@ -136,6 +136,15 @@ namespace MomomiAPI.Controllers
         }
 
         /// <summary>
+        /// Update current user's discovery settings
+        /// </summary>
+        [HttpPut("discovery-settings")]
+        public async Task<ActionResult<object>> UpdateDiscoverySettings()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
         /// Delete user account and all associated data
         /// </summary>
         [HttpDelete("delete-account")]

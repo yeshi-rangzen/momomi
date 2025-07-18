@@ -75,10 +75,7 @@ namespace MomomiAPI.Data.Configurations
             builder.Property(u => u.Heritage)
                 .HasConversion(
                     v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
-                    v => !string.IsNullOrEmpty(v)
-                    ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(x => Enum.Parse<HeritageType>(x.Trim(), true)).ToList()
-                    : new List<HeritageType>()
+                    v => ParseEnumList<HeritageType>(v)
                 )
                 .Metadata.SetValueComparer(new ValueComparer<List<HeritageType>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
@@ -88,10 +85,7 @@ namespace MomomiAPI.Data.Configurations
             builder.Property(u => u.Religion)
                .HasConversion(
                    v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
-                   v => !string.IsNullOrEmpty(v)
-                       ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                           .Select(x => Enum.Parse<ReligionType>(x)).ToList()
-                       : new List<ReligionType>()
+                    v => ParseEnumList<ReligionType>(v)
                )
                .Metadata.SetValueComparer(new ValueComparer<List<ReligionType>>(
                    (c1, c2) => c1!.SequenceEqual(c2!),
@@ -101,10 +95,7 @@ namespace MomomiAPI.Data.Configurations
             builder.Property(u => u.LanguagesSpoken)
                 .HasConversion(
                     v => v != null ? string.Join(',', v.Select(x => x.ToString())) : null,
-                    v => !string.IsNullOrEmpty(v)
-                        ? v.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                            .Select(x => Enum.Parse<LanguageType>(x)).ToList()
-                        : new List<LanguageType>()
+                   v => ParseEnumList<LanguageType>(v)
                 )
                 .Metadata.SetValueComparer(new ValueComparer<List<LanguageType>>(
                     (c1, c2) => c1!.SequenceEqual(c2!),
@@ -181,6 +172,33 @@ namespace MomomiAPI.Data.Configurations
                 .WithOne(p => p.User)
                 .HasForeignKey<UserPreference>(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        }
+
+        // Helper method to clean and parse enum values
+        private static List<T> ParseEnumList<T>(string value) where T : struct, Enum
+        {
+            if (string.IsNullOrEmpty(value))
+                return new List<T>();
+
+            return value.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x =>
+                {
+                    // Clean the value - remove common formatting issues
+                    var cleaned = x.Trim()
+                                  .TrimStart('{', '[', '(')  // Remove opening brackets
+                                  .TrimEnd('}', ']', ')')    // Remove closing brackets
+                                  .Trim();
+
+                    if (Enum.TryParse<T>(cleaned, true, out var result))
+                        return (T?)result;
+
+                    // Log the problematic value for debugging
+                    Console.WriteLine($"Failed to parse {typeof(T).Name} value: '{x}' (cleaned: '{cleaned}')");
+                    return null;
+                })
+                .Where(x => x.HasValue)
+                .Select(x => x.Value)
+                .ToList();
         }
     }
 }

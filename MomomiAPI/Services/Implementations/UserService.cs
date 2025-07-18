@@ -453,6 +453,15 @@ namespace MomomiAPI.Services.Implementations
             if (!string.IsNullOrEmpty(request.Bio))
                 user.Bio = request.Bio;
 
+            if (!string.IsNullOrEmpty(request.Occupation))
+                user.Occupation = request.Occupation;
+
+            if (!string.IsNullOrEmpty(request.Hometown))
+                user.Hometown = request.Hometown;
+
+            if (request.InterestedIn.HasValue)
+                user.InterestedIn = request.InterestedIn;
+
             if (request.Heritage != null)
                 user.Heritage = request.Heritage;
 
@@ -464,9 +473,6 @@ namespace MomomiAPI.Services.Implementations
 
             if (request.EducationLevel.HasValue)
                 user.EducationLevel = request.EducationLevel.Value;
-
-            if (!string.IsNullOrEmpty(request.Occupation))
-                user.Occupation = request.Occupation;
 
             if (request.HeightCm.HasValue)
                 user.HeightCm = request.HeightCm.Value;
@@ -494,9 +500,6 @@ namespace MomomiAPI.Services.Implementations
 
             if (request.IsDiscoverable.HasValue)
                 user.IsDiscoverable = request.IsDiscoverable.Value;
-
-            if (!string.IsNullOrEmpty(request.Hometown))
-                user.Hometown = request.Hometown;
 
             if (request.Children.HasValue)
                 user.Children = request.Children.Value;

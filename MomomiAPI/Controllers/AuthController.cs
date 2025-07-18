@@ -35,6 +35,7 @@ namespace MomomiAPI.Controllers
         /// </summary>
         [HttpPost("send-verification-code")]
         [EnableRateLimiting("OtpPolicy")]
+        [AllowAnonymous]
         public async Task<ActionResult<EmailVerificationResult>> SendVerificationCode([FromBody] SendOtpRequest request)
         {
             LogControllerAction(nameof(SendVerificationCode), new { request.Email });
@@ -183,16 +184,16 @@ namespace MomomiAPI.Controllers
         /// <summary>
         /// Revoke all user sessions (security feature)
         /// </summary>
-        [HttpPost("revoke-all-sessions")]
-        public async Task<ActionResult> RevokeAllSessions()
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
+        //[HttpPost("revoke-all-sessions")]
+        //public async Task<ActionResult> RevokeAllSessions()
+        //{
+        //    var userIdResult = GetCurrentUserIdOrUnauthorized();
+        //    if (userIdResult.Result != null) return userIdResult.Result;
 
-            LogControllerAction(nameof(RevokeAllSessions));
+        //    LogControllerAction(nameof(RevokeAllSessions));
 
-            var result = await _tokenManagementService.InvalidateAllUserTokens(userIdResult.Value);
-            return HandleOperationResult(result);
-        }
+        //    var result = await _tokenManagementService.InvalidateAllUserTokens(userIdResult.Value);
+        //    return HandleOperationResult(result);
+        //}
     }
 }

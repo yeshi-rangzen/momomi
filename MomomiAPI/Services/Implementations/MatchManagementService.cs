@@ -157,76 +157,82 @@ namespace MomomiAPI.Services.Implementations
             {
                 _logger.LogInformation("Removing match between user {UserId} and {MatchedUserId}", userId, matchedUserId);
 
-                using var transaction = await _dbContext.Database.BeginTransactionAsync();
-                try
+                // Use the execution strategy to handle retries and transactions
+                var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
+
+                return await executionStrategy.ExecuteAsync(async () =>
                 {
-                    // Find and update like records to remove match status
-                    var likes = await _dbContext.UserLikes
-                        .Where(ul => ((ul.LikerUserId == userId && ul.LikedUserId == matchedUserId) ||
-                                      (ul.LikerUserId == matchedUserId && ul.LikedUserId == userId)) &&
-                                     ul.IsMatch)
-                        .ToListAsync();
-
-                    if (!likes.Any())
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
                     {
-                        _logger.LogWarning("No match found between user {UserId} and {MatchedUserId}", userId, matchedUserId);
-                        return OperationResult.NotFound("Match not found.");
-                    }
+                        // Find and update like records to remove match status
+                        var likes = await _dbContext.UserLikes
+                            .Where(ul => ((ul.LikerUserId == userId && ul.LikedUserId == matchedUserId) ||
+                                          (ul.LikerUserId == matchedUserId && ul.LikedUserId == userId)) &&
+                                         ul.IsMatch)
+                            .ToListAsync();
 
-                    // Remove match status
-                    foreach (var like in likes)
-                    {
-                        like.IsMatch = false;
-                        like.UpdatedAt = DateTime.UtcNow;
-                    }
-
-                    // Find and DELETE conversation and all messages
-                    var conversation = await _dbContext.Conversations
-                        .Include(c => c.Messages)
-                        .FirstOrDefaultAsync(c =>
-                            (c.User1Id == userId && c.User2Id == matchedUserId) ||
-                            (c.User1Id == matchedUserId && c.User2Id == userId));
-
-                    if (conversation != null)
-                    {
-                        // Delete all messages first (due to foreign key constraints)
-                        if (conversation.Messages.Any())
+                        if (!likes.Any())
                         {
-                            _dbContext.Messages.RemoveRange(conversation.Messages);
-                            _logger.LogDebug("Removing {Count} messages for conversation {ConversationId}",
-                                conversation.Messages.Count, conversation.Id);
+                            _logger.LogWarning("No match found between user {UserId} and {MatchedUserId}", userId, matchedUserId);
+                            return OperationResult.NotFound("Match not found.");
                         }
 
-                        // Delete the conversation
-                        _dbContext.Conversations.Remove(conversation);
-                        _logger.LogDebug("Removing conversation {ConversationId}", conversation.Id);
+                        // Remove match status
+                        foreach (var like in likes)
+                        {
+                            like.IsMatch = false;
+                            like.UpdatedAt = DateTime.UtcNow;
+                        }
+
+                        // Find and DELETE conversation and all messages
+                        var conversation = await _dbContext.Conversations
+                            .Include(c => c.Messages)
+                            .FirstOrDefaultAsync(c =>
+                                (c.User1Id == userId && c.User2Id == matchedUserId) ||
+                                (c.User1Id == matchedUserId && c.User2Id == userId));
+
+                        if (conversation != null)
+                        {
+                            // Delete all messages first (due to foreign key constraints)
+                            if (conversation.Messages.Any())
+                            {
+                                _dbContext.Messages.RemoveRange(conversation.Messages);
+                                _logger.LogDebug("Removing {Count} messages for conversation {ConversationId}",
+                                    conversation.Messages.Count, conversation.Id);
+                            }
+
+                            // Delete the conversation
+                            _dbContext.Conversations.Remove(conversation);
+                            _logger.LogDebug("Removing conversation {ConversationId}", conversation.Id);
+                        }
+
+                        await _dbContext.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // Clear relevant caches
+                        await _cacheInvalidation.InvalidateMatchingCaches(userId, matchedUserId);
+                        await _cacheInvalidation.InvalidateUserConversations(userId);
+                        await _cacheInvalidation.InvalidateUserConversations(matchedUserId);
+
+                        if (conversation != null)
+                        {
+                            await _cacheInvalidation.InvalidateConversationCache(conversation.Id);
+                        }
+
+                        _logger.LogInformation("Successfully removed match between user {UserId} and {MatchedUserId}",
+                            userId, matchedUserId);
+
+                        return OperationResult.Successful()
+                            .WithMetadata("removed_at", DateTime.UtcNow)
+                            .WithMetadata("conversation_deleted", conversation != null);
                     }
-
-                    await _dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Clear relevant caches
-                    await _cacheInvalidation.InvalidateMatchingCaches(userId, matchedUserId);
-                    await _cacheInvalidation.InvalidateUserConversations(userId);
-                    await _cacheInvalidation.InvalidateUserConversations(matchedUserId);
-
-                    if (conversation != null)
+                    catch (Exception)
                     {
-                        await _cacheInvalidation.InvalidateConversationCache(conversation.Id);
+                        await transaction.RollbackAsync();
+                        throw;
                     }
-
-                    _logger.LogInformation("Successfully removed match between user {UserId} and {MatchedUserId}",
-                        userId, matchedUserId);
-
-                    return OperationResult.Successful()
-                        .WithMetadata("removed_at", DateTime.UtcNow)
-                        .WithMetadata("conversation_deleted", conversation != null);
-                }
-                catch (Exception)
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+                });
             }
             catch (Exception ex)
             {

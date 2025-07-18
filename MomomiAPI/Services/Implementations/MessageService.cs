@@ -147,7 +147,7 @@ namespace MomomiAPI.Services.Implementations
                         Id = m.Id,
                         ConversationId = m.ConversationId,
                         SenderId = m.SenderId,
-                        SenderName = $"{m.Sender.FirstName} {m.Sender.LastName}".Trim(),
+                        SenderName = m.Sender.Id == userId ? "You" : m.Sender.FirstName ?? "",
                         Content = m.Content,
                         MessageType = m.MessageType,
                         IsRead = m.IsRead,
