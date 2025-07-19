@@ -42,7 +42,7 @@
 
         public static class DefaultValues
         {
-            public const string DefaultPhotoUrl = "https://res.cloudinary.com/dgfyvwnuo/image/upload/v1/momomi/default-avatar.jpg";
+            public const string DefaultPhotoUrl = "https://jcosjsmsespqkixaqgkm.supabase.co/storage/v1/object/public/user-photos/default-avatar.jpg";
             public const int DefaultMaxDistance = 50;
             public const int DefaultMinAge = 18;
             public const int DefaultMaxAge = 35;

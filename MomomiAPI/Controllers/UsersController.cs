@@ -110,38 +110,40 @@ namespace MomomiAPI.Controllers
         /// Get current user's discovery settings
         /// </summary>
         [HttpGet("discovery-settings")]
-        public async Task<ActionResult<object>> GetDiscoverySettings()
+        public async Task<ActionResult<DiscoverySettingsDTO>> GetDiscoverySettings()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(GetDiscoverySettings));
 
-            var userResult = await _userService.GetUserByIdAsync(userIdResult.Value);
-            if (!userResult.Success)
-                return HandleOperationResult(userResult);
-
-            var user = userResult.Data!;
-            var discoverySettings = new
-            {
-                enableGlobalDiscovery = user.EnableGlobalDiscovery,
-                isDiscoverable = user.IsDiscoverable,
-                maxDistanceKm = user.MaxDistanceKm,
-                minAge = user.MinAge,
-                maxAge = user.MaxAge,
-                hasLocation = user.Latitude.HasValue && user.Longitude.HasValue
-            };
-
-            return Ok(new { data = discoverySettings });
+            var result = await _userService.GetDiscoverySettingsAsync(userIdResult.Value);
+            return HandleOperationResult(result);
         }
 
         /// <summary>
         /// Update current user's discovery settings
         /// </summary>
         [HttpPut("discovery-settings")]
-        public async Task<ActionResult<object>> UpdateDiscoverySettings()
+        public async Task<ActionResult<DiscoverySettingsDTO>> UpdateDiscoverySettings([FromBody] UpdateDiscoverySettingsRequest request)
         {
-            throw new NotImplementedException();
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(UpdateDiscoverySettings), new
+            {
+                request.EnableGlobalDiscovery,
+                request.IsDiscoverable,
+                request.MaxDistanceKm,
+                request.MinAge,
+                request.MaxAge
+            });
+
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await _userService.UpdateDiscoverySettingsAsync(userIdResult.Value, request);
+            return HandleOperationResult(result);
         }
 
         /// <summary>

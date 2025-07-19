@@ -1,4 +1,3 @@
-using CloudinaryDotNet;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -128,38 +127,44 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
         logger?.LogError(ex, "Failed to connect to Redis: {Message}", ex.Message);
 
         // Return a null multiplexer or throw - depending on your preference
-        throw new InvalidOperationException("Redis connection failed", ex);
+        return null;
+        //throw new InvalidOperationException("Redis connection failed", ex);
     }
-});
-
-// Cloudinary
-builder.Services.AddSingleton(provider =>
-{
-    var config = builder.Configuration.GetSection("Cloudinary");
-    if (config == null)
-    {
-        throw new ArgumentNullException(nameof(config), "Cloudinary configuration section cannot be null.");
-    }
-    return new Cloudinary(new Account(
-        config["CloudName"],
-        config["ApiKey"],
-        config["ApiSecret"]
-    ));
 });
 
 // Supabase
-builder.Services.AddSingleton(provider =>
+// User Client (with anon key) - for operations that work with Supabase Auth
+builder.Services.AddKeyedSingleton<Supabase.Client>("UserClient", (provider, key) =>
 {
     var supabaseConfig = builder.Configuration.GetSection("Supabase");
     return new Supabase.Client(
         supabaseConfig["Url"]!,
-        supabaseConfig["Key"]!,
+        supabaseConfig["Key"]!, // Anon key
         new Supabase.SupabaseOptions
         {
-            AutoConnectRealtime = true
+            AutoConnectRealtime = true,
+            AutoRefreshToken = true
         }
     );
 });
+
+// Admin Client (with service role key) - for storage operations and health checks
+builder.Services.AddKeyedSingleton<Supabase.Client>("AdminClient", (provider, key) =>
+{
+    var supabaseConfig = builder.Configuration.GetSection("Supabase");
+    return new Supabase.Client(
+        supabaseConfig["Url"]!,
+        supabaseConfig["ServiceRoleKey"]!, // Service role key
+        new Supabase.SupabaseOptions
+        {
+            AutoConnectRealtime = false, // Usually don't need realtime for admin
+            AutoRefreshToken = false
+        }
+    );
+});
+
+builder.Services.AddSingleton<Supabase.Client>(provider =>
+    provider.GetRequiredKeyedService<Supabase.Client>("UserClient"));
 
 
 // Authentication  
@@ -378,7 +383,7 @@ builder.Services.AddRateLimiter(options =>
 // Register health check services
 builder.Services.AddScoped<RedisHealthCheck>();
 builder.Services.AddScoped<SupabaseHealthCheck>();
-builder.Services.AddScoped<CloudinaryHealthCheck>();
+builder.Services.AddScoped<SupabaseStorageHealthCheck>();
 
 
 // Health checks using custom classes
@@ -386,7 +391,7 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<MomomiDbContext>("database", HealthStatus.Unhealthy, new[] { "db", "database" })
     .AddCheck<RedisHealthCheck>("redis", tags: new[] { "cache", "redis" })
     .AddCheck<SupabaseHealthCheck>("supabase", tags: new[] { "auth", "supabase" })
-    .AddCheck<CloudinaryHealthCheck>("cloudinary", tags: new[] { "storage", "cloudinary" });
+    .AddCheck<SupabaseStorageHealthCheck>("supabase-storage", tags: new[] { "storage", "supabase" });
 
 var app = builder.Build();
 

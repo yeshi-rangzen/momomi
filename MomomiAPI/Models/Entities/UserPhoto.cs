@@ -14,10 +14,10 @@ namespace MomomiAPI.Models.Entities
         [Required]
         public Guid UserId { get; set; }
 
-        [Column("cloudinary_public_id")]
+        [Column("storage_path")]
         [Required]
         [MaxLength(255)]
-        public string CloudinaryPublicId { get; set; } = string.Empty;
+        public string StoragePath { get; set; } = string.Empty;
 
         [Column("url")]
         [Required]

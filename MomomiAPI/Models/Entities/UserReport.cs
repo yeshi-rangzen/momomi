@@ -39,6 +39,9 @@ namespace MomomiAPI.Models.Entities
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        [Column("updated_at")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
         // Navigation properties
         [ForeignKey("ReporterId")]
         public virtual User Reporter { get; set; } = null!;

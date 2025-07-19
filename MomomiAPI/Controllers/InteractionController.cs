@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 
@@ -18,7 +19,7 @@ namespace MomomiAPI.Controllers
         /// <summary>
         /// Express interest in another user (like or super like)
         /// </summary>
-        [HttpPost("users/{userId}/like")]
+        [HttpPost("users/like")]
         public async Task<ActionResult> ExpressInterestInUser(Guid userId, [FromBody] LikeUserRequest request)
         {
             var currentUserIdResult = GetCurrentUserIdOrUnauthorized();
@@ -30,7 +31,7 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(ExpressInterestInUser), new { targetUserId = userId, likeType = request.LikeType });
 
             var result = await _userInteractionService.ExpressInterest(currentUserIdResult.Value, userId, request.LikeType);
-            return HandleOperationResult(result);
+            return HandleInteractionResult(result);
         }
 
         /// <summary>
@@ -48,7 +49,7 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(DismissUser), new { targetUserId = userId });
 
             var result = await _userInteractionService.DismissUser(currentUserIdResult.Value, userId);
-            return HandleOperationResult(result);
+            return HandleInteractionResult(result);
         }
 
         /// <summary>
@@ -63,6 +64,21 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(UndoLastSwipe));
 
             var result = await _userInteractionService.UndoLastSwipe(userIdResult.Value);
+            return HandleInteractionResult(result);
+        }
+
+        /// <summary>
+        /// Get users who have liked the current user
+        /// </summary>
+        [HttpGet("users-who-liked-me")]
+        public async Task<ActionResult<List<UserLikeDTO>>> GetUsersWhoLikedMe([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(GetUsersWhoLikedMe), new { page, pageSize });
+
+            var result = await _userInteractionService.GetUsersWhoLikedMe(userIdResult.Value, page, pageSize);
             return HandleOperationResult(result);
         }
     }

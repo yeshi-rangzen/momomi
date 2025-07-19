@@ -15,5 +15,8 @@ namespace MomomiAPI.Services.Interfaces
         Task<OperationResult<List<UserProfileDTO>>> GetNearbyUsersAsync(Guid userId, int maxDistance);
         Task<OperationResult> UpdateDiscoveryStatusAsync(Guid userId, bool isDiscoverable);
         Task<OperationResult> DeleteUserAsync(Guid userId);
+
+        Task<OperationResult<DiscoverySettingsDTO>> GetDiscoverySettingsAsync(Guid userId);
+        Task<OperationResult<DiscoverySettingsDTO>> UpdateDiscoverySettingsAsync(Guid userId, UpdateDiscoverySettingsRequest request);
     }
 }

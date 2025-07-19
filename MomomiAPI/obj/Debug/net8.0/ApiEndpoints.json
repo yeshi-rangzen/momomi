@@ -302,24 +302,34 @@
   },
   {
     "ContainingType": "MomomiAPI.Controllers.InteractionsController",
-    "Method": "ExpressInterestInUser",
-    "RelativePath": "api/Interactions/users/{userId}/like",
-    "HttpMethod": "POST",
+    "Method": "GetUsersWhoLikedMe",
+    "RelativePath": "api/Interactions/users-who-liked-me",
+    "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "userId",
-        "Type": "System.Guid",
-        "IsRequired": true
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
       },
       {
-        "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.LikeUserRequest",
-        "IsRequired": true
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
       }
     ],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserLikeDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.InteractionsController",
@@ -332,6 +342,27 @@
       {
         "Name": "userId",
         "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.InteractionsController",
+    "Method": "ExpressInterestInUser",
+    "RelativePath": "api/Interactions/users/like",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Guid",
+        "IsRequired": false
+      },
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.LikeUserRequest",
         "IsRequired": true
       }
     ],
@@ -897,7 +928,43 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
-    "ReturnTypes": []
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.DiscoverySettingsDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "Method": "UpdateDiscoverySettings",
+    "RelativePath": "api/Users/discovery-settings",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.UpdateDiscoverySettingsRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.DiscoverySettingsDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "MomomiAPI.Controllers.UsersController",

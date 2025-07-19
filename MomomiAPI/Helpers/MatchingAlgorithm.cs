@@ -45,7 +45,7 @@ namespace MomomiAPI.Helpers
                 var reportedUsers = await _reportingService.GetUserReportsAsync(userId);
                 foreach (var reportedUser in reportedUsers.Data)
                 {
-                    excludedUserIds.Add(reportedUser.Id); // Exclude reported user
+                    excludedUserIds.Add(reportedUser.ReportedUserId); // Exclude reported user
                 }
 
                 excludedUserIds.Add(userId); // Exclude current user

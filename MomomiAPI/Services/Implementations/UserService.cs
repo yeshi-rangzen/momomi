@@ -1,5 +1,4 @@
-﻿using CloudinaryDotNet;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
@@ -15,18 +14,23 @@ namespace MomomiAPI.Services.Implementations
     public class UserService : IUserService
     {
         private readonly MomomiDbContext _dbContext;
-        private readonly Cloudinary _cloudinary;
+        private readonly Supabase.Client _supabaseClient;
         private readonly ICacheService _cacheService;
         private readonly ICacheInvalidation _cacheInvalidation;
         private readonly ILogger<UserService> _logger;
 
-        public UserService(MomomiDbContext dbContext, ICacheService cacheService, ICacheInvalidation cacheInvalidation, ILogger<UserService> logger, Cloudinary cloudinary)
+        public UserService(
+            MomomiDbContext dbContext,
+            ICacheService cacheService,
+            ICacheInvalidation cacheInvalidation,
+            ILogger<UserService> logger,
+            Supabase.Client supabaseClient)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _cacheInvalidation = cacheInvalidation;
             _logger = logger;
-            _cloudinary = cloudinary;
+            _supabaseClient = supabaseClient;
         }
 
         public async Task<OperationResult<User>> GetUserByIdAsync(Guid userId)
@@ -319,66 +323,242 @@ namespace MomomiAPI.Services.Implementations
             {
                 _logger.LogInformation("Deleting user account: {UserId}", userId);
 
-                using var transaction = await _dbContext.Database.BeginTransactionAsync();
-                try
-                {
-                    var user = await _dbContext.Users
-                        .Include(u => u.Photos)
-                        .Include(u => u.Preferences)
-                        .Include(u => u.LikesGiven)
-                        .Include(u => u.LikesReceived)
-                        .Include(u => u.ConversationsAsUser1)
-                        .Include(u => u.ConversationsAsUser2)
-                        .Include(u => u.MessagesSent)
-                        .Include(u => u.Subscription)
-                        .Include(u => u.UsageLimit)
-                        .Include(u => u.Notifications)
-                        .FirstOrDefaultAsync(u => u.Id == userId);
+                // Use the execution strategy to handle retries and transactions
+                var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
-                    if (user == null)
+                return await executionStrategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
                     {
-                        return OperationResult.NotFound("User not found.");
+                        var user = await _dbContext.Users
+                            .Include(u => u.Photos)
+                            .Include(u => u.Preferences)
+                            .Include(u => u.LikesGiven)
+                            .Include(u => u.LikesReceived)
+                            .Include(u => u.ConversationsAsUser1)
+                            .Include(u => u.ConversationsAsUser2)
+                            .Include(u => u.MessagesSent)
+                            .Include(u => u.Subscription)
+                            .Include(u => u.UsageLimit)
+                            .Include(u => u.Notifications)
+                            .Include(u => u.ReportsMade)
+                            .FirstOrDefaultAsync(u => u.Id == userId);
+
+                        if (user == null)
+                        {
+                            return OperationResult.NotFound("User not found.");
+                        }
+
+                        // 1. Delete user photos from Storage first
+                        var photoDeleteTasks = user.Photos.Select(async photo =>
+                        {
+                            try
+                            {
+                                await _supabaseClient.Storage
+                                    .From("user-photos")
+                                    .Remove(new List<string> { photo.StoragePath });
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to delete photo {PhotoId} from Storage", photo.Id);
+                            }
+                        });
+
+                        await Task.WhenAll(photoDeleteTasks);
+
+                        // Delete database records in correct order
+                        await DeleteUserRelatedData(user);
+
+                        await _dbContext.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // Invalidate all user-related caches
+                        await _cacheInvalidation.InvalidateUserRelatedCaches(userId);
+
+                        _logger.LogInformation("Successfully deleted user {UserId} and all associated data", userId);
+                        return OperationResult.Successful().WithMetadata("deleted_at", DateTime.UtcNow);
                     }
-
-                    // 1. Delete user photos from Cloudinary first
-                    var photoDeleteTasks = user.Photos.Select(async photo =>
+                    catch (Exception)
                     {
-                        try
-                        {
-                            var deleteParams = new CloudinaryDotNet.Actions.DeletionParams(photo.CloudinaryPublicId);
-                            await _cloudinary.DestroyAsync(deleteParams);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to delete photo {PhotoId} from Cloudinary", photo.Id);
-                        }
-                    });
-
-                    await Task.WhenAll(photoDeleteTasks);
-
-                    // Delete database records in correct order
-                    await DeleteUserRelatedData(user);
-
-                    await _dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Invalidate all user-related caches
-                    await _cacheInvalidation.InvalidateUserRelatedCaches(userId);
-
-                    _logger.LogInformation("Successfully deleted user {UserId} and all associated data", userId);
-                    return OperationResult.Successful().WithMetadata("deleted_at", DateTime.UtcNow);
-                }
-                catch (Exception)
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting user {UserId}", userId);
                 return OperationResult.Failed("Unable to delete account. Please try again.");
             }
+        }
+
+        public async Task<OperationResult<DiscoverySettingsDTO>> GetDiscoverySettingsAsync(Guid userId)
+        {
+            try
+            {
+                _logger.LogInformation("Getting discovery settings for user {UserId}", userId);
+
+                var user = await _dbContext.Users
+                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+
+                if (user == null)
+                {
+                    return OperationResult<DiscoverySettingsDTO>.NotFound("User not found.");
+                }
+
+                var discoverySettings = new DiscoverySettingsDTO
+                {
+                    EnableGlobalDiscovery = user.EnableGlobalDiscovery,
+                    IsDiscoverable = user.IsDiscoverable,
+                    IsGloballyDiscoverable = user.IsGloballyDiscoverable,
+                    MaxDistanceKm = user.MaxDistanceKm,
+                    MinAge = user.MinAge,
+                    MaxAge = user.MaxAge,
+                    HasLocation = user.Latitude.HasValue && user.Longitude.HasValue
+                };
+
+                _logger.LogDebug("Retrieved discovery settings for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Successful(discoverySettings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting discovery settings for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to retrieve discovery settings. Please try again.");
+            }
+        }
+
+        public async Task<OperationResult<DiscoverySettingsDTO>> UpdateDiscoverySettingsAsync(Guid userId, UpdateDiscoverySettingsRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Updating discovery settings for user {UserId}", userId);
+
+                // Validate request
+                var validationResult = ValidateUpdateDiscoverySettingsRequest(request);
+                if (!validationResult.Success)
+                {
+                    return OperationResult<DiscoverySettingsDTO>.ValidationFailure(validationResult.ErrorMessage!);
+                }
+
+                var user = await _dbContext.Users
+                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+
+                if (user == null)
+                {
+                    return OperationResult<DiscoverySettingsDTO>.NotFound("User not found.");
+                }
+
+                // Update discovery settings
+                if (request.EnableGlobalDiscovery.HasValue)
+                {
+                    user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
+                }
+
+                if (request.IsDiscoverable.HasValue)
+                {
+                    user.IsDiscoverable = request.IsDiscoverable.Value;
+                }
+
+                if (request.IsGloballyDiscoverable.HasValue)
+                {
+                    user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
+                }
+
+                if (request.MaxDistanceKm.HasValue)
+                {
+                    user.MaxDistanceKm = request.MaxDistanceKm.Value;
+                }
+
+                if (request.MinAge.HasValue)
+                {
+                    user.MinAge = request.MinAge.Value;
+                }
+
+                if (request.MaxAge.HasValue)
+                {
+                    user.MaxAge = request.MaxAge.Value;
+                }
+
+                // Update location if provided
+                if (request.Latitude.HasValue && request.Longitude.HasValue)
+                {
+                    user.Latitude = (decimal)request.Latitude.Value;
+                    user.Longitude = (decimal)request.Longitude.Value;
+                }
+
+                user.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+
+                // Invalidate relevant caches
+                await _cacheInvalidation.InvalidateUserProfile(userId);
+                await _cacheInvalidation.InvalidateUserDiscovery(userId);
+
+                // Return updated settings
+                var updatedSettings = new DiscoverySettingsDTO
+                {
+                    EnableGlobalDiscovery = user.EnableGlobalDiscovery,
+                    IsDiscoverable = user.IsDiscoverable,
+                    IsGloballyDiscoverable = user.IsGloballyDiscoverable,
+                    MaxDistanceKm = user.MaxDistanceKm,
+                    MinAge = user.MinAge,
+                    MaxAge = user.MaxAge,
+                    HasLocation = user.Latitude.HasValue && user.Longitude.HasValue
+                };
+
+                _logger.LogInformation("Successfully updated discovery settings for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Successful(updatedSettings)
+                    .WithMetadata("updated_at", DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating discovery settings for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to update discovery settings. Please try again.");
+            }
+        }
+
+        private static OperationResult ValidateUpdateDiscoverySettingsRequest(UpdateDiscoverySettingsRequest request)
+        {
+            if (request.MinAge.HasValue && request.MaxAge.HasValue && request.MinAge >= request.MaxAge)
+            {
+                return OperationResult.ValidationFailure("Minimum age must be less than maximum age.");
+            }
+
+            if (request.MinAge.HasValue && request.MinAge < 18)
+            {
+                return OperationResult.ValidationFailure("Minimum age must be at least 18.");
+            }
+
+            if (request.MaxAge.HasValue && request.MaxAge > 100)
+            {
+                return OperationResult.ValidationFailure("Maximum age cannot exceed 100.");
+            }
+
+            if (request.MaxDistanceKm.HasValue && (request.MaxDistanceKm < 1 || request.MaxDistanceKm > 200))
+            {
+                return OperationResult.ValidationFailure("Maximum distance must be between 1 and 200 km.");
+            }
+
+            // Validate location coordinates if provided
+            if (request.Latitude.HasValue || request.Longitude.HasValue)
+            {
+                if (!request.Latitude.HasValue || !request.Longitude.HasValue)
+                {
+                    return OperationResult.ValidationFailure("Both latitude and longitude must be provided together.");
+                }
+
+                if (request.Latitude < -90 || request.Latitude > 90)
+                {
+                    return OperationResult.ValidationFailure("Latitude must be between -90 and 90.");
+                }
+
+                if (request.Longitude < -180 || request.Longitude > 180)
+                {
+                    return OperationResult.ValidationFailure("Longitude must be between -180 and 180.");
+                }
+            }
+
+            return OperationResult.Successful();
         }
 
         private async Task<OperationResult<List<UserProfileDTO>>> GetGlobalUsersAsync(Guid userId)
@@ -617,6 +797,12 @@ namespace MomomiAPI.Services.Implementations
             {
                 _dbContext.UserUsageLimits.Remove(user.UsageLimit);
             }
+
+            // TODO: Check if user.ReportsMade is working: Delete reports
+            //var userReports = _dbContext.UserReports
+            //.Where(ur => ur.ReporterId == user.Id);
+            //_dbContext.UserReports.RemoveRange(userReports);
+            _dbContext.UserReports.RemoveRange(user.ReportsMade);
 
             // Delete notifications
             _dbContext.PushNotifications.RemoveRange(user.Notifications);

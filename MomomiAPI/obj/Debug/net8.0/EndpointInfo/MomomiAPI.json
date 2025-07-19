@@ -536,7 +536,7 @@
         }
       }
     },
-    "/api/Interactions/users/{userId}/like": {
+    "/api/Interactions/users/like": {
       "post": {
         "tags": [
           "Interactions"
@@ -544,8 +544,7 @@
         "parameters": [
           {
             "name": "userId",
-            "in": "path",
-            "required": true,
+            "in": "query",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -609,6 +608,64 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Interactions/users-who-liked-me": {
+      "get": {
+        "tags": [
+          "Interactions"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserLikeDTO"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserLikeDTO"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserLikeDTO"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1693,7 +1750,70 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                }
+              }
+            }
           }
         }
       }
@@ -1897,6 +2017,36 @@
         "type": "object",
         "properties": {
           "enableGlobalDiscovery": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoverySettingsDTO": {
+        "type": "object",
+        "properties": {
+          "enableGlobalDiscovery": {
+            "type": "boolean"
+          },
+          "isDiscoverable": {
+            "type": "boolean"
+          },
+          "isGloballyDiscoverable": {
+            "type": "boolean"
+          },
+          "maxDistanceKm": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasLocation": {
             "type": "boolean"
           }
         },
@@ -2589,6 +2739,55 @@
         },
         "additionalProperties": false
       },
+      "UpdateDiscoverySettingsRequest": {
+        "type": "object",
+        "properties": {
+          "enableGlobalDiscovery": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isDiscoverable": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isGloballyDiscoverable": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "maxDistanceKm": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "minAge": {
+            "maximum": 100,
+            "minimum": 18,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxAge": {
+            "maximum": 100,
+            "minimum": 18,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateDiscoveryVisibilityRequest": {
         "type": "object",
         "properties": {
@@ -3218,9 +3417,54 @@
         },
         "additionalProperties": false
       },
+      "UserLikeDTO": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "primaryPhoto": {
+            "type": "string",
+            "nullable": true
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "likeType": {
+            "$ref": "#/components/schemas/LikeType"
+          },
+          "likedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "distanceKm": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "UserPhoto": {
         "required": [
-          "cloudinaryPublicId",
+          "storagePath",
           "url",
           "userId"
         ],
@@ -3234,7 +3478,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "cloudinaryPublicId": {
+          "storagePath": {
             "maxLength": 255,
             "minLength": 1,
             "type": "string"
@@ -3554,6 +3798,10 @@
             "nullable": true
           },
           "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
             "type": "string",
             "format": "date-time"
           },

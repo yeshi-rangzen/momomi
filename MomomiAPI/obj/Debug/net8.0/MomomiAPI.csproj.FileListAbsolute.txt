@@ -6,7 +6,6 @@ C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\MomomiAPI.deps.
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\MomomiAPI.runtimeconfig.json
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\MomomiAPI.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\MomomiAPI.pdb
-C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\CloudinaryDotNet.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Humanizer.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Bcl.AsyncInterfaces.dll
@@ -169,3 +168,4 @@ C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Exten
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
 C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\obj\Debug\net8.0\MomomiAPI.sourcelink.json
+C:\Users\yeshi\source\repos\MomomiAPI\MomomiAPI\bin\Debug\net8.0\SixLabors.ImageSharp.dll

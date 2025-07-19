@@ -106,6 +106,69 @@ namespace MomomiAPI.Controllers
         }
 
         /// <summary>
+        /// Handles InteractionResult responses consistently
+        /// </summary>
+        protected ActionResult HandleInteractionResult(InteractionResult result)
+        {
+            if (result.Success)
+            {
+                var response = new
+                {
+                    success = true,
+                    outcome = result.Outcome.ToString(),
+                    isMatch = result.IsMatch,
+                    targetUserId = result.TargetUserId,
+                    interactionType = result.InteractionType?.ToString(),
+                    updatedLimits = result.UpdatedLimits,
+                    metadata = result.Metadata
+                };
+
+                return Ok(response);
+            }
+
+            return result.ErrorCode switch
+            {
+                "VALIDATION_ERROR" => BadRequest(new
+                {
+                    success = false,
+                    outcome = result.Outcome.ToString(),
+                    message = result.ErrorMessage,
+                    errorCode = result.ErrorCode,
+                    updatedLimits = result.UpdatedLimits
+                }),
+                "BUSINESS_RULE_VIOLATION" => BadRequest(new
+                {
+                    success = false,
+                    outcome = result.Outcome.ToString(),
+                    message = result.ErrorMessage,
+                    errorCode = result.ErrorCode,
+                    updatedLimits = result.UpdatedLimits
+                }),
+                "NOT_FOUND" => NotFound(new
+                {
+                    success = false,
+                    outcome = result.Outcome.ToString(),
+                    message = result.ErrorMessage,
+                    errorCode = result.ErrorCode
+                }),
+                "UNAUTHORIZED" => Unauthorized(new
+                {
+                    success = false,
+                    outcome = result.Outcome.ToString(),
+                    message = result.ErrorMessage,
+                    errorCode = result.ErrorCode
+                }),
+                _ => StatusCode(500, new
+                {
+                    success = false,
+                    outcome = result.Outcome.ToString(),
+                    message = result.ErrorMessage ?? "An error occurred",
+                    errorCode = result.ErrorCode
+                })
+            };
+        }
+
+        /// <summary>
         /// Logs controller action with context
         /// </summary>
         protected void LogControllerAction(string action, object? parameters = null)

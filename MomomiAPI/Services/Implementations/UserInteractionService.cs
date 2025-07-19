@@ -2,6 +2,8 @@
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Helpers;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
@@ -36,7 +38,7 @@ namespace MomomiAPI.Services.Implementations
             _logger = logger;
         }
 
-        public async Task<LikeResult> ExpressInterest(Guid likerId, Guid likedId, LikeType interestType = LikeType.Regular)
+        public async Task<InteractionResult> ExpressInterest(Guid likerId, Guid likedId, LikeType interestType = LikeType.Regular)
         {
             try
             {
@@ -47,7 +49,7 @@ namespace MomomiAPI.Services.Implementations
                 var canLikeResult = await _subscriptionService.CanUserLikeAsync(likerId, interestType);
                 if (!canLikeResult.Success)
                 {
-                    return (LikeResult)LikeResult.Failed("Unable to check like permissions.");
+                    return InteractionResult.Failed("Unable to check like permissions.");
                 }
 
                 if (!canLikeResult.Data)
@@ -55,7 +57,7 @@ namespace MomomiAPI.Services.Implementations
                     var usageLimitsResult = await _subscriptionService.GetUsageLimitsAsync(likerId);
                     var usageLimits = usageLimitsResult.Success ? usageLimitsResult.Data : null;
                     var limitType = interestType == LikeType.SuperLike ? "super likes" : "likes";
-                    return LikeResult.LimitReached($"You've reached your daily {limitType} limit.", usageLimits);
+                    return InteractionResult.LimitReached($"You've reached your daily {limitType} limit.", usageLimits, interestType);
                 }
 
                 // Check if user is reported
@@ -63,12 +65,12 @@ namespace MomomiAPI.Services.Implementations
                 if (!isReportedResult.Success)
                 {
                     _logger.LogWarning("Unable to check report status for user {LikerId} and {LikedId}", likerId, likedId);
-                    return (LikeResult)LikeResult.Failed("Unable to verify user status.");
+                    return InteractionResult.Failed("Unable to verify user status.");
                 }
 
                 if (isReportedResult.Data)
                 {
-                    return LikeResult.UserBlocked();
+                    return InteractionResult.UserBlocked(likedId);
                 }
 
                 // Check if already liked/passed
@@ -77,7 +79,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (existingInteraction != null)
                 {
-                    return LikeResult.UserAlreadyProcessed();
+                    return InteractionResult.UserAlreadyProcessed(likedId);
                 }
 
                 // Verify target user exists and is active
@@ -86,7 +88,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (targetUser == null)
                 {
-                    return LikeResult.UserNotFound();
+                    return InteractionResult.UserNotFound();
                 }
 
                 // Create new like record
@@ -144,17 +146,17 @@ namespace MomomiAPI.Services.Implementations
                 var updatedLimits = updatedLimitsResult.Success ? updatedLimitsResult.Data : null;
 
                 return isMatch
-                    ? LikeResult.MatchCreated(updatedLimits)
-                    : LikeResult.LikeRecorded(updatedLimits);
+                    ? InteractionResult.MatchCreated(likedId, interestType, updatedLimits!)
+                    : InteractionResult.LikeRecorded(likedId, interestType, updatedLimits!);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error expressing interest from user {LikerId} to user {LikedId}", likerId, likedId);
-                return (LikeResult)LikeResult.Failed("Unable to process your like. Please try again.");
+                return InteractionResult.Failed("Unable to process your like. Please try again.");
             }
         }
 
-        public async Task<OperationResult> DismissUser(Guid dismisserId, Guid dismissedId)
+        public async Task<InteractionResult> DismissUser(Guid dismisserId, Guid dismissedId)
         {
             try
             {
@@ -166,7 +168,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (existingInteraction != null)
                 {
-                    return OperationResult.BusinessRuleViolation("You have already interacted with this user.");
+                    return InteractionResult.UserAlreadyProcessed(dismissedId);
                 }
 
                 // Verify target user exists
@@ -175,7 +177,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (targetUser == null)
                 {
-                    return OperationResult.NotFound("User not found or inactive.");
+                    return InteractionResult.UserNotFound();
                 }
 
                 // Create a pass record
@@ -195,18 +197,17 @@ namespace MomomiAPI.Services.Implementations
                 await _cacheInvalidation.InvalidateUserDiscovery(dismisserId);
 
                 _logger.LogDebug("User {DismisserId} successfully dismissed user {DismissedId}", dismisserId, dismissedId);
-                return OperationResult.Successful()
-                                    .WithMetadata("dismissed_user_id", dismissedId)
-                                    .WithMetadata("dismissed_at", DateTime.UtcNow);
+                return InteractionResult.PassRecorded(dismissedId)
+                    .WithMetadata("dismissed_at", DateTime.UtcNow) as InteractionResult;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error dismissing user {DismissedId} by user {DismisserId}", dismissedId, dismisserId);
-                return OperationResult.Failed("Unable to dismiss user. Please try again.");
+                return InteractionResult.Failed("Unable to dismiss user. Please try again.");
             }
         }
 
-        public async Task<OperationResult> UndoLastSwipe(Guid userId)
+        public async Task<InteractionResult> UndoLastSwipe(Guid userId)
         {
             try
             {
@@ -220,19 +221,19 @@ namespace MomomiAPI.Services.Implementations
 
                 if (lastSwipe == null)
                 {
-                    return OperationResult.BusinessRuleViolation("No recent swipe found to undo.");
+                    return InteractionResult.Failed("No recent swipe found to undo.");
                 }
 
                 // Check if it's been too long (only allow undo within 5 minutes)
                 if (DateTime.UtcNow - lastSwipe.CreatedAt > TimeSpan.FromMinutes(5))
                 {
-                    return OperationResult.BusinessRuleViolation("Cannot undo a swipe older than 5 minutes.");
+                    return InteractionResult.Failed("Cannot undo a swipe older than 5 minutes.");
                 }
 
                 // Check if it resulted in a match - matches cannot be undone this way
                 if (lastSwipe.IsMatch)
                 {
-                    return OperationResult.BusinessRuleViolation("Cannot undo a swipe that resulted in a match.");
+                    return InteractionResult.Failed("Cannot undo a swipe that resulted in a match.");
                 }
 
                 // Remove the swipe record
@@ -245,14 +246,91 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("User {UserId} successfully undid last swipe on user {TargetUserId}",
                     userId, lastSwipe.LikedUserId);
 
-                return OperationResult.Successful()
-                                    .WithMetadata("undone_user_id", lastSwipe.LikedUserId)
-                                    .WithMetadata("undone_at", DateTime.UtcNow);
+                return InteractionResult.UndoSuccessful(lastSwipe.LikedUserId)
+                    .WithMetadata("undone_at", DateTime.UtcNow) as InteractionResult;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error undoing last swipe for user {UserId}", userId);
-                return OperationResult.Failed("Unable to undo last swipe. Please try again.");
+                return InteractionResult.Failed("Unable to undo last swipe. Please try again.");
+            }
+        }
+
+        public async Task<OperationResult<List<UserLikeDTO>>> GetUsersWhoLikedMe(Guid userId, int page = 1, int pageSize = 20)
+        {
+            try
+            {
+                _logger.LogInformation("Getting users who liked user {UserId}, page {Page}", userId, page);
+
+                // Validate pagination parameters
+                if (page < 1) page = 1;
+                if (pageSize < 1 || pageSize > 50) pageSize = 20;
+
+                // Verify user exists
+                var currentUser = await _dbContext.Users.FindAsync(userId);
+                if (currentUser == null)
+                {
+                    return OperationResult<List<UserLikeDTO>>.NotFound("User not found.");
+                }
+
+                // Get users who liked current user (but current user hasn't liked back)
+                var usersWhoLikedMe = await _dbContext.UserLikes
+                    .Where(ul => ul.LikedUserId == userId && ul.IsLike && !ul.IsMatch)
+                    .Include(ul => ul.LikerUser)
+                        .ThenInclude(u => u.Photos)
+                    .Where(ul => ul.LikerUser.IsActive) // Only active users
+                    .OrderByDescending(ul => ul.CreatedAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                var result = new List<UserLikeDTO>();
+
+                foreach (var like in usersWhoLikedMe)
+                {
+                    var liker = like.LikerUser;
+
+                    // Calculate distance if both users have location
+                    double? distance = null;
+                    if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue &&
+                        liker.Latitude.HasValue && liker.Longitude.HasValue)
+                    {
+                        distance = LocationHelper.CalculateDistance(
+                            (double)currentUser.Latitude, (double)currentUser.Longitude,
+                            (double)liker.Latitude, (double)liker.Longitude);
+                    }
+
+                    var userLikeDto = new UserLikeDTO
+                    {
+                        UserId = liker.Id,
+                        FirstName = liker.FirstName,
+                        LastName = liker.LastName,
+                        Age = liker.DateOfBirth.HasValue ?
+                            DateTime.UtcNow.Year - liker.DateOfBirth.Value.Year : 0,
+                        PrimaryPhoto = liker.Photos
+                            .FirstOrDefault(p => p.IsPrimary)?.Url ??
+                            liker.Photos
+                            .OrderBy(p => p.PhotoOrder)
+                            .FirstOrDefault()?.Url,
+                        Heritage = liker.Heritage,
+                        LikeType = like.LikeType,
+                        LikedAt = like.CreatedAt,
+                        DistanceKm = distance
+                    };
+
+                    result.Add(userLikeDto);
+                }
+
+                _logger.LogInformation("Retrieved {Count} users who liked user {UserId}", result.Count, userId);
+                return OperationResult<List<UserLikeDTO>>.Successful(result)
+                    .WithMetadata("page", page)
+                    .WithMetadata("page_size", pageSize)
+                    .WithMetadata("has_more", result.Count == pageSize);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting users who liked user {UserId}", userId);
+                return OperationResult<List<UserLikeDTO>>.Failed("Unable to retrieve users who liked you. Please try again.");
             }
         }
     }

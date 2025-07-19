@@ -1,6 +1,4 @@
-﻿using CloudinaryDotNet;
-using CloudinaryDotNet.Actions;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
@@ -8,30 +6,44 @@ using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Services.Interfaces;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Processing;
 
 namespace MomomiAPI.Services.Implementations
 {
-    public class PhotoManagementService : IPhotoManagementService
+    public class SupabasePhotoService : IPhotoManagementService
     {
-        private readonly Cloudinary _cloudinary;
+        private readonly Supabase.Client _adminClient;
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheInvalidation _cacheInvalidation;
-        private readonly ILogger<PhotoManagementService> _logger;
+        private readonly ILogger<SupabasePhotoService> _logger;
+        private readonly IConfiguration _configuration;
 
-        private static readonly string[] AllowedMimeTypes = {
+        private static readonly string[] AllowedMimeTypes =
+        {
             "image/jpeg", "image/jpg", "image/png", "image/webp"
         };
 
-        public PhotoManagementService(
-            Cloudinary cloudinary,
+        private const string UserPhotosBucket = "user-photos";
+
+        public SupabasePhotoService(
+            [FromKeyedServices("AdminClient")] Supabase.Client adminClient,
             MomomiDbContext dbContext,
             ICacheInvalidation cacheInvalidation,
-            ILogger<PhotoManagementService> logger)
+            ILogger<SupabasePhotoService> logger,
+            IConfiguration configuration
+            )
         {
-            _cloudinary = cloudinary ?? throw new ArgumentNullException(nameof(cloudinary));
+            _adminClient = adminClient ?? throw new ArgumentNullException(nameof(adminClient));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _cacheInvalidation = cacheInvalidation;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _configuration = configuration;
+            _configuration = configuration;
         }
 
         public async Task<OperationResult<UserPhotoDTO>> AddUserPhoto(Guid userId, IFormFile file, bool setAsPrimary = false)
@@ -51,7 +63,7 @@ namespace MomomiAPI.Services.Implementations
                 var user = await _dbContext.Users.FindAsync(userId);
                 if (user == null)
                 {
-                    return OperationResult<UserPhotoDTO>.NotFound("User not found.");
+                    return OperationResult<UserPhotoDTO>.ValidationFailure(validationResult.ErrorMessage!);
                 }
 
                 // Check photo count limit
@@ -62,8 +74,8 @@ namespace MomomiAPI.Services.Implementations
                         $"Maximum of {AppConstants.Limits.MaxPhotosPerUser} photos allowed per user.");
                 }
 
-                // Upload to Cloudinary
-                var uploadResult = await UploadToCloudinary(userId, file);
+                // Upload to Supabase Storage
+                var uploadResult = await UploadToSupabaseStorage(userId, file);
                 if (!uploadResult.Success)
                 {
                     return OperationResult<UserPhotoDTO>.Failed(uploadResult.ErrorMessage!);
@@ -75,19 +87,13 @@ namespace MomomiAPI.Services.Implementations
                     setAsPrimary = true;
                 }
 
-                // If setting as primary, unset other primary photos
-                if (setAsPrimary)
-                {
-                    await UnsetOtherPrimaryPhotos(userId);
-                }
-
                 // Create photo record
                 var userPhoto = new UserPhoto
                 {
                     UserId = userId,
-                    CloudinaryPublicId = uploadResult.Data!.PublicId,
-                    Url = uploadResult.Data.SecureUrl.ToString(),
-                    ThumbnailUrl = GenerateThumbnailUrl(uploadResult.Data.SecureUrl.ToString()),
+                    StoragePath = uploadResult.Data!.FilePath,
+                    Url = uploadResult.Data.PublicUrl,
+                    ThumbnailUrl = GenerateThumbnailUrl(uploadResult.Data.PublicUrl),
                     PhotoOrder = currentPhotoCount,
                     IsPrimary = setAsPrimary,
                     CreatedAt = DateTime.UtcNow
@@ -115,22 +121,22 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                _logger.LogInformation("Removing photo {PhotoId} for user {UserId}", photoId, userId);
+                _logger.LogInformation("Removing photo {PhotoId} for {UserId}", photoId, userId);
 
                 var photo = await _dbContext.UserPhotos
                     .FirstOrDefaultAsync(p => p.Id == photoId && p.UserId == userId);
 
                 if (photo == null)
                 {
-                    return OperationResult.NotFound("Photo not found or you don't have permission to delete it.");
+                    return OperationResult.NotFound("Photo not found or you don't have permission to delete.");
                 }
 
-                // Delete from Cloudinary
-                var deleteResult = await DeleteFromCloudinary(photo.CloudinaryPublicId);
+                // Delete from Supabase Storage
+                var deleteResult = await DeleteFromSupabaseStorage(photo.StoragePath);
                 if (!deleteResult.Success)
                 {
-                    _logger.LogWarning("Failed to delete photo from Cloudinary: {Error}", deleteResult.ErrorMessage);
-                    // Continue with database deletion even if Cloudinary deletion fails
+                    _logger.LogWarning("Failed to delete photo from Supabase Storage: {Error}", deleteResult.ErrorMessage);
+                    // Continue with database deletion even if storage deletion failes
                 }
 
                 // If this was the primary photo, set another as primary
@@ -151,7 +157,7 @@ namespace MomomiAPI.Services.Implementations
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error removing photo {PhotoId} for user {UserId}", photoId, userId);
+                _logger.LogError(ex, "Error removing {PhotoId} for user {UserId}", photoId, userId);
                 return OperationResult.Failed("Failed to remove photo. Please try again.");
             }
         }
@@ -201,7 +207,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (orderedPhotoIds == null || !orderedPhotoIds.Any())
                 {
-                    return OperationResult.ValidationFailure("Photo IDs list cannot be empty.");
+                    return OperationResult.ValidationFailure("Photo IDs list cannot be empty");
                 }
 
                 var photos = await _dbContext.UserPhotos
@@ -248,7 +254,7 @@ namespace MomomiAPI.Services.Implementations
 
             if (!AllowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
             {
-                return OperationResult.ValidationFailure("Invalid file type. Only JPEG, PNG, and WebP images are allowed.");
+                return OperationResult.ValidationFailure("Invalid file type. Only JPEG, PNG and WebP images are allowed.");
             }
 
             if (file.Length > AppConstants.FileSizes.MaxPhotoSizeBytes)
@@ -259,61 +265,127 @@ namespace MomomiAPI.Services.Implementations
             return OperationResult.Successful();
         }
 
-        private async Task<OperationResult<ImageUploadResult>> UploadToCloudinary(Guid userId, IFormFile file)
+        private async Task<OperationResult<SupabaseUploadResult>> UploadToSupabaseStorage(Guid userId, IFormFile file)
         {
             try
             {
-                using var stream = file.OpenReadStream();
+                // Generate unique filename
+                var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                var fileName = $"user_{userId}_{Guid.NewGuid()}{fileExtension}";
+                var filePath = $"users/{userId}/{fileName}";
 
-                var uploadParams = new ImageUploadParams
+                // Process and resize image
+                using var processedImageStream = await ProcessImageAsync(file);
+                var fileBytes = processedImageStream.ToArray();
+
+                // Upload to Supabase Storage
+                var uploadResult = await _adminClient.Storage
+                    .From(UserPhotosBucket)
+                    .Upload(fileBytes, filePath, new Supabase.Storage.FileOptions
+                    {
+                        ContentType = file.ContentType,
+                        Upsert = false
+                    });
+
+                if (uploadResult == null)
                 {
-                    File = new FileDescription(file.FileName, stream),
-                    Folder = $"mimori/users/{userId}",
-                    PublicId = $"user_{userId}_{Guid.NewGuid()}",
-                    Transformation = new Transformation()
-                        .Width(AppConstants.FileSizes.DisplayPhotoSize)
-                        .Height(AppConstants.FileSizes.DisplayPhotoSize)
-                        .Crop("fill")
-                        .Quality("auto")
-                        .FetchFormat("auto"),
-                };
-
-                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
-
-                if (uploadResult.Error != null)
-                {
-                    _logger.LogError("Cloudinary upload error: {Error}", uploadResult.Error.Message);
-                    return OperationResult<ImageUploadResult>.Failed("Photo upload failed. Please try again.");
+                    return OperationResult<SupabaseUploadResult>.Failed("Failed to upload photo to storage.");
                 }
 
-                return OperationResult<ImageUploadResult>.Successful(uploadResult);
+                // Get public URL
+                var publicUrl = _adminClient.Storage.From(UserPhotosBucket).GetPublicUrl(filePath);
+
+                var result = new SupabaseUploadResult
+                {
+                    FilePath = filePath,
+                    PublicUrl = publicUrl,
+                    FileName = fileName
+                };
+
+                return OperationResult<SupabaseUploadResult>.Successful(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error uploading to Cloudinary");
-                return OperationResult<ImageUploadResult>.Failed("Photo upload failed. Please try again.");
+                _logger.LogError(ex, "Error uploading to Supabase Storage");
+                return OperationResult<SupabaseUploadResult>.Failed("Photo upload failed. Please try again later.");
             }
         }
 
-        private async Task<OperationResult> DeleteFromCloudinary(string publicId)
+        private async Task<OperationResult> DeleteFromSupabaseStorage(string filePath)
         {
             try
             {
-                var deleteParams = new DeletionParams(publicId);
-                var deleteResult = await _cloudinary.DestroyAsync(deleteParams);
+                var deleteResult = await _adminClient.Storage
+                    .From(UserPhotosBucket)
+                    .Remove(new List<string> { filePath });
 
-                if (deleteResult.Error != null)
+                if (deleteResult == null || !deleteResult.Any())
                 {
-                    return OperationResult.Failed($"Cloudinary deletion error: {deleteResult.Error.Message}");
+                    return OperationResult.Failed("Failed to delete photo from storage.");
                 }
 
                 return OperationResult.Successful();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting from Cloudinary: {PublicId}", publicId);
+                _logger.LogError(ex, "Error deleting from Supabase Storage: {FilePath}", filePath);
                 return OperationResult.Failed("Failed to delete photo from storage.");
             }
+        }
+
+        private async Task<MemoryStream> ProcessImageAsync(IFormFile file)
+        {
+            try
+            {
+
+                using var inputStream = file.OpenReadStream();
+                using var image = await Image.LoadAsync(inputStream);
+
+                // Calculate resize dimensions while maintaining aspect ratio
+                var (newWidth, newHeight) = CalculateResizeDimensions(
+                    image.Width, image.Height,
+                    AppConstants.FileSizes.DisplayPhotoSize,
+                    AppConstants.FileSizes.DisplayPhotoSize);
+
+                // Resize the image
+                image.Mutate(x => x.Resize(newWidth, newHeight));
+
+                // save to memory stream with appropriate encoder
+                var outputStream = new MemoryStream();
+                var encoder = GetImageEncoder(file.ContentType);
+
+                await image.SaveAsync(outputStream, encoder);
+                outputStream.Position = 0;
+                return outputStream;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing image");
+                throw new InvalidOperationException("Failed to process image", ex);
+            }
+        }
+
+        private static (int width, int height) CalculateResizeDimensions(int originalWidth, int originalHeight, int maxWidth, int maxHeight)
+        {
+            var ratioX = (double)maxWidth / originalWidth;
+            var ratioY = (double)maxHeight / originalHeight;
+            var ratio = Math.Min(ratioX, ratioY);
+
+            var newWidth = (int)(originalWidth * ratio);
+            var newHeight = (int)(originalHeight * ratio);
+
+            return (newWidth, newHeight);
+        }
+
+        private static IImageEncoder GetImageEncoder(string mimeType)
+        {
+            return mimeType.ToLowerInvariant() switch
+            {
+                "image/jpeg" or "image/jpg" => new JpegEncoder { Quality = 85 },
+                "image/png" => new PngEncoder(),
+                "image/webp" => new WebpEncoder { Quality = 85 },
+                _ => new JpegEncoder { Quality = 85 } // Default to JPEG
+            };
         }
 
         private async Task UnsetOtherPrimaryPhotos(Guid userId)
@@ -341,10 +413,11 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        private static string GenerateThumbnailUrl(string originalUrl)
+        private string GenerateThumbnailUrl(string originalUrl)
         {
-            // Generate thumbnail URL using Cloudinary transformations
-            return originalUrl.Replace("/upload/", $"/upload/w_{AppConstants.FileSizes.ThumbnailSize},h_{AppConstants.FileSizes.ThumbnailSize},c_fill/");
+            // For Supabase, we'll use URL parameters for transformation
+            // This assumes you have image transformations enabled in Supabase
+            return $"{originalUrl}?width={AppConstants.FileSizes.ThumbnailSize}&height={AppConstants.FileSizes.ThumbnailSize}&resize=cover";
         }
 
         private static UserPhotoDTO MapToPhotoDTO(UserPhoto photo)
@@ -357,6 +430,14 @@ namespace MomomiAPI.Services.Implementations
                 PhotoOrder = photo.PhotoOrder,
                 IsPrimary = photo.IsPrimary
             };
+        }
+
+        // Helper class for upload results
+        private class SupabaseUploadResult
+        {
+            public string FilePath { get; set; } = string.Empty;
+            public string PublicUrl { get; set; } = string.Empty;
+            public string FileName { get; set; } = string.Empty;
         }
     }
 }

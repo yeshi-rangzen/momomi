@@ -483,7 +483,7 @@ namespace MomomiAPI.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("CloudinaryPublicId")
+                    b.Property<string>("PublicId")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")

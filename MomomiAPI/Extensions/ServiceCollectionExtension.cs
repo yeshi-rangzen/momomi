@@ -29,7 +29,7 @@ namespace MomomiAPI.Extensions
             services.AddScoped<IMatchManagementService, MatchManagementService>();
 
             // Photo services
-            services.AddScoped<IPhotoManagementService, PhotoManagementService>();
+            services.AddScoped<IPhotoManagementService, SupabasePhotoService>();
             services.AddScoped<IPhotoGalleryService, PhotoGalleryService>();
 
             // Messaging services
@@ -67,7 +67,6 @@ namespace MomomiAPI.Extensions
 
             // Register individual configuration sections
             services.Configure<SupabaseSettings>(configuration.GetSection("Supabase"));
-            services.Configure<CloudinarySettings>(configuration.GetSection("Cloudinary"));
             services.Configure<JwtSettings>(configuration.GetSection("JWT"));
             services.Configure<AppLimits>(configuration.GetSection("AppSettings"));
             services.Configure<PushNotificationSettings>(configuration.GetSection("PushNotifications"));
@@ -79,7 +78,6 @@ namespace MomomiAPI.Extensions
         public class MomomiConfiguration
         {
             public SupabaseSettings Supabase { get; set; } = new();
-            public CloudinarySettings Cloudinary { get; set; } = new();
             public JwtSettings Jwt { get; set; } = new();
             public AppLimits AppSettings { get; set; } = new();
             public PushNotificationSettings PushNotifications { get; set; } = new();
@@ -87,27 +85,9 @@ namespace MomomiAPI.Extensions
             public void Validate()
             {
                 Supabase.Validate();
-                Cloudinary.Validate();
                 Jwt.Validate();
                 AppSettings.Validate();
                 PushNotifications.Validate();
-            }
-        }
-
-        public class CloudinarySettings
-        {
-            public string CloudName { get; set; } = string.Empty;
-            public string ApiKey { get; set; } = string.Empty;
-            public string ApiSecret { get; set; } = string.Empty;
-
-            public void Validate()
-            {
-                if (string.IsNullOrEmpty(CloudName))
-                    throw new InvalidOperationException("Cloudinary Cloud Name is required");
-                if (string.IsNullOrEmpty(ApiKey))
-                    throw new InvalidOperationException("Cloudinary API Key is required");
-                if (string.IsNullOrEmpty(ApiSecret))
-                    throw new InvalidOperationException("Cloudinary API Secret is required");
             }
         }
 
@@ -119,7 +99,7 @@ namespace MomomiAPI.Extensions
             public string Issuer { get; set; } = string.Empty;
             public string ProjectRef { get; set; } = string.Empty;
             public string JwtSecret { get; set; } = string.Empty;
-
+            public string StorageUrl { get; set; } = string.Empty;
             public void Validate()
             {
                 if (string.IsNullOrEmpty(Url))
@@ -128,6 +108,8 @@ namespace MomomiAPI.Extensions
                     throw new InvalidOperationException("Supabase Key is required");
                 if (string.IsNullOrEmpty(ServiceRoleKey))
                     throw new InvalidOperationException("Supabase Service Role Key is required");
+                if (string.IsNullOrEmpty(StorageUrl))
+                    throw new InvalidOperationException("Supabase Storage URL is required");
             }
         }
 
