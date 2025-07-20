@@ -7,6 +7,7 @@ using MomomiAPI.Data;
 using MomomiAPI.Extensions;
 using MomomiAPI.HealthChecks;
 using MomomiAPI.Hubs;
+using MomomiAPI.Services.Implementations;
 using MomomiAPI.Services.Interfaces;
 using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
@@ -385,15 +386,23 @@ builder.Services.AddScoped<RedisHealthCheck>();
 builder.Services.AddScoped<SupabaseHealthCheck>();
 builder.Services.AddScoped<SupabaseStorageHealthCheck>();
 
+// Register Analytics Services
+builder.Services.AddAnalyticsServices(builder.Configuration);
+
+// Register Retention Tracking Background Service
+builder.Services.AddHostedService<RetentionTrackingService>();
 
 // Health checks using custom classes
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<MomomiDbContext>("database", HealthStatus.Unhealthy, new[] { "db", "database" })
     .AddCheck<RedisHealthCheck>("redis", tags: new[] { "cache", "redis" })
     .AddCheck<SupabaseHealthCheck>("supabase", tags: new[] { "auth", "supabase" })
-    .AddCheck<SupabaseStorageHealthCheck>("supabase-storage", tags: new[] { "storage", "supabase" });
+    .AddCheck<SupabaseStorageHealthCheck>("supabase-storage", tags: new[] { "storage", "supabase" })
+    .AddCheck<PostHogHealthCheck>("posthog", tags: new[] { "analytics", "posthog" });
+
 
 var app = builder.Build();
+app.UseAnalyticsMiddleware();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

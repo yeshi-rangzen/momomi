@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MomomiAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c20b47bc1635f8c522f9e28305dd29ae9b35f1e3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b4eb9bb5f7cb68d3b599936fd4e2c038efe7ba86")]
 [assembly: System.Reflection.AssemblyProductAttribute("MomomiAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MomomiAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

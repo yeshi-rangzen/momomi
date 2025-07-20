@@ -2,8 +2,10 @@
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Services.Implementations
@@ -13,17 +15,20 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
         private readonly ICacheInvalidation _cacheInvalidation;
+        private readonly IAnalyticsService _analyticsService;
         private readonly ILogger<MatchManagementService> _logger;
 
         public MatchManagementService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
             ICacheInvalidation cacheInvalidation,
+            IAnalyticsService analyticsService,
             ILogger<MatchManagementService> logger)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _cacheInvalidation = cacheInvalidation;
+            _analyticsService = analyticsService;
             _logger = logger;
         }
 
@@ -292,6 +297,29 @@ namespace MomomiAPI.Services.Implementations
 
                     await _dbContext.SaveChangesAsync();
 
+                    // Track match creation analytics
+                    _ = Task.Run(async () =>
+                    {
+                        // Get user data for cultural analysis
+                        var user1 = await _dbContext.Users.FindAsync(user1Id);
+                        var user2 = await _dbContext.Users.FindAsync(user2Id);
+
+                        if (user1 != null && user2 != null)
+                        {
+                            var analyticsData = new MatchData
+                            {
+                                MatchType = DetermineMatchType(user1LikesUser2, user2LikesUser1),
+                                CulturalCompatibilityScore = CalculateCulturalCompatibility(user1, user2),
+                                User1Heritage = user1.Heritage ?? new List<HeritageType>(),
+                                User2Heritage = user2.Heritage ?? new List<HeritageType>(),
+                                IsCrossCultural = IsCrossCultural(user1.Heritage, user2.Heritage),
+                                MatchTimestamp = DateTime.UtcNow
+                            };
+
+                            await _analyticsService.TrackMatchCreatedAsync(user1Id, user2Id, analyticsData);
+                        }
+                    });
+
                     // Clear match caches for both users
                     await _cacheInvalidation.InvalidateMatchingCaches(user1Id, user2Id);
 
@@ -305,6 +333,27 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogError(ex, "Error checking for match between user {User1Id} and {User2Id}", user1Id, user2Id);
                 return OperationResult<bool>.Failed("Unable to check for match. Please try again.");
             }
+        }
+
+        private static string DetermineMatchType(UserLike like1, UserLike like2)
+        {
+            if (like1.LikeType == LikeType.SuperLike || like2.LikeType == LikeType.SuperLike)
+                return "super_like_match";
+            return "regular_match";
+        }
+
+        private static double CalculateCulturalCompatibility(User user1, User user2)
+        {
+            // Use the existing CulturalCompatibility helper
+            return CulturalCompatibility.CalculateCompatibilityScore(user1, user2);
+        }
+
+        private static bool IsCrossCultural(List<HeritageType>? heritage1, List<HeritageType>? heritage2)
+        {
+            if (heritage1 == null || heritage2 == null || !heritage1.Any() || !heritage2.Any())
+                return false;
+
+            return !heritage1.Intersect(heritage2).Any();
         }
     }
 }

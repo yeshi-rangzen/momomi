@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Models.DTOs;
+using MomomiAPI.Models.Enums;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 
@@ -12,11 +13,15 @@ namespace MomomiAPI.Controllers
     public class SubscriptionController : BaseApiController
     {
         private readonly ISubscriptionService _subscriptionService;
+        private readonly IAnalyticsService _analyticsService;
 
-        public SubscriptionController(ISubscriptionService subscriptionService, ILogger<SubscriptionController> logger)
-            : base(logger)
+        public SubscriptionController(
+            ISubscriptionService subscriptionService,
+            IAnalyticsService analyticsService,
+            ILogger<SubscriptionController> logger) : base(logger)
         {
             _subscriptionService = subscriptionService;
+            _analyticsService = analyticsService;
         }
 
         /// <summary>
@@ -65,6 +70,25 @@ namespace MomomiAPI.Controllers
 
             var result = await _subscriptionService.UpgradeToPremiumAsync(userIdResult.Value, request.DurationMonths);
 
+            // Track subscription upgrade
+            if (result.Success)
+            {
+                _ = Task.Run(() =>
+                {
+                    var analyticsData = new SubscriptionData
+                    {
+                        PlanType = SubscriptionType.Premium,
+                        DurationMonths = request.DurationMonths,
+                        PricePaid = CalculatePrice(request.DurationMonths),
+                        PaymentMethod = request.PaymentToken ?? "unknown",
+                        TriggerReason = DetermineTriggerReason(userIdResult.Value), // TODO: Implement
+                        PreviousSubscription = SubscriptionType.Free,
+                        UpgradeTimestamp = DateTime.UtcNow
+                    };
+
+                    return _analyticsService.TrackSubscriptionUpgradedAsync(userIdResult.Value, analyticsData);
+                });
+            }
             if (!result.Success)
             {
                 return HandleOperationResult(result);
@@ -92,7 +116,30 @@ namespace MomomiAPI.Controllers
 
             LogControllerAction(nameof(CancelSubscription));
 
+            // Get current subscription before cancelling
+            var currentSubscriptionResult = await _subscriptionService.GetUserSubscriptionAsync(userIdResult.Value);
+
             var result = await _subscriptionService.CancelSubscriptionAsync(userIdResult.Value);
+
+            // Track subscription cancellation
+            if (result.Success && currentSubscriptionResult.Success && currentSubscriptionResult.Data != null)
+            {
+                _ = Task.Run(() =>
+                {
+                    var daysSubscribed = currentSubscriptionResult.Data.StartsAt != null ?
+                        (int)(DateTime.UtcNow - currentSubscriptionResult.Data.StartsAt).TotalDays : 0;
+
+                    var analyticsData = new CancellationData
+                    {
+                        CancellationReason = "user_requested", // TODO: Get from request
+                        DaysSubscribed = daysSubscribed,
+                        CancelledPlan = currentSubscriptionResult.Data.SubscriptionType,
+                        CancellationTimestamp = DateTime.UtcNow
+                    };
+
+                    return _analyticsService.TrackSubscriptionCancelledAsync(userIdResult.Value, analyticsData);
+                });
+            }
             return HandleOperationResult(result);
         }
 
@@ -123,6 +170,19 @@ namespace MomomiAPI.Controllers
                 data = limitsResult.Data,
                 metadata = result.Metadata
             });
+        }
+
+        private static decimal CalculatePrice(int durationMonths)
+        {
+            // TODO: Implement actual pricing logic
+            return durationMonths * 9.99m; // Example: $9.99 per month
+        }
+
+        private static string DetermineTriggerReason(Guid userId)
+        {
+            // TODO: Implement logic to determine why user upgraded
+            // Could check recent limit hits, feature usage, etc.
+            return "unknown";
         }
     }
 }

@@ -8,12 +8,17 @@ namespace MomomiAPI.Controllers
     public class InteractionsController : BaseApiController
     {
         private readonly IUserInteractionService _userInteractionService;
-
+        private readonly IAnalyticsService _analyticsService;
+        private readonly IUserService _userService;
         public InteractionsController(
             IUserInteractionService userInteractionService,
+            IAnalyticsService analyticsService,
+            IUserService userService,
             ILogger<InteractionsController> logger) : base(logger)
         {
             _userInteractionService = userInteractionService;
+            _analyticsService = analyticsService;
+            _userService = userService;
         }
 
         /// <summary>
@@ -31,7 +36,31 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(ExpressInterestInUser), new { targetUserId = userId, likeType = request.LikeType });
 
             var result = await _userInteractionService.ExpressInterest(currentUserIdResult.Value, userId, request.LikeType);
+
+            // Track like interaction
+            if (result.Success)
+            {
+                _ = Task.Run(async () =>
+                {
+                    // Get target user data for analytics
+                    var targetUserResult = await _userService.GetUserByIdAsync(userId);
+
+                    var analyticsData = new LikeInteractionData
+                    {
+                        LikeType = request.LikeType,
+                        DiscoveryMode = targetUserResult.Data.EnableGlobalDiscovery.ToString(), // TODO: Pass from frontend
+                        //CulturalCompatibilityScore = null, // TODO: Calculate if available
+                        TargetHeritage = targetUserResult.Success ? targetUserResult.Data?.Heritage : null,
+                        IsMatch = result.IsMatch,
+                        InteractionTimestamp = DateTime.UtcNow
+                    };
+
+                    await _analyticsService.TrackLikeRecordedAsync(currentUserIdResult.Value, userId, analyticsData);
+                });
+            }
+
             return HandleInteractionResult(result);
+
         }
 
         /// <summary>

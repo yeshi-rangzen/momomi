@@ -1,5 +1,6 @@
 ﻿using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
+using MomomiAPI.HealthChecks;
 using MomomiAPI.Helpers;
 using MomomiAPI.Services.Implementations;
 using MomomiAPI.Services.Interfaces;
@@ -74,6 +75,20 @@ namespace MomomiAPI.Extensions
             return services;
         }
 
+        public static IServiceCollection AddAnalyticsServices(this IServiceCollection services, IConfiguration configuration)
+        {
+            // Register PostHog Analytics Service
+            services.AddHttpClient<IAnalyticsService, PostHogAnalyticsService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.Add("User-Agent", "Momomi-API/1.0");
+            });
+
+            // Register PostHog Health Check
+            services.AddScoped<PostHogHealthCheck>();
+
+            return services;
+        }
         // Configuration classes with validation
         public class MomomiConfiguration
         {

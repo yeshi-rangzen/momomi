@@ -12,11 +12,14 @@ namespace MomomiAPI.Controllers
     public class MessagesController : BaseApiController
     {
         private readonly IMessageService _messageService;
-
-        public MessagesController(IMessageService messageService, ILogger<MessagesController> logger)
-            : base(logger)
+        private readonly IAnalyticsService _analyticsService;
+        public MessagesController(
+            IMessageService messageService,
+            IAnalyticsService analyticsService,
+            ILogger<MessagesController> logger) : base(logger)
         {
             _messageService = messageService;
+            _analyticsService = analyticsService;
         }
 
         /// <summary>
@@ -97,7 +100,36 @@ namespace MomomiAPI.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             var result = await _messageService.SendMessageAsync(userIdResult.Value, request);
+            stopwatch.Stop();
+
+            // Track message delivery
+            if (result.Success && result.Data != null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    // Determine receiver ID from conversation
+                    var conversationResult = await _messageService.GetConversationAsync(userIdResult.Value, request.ConversationId);
+                    if (conversationResult.Success && conversationResult.Data != null)
+                    {
+                        var receiverId = conversationResult.Data.OtherUserId;
+
+                        var analyticsData = new MessageData
+                        {
+                            ConversationId = request.ConversationId,
+                            MessageType = request.MessageType,
+                            MessageLength = request.Content.Length,
+                            IsFirstMessage = false, // TODO: Determine if first message
+                            ProcessingTime = stopwatch.Elapsed,
+                            MessageTimestamp = DateTime.UtcNow
+                        };
+
+                        await _analyticsService.TrackMessageDeliveredAsync(userIdResult.Value, receiverId, analyticsData);
+                    }
+                });
+            }
+
             return HandleOperationResult(result);
         }
 

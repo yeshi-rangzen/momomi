@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Models.Entities;
+using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
 
@@ -16,18 +17,21 @@ namespace MomomiAPI.Controllers
         private readonly IUserRegistrationService _userRegistrationService;
         private readonly IUserLoginService _userLoginService;
         private readonly ITokenManagementService _tokenManagementService;
+        private readonly IAnalyticsService _analyticsService;
 
         public AuthController(
             IEmailVerificationService emailVerificationService,
             IUserRegistrationService userRegistrationService,
             IUserLoginService userLoginService,
             ITokenManagementService tokenManagementService,
+            IAnalyticsService analyticsService,
             ILogger<AuthController> logger) : base(logger)
         {
             _emailVerificationService = emailVerificationService;
             _userRegistrationService = userRegistrationService;
             _userLoginService = userLoginService;
             _tokenManagementService = tokenManagementService;
+            _analyticsService = analyticsService;
         }
 
         /// <summary>
@@ -43,6 +47,15 @@ namespace MomomiAPI.Controllers
                 return BadRequest(ModelState);
 
             var result = await _emailVerificationService.SendVerificationCode(request.Email);
+
+            // Track email verification sent
+            if (result.Success)
+            {
+                _ = Task.Run(() => _analyticsService.TrackEmailVerificationSentAsync(
+                    request.Email,
+                    result.RemainingAttempts ?? 0));
+            }
+
             return HandleAuthResult(result);
         }
 
@@ -78,6 +91,27 @@ namespace MomomiAPI.Controllers
                 return BadRequest(ModelState);
 
             var result = await _userRegistrationService.RegisterNewUser(request);
+
+            // Track successful registration
+            if (((OperationResult)result).Success && result.Data != null)
+            {
+                var analyticsData = new UserRegistrationData
+                {
+                    Email = request.Email,
+                    Age = DateTime.UtcNow.Year - request.DateOfBirth.Year,
+                    Gender = request.Gender,
+                    Heritage = request.Heritage ?? new List<HeritageType>(),
+                    Religion = request.Religion ?? new List<ReligionType>(),
+                    Languages = request.LanguagesSpoken ?? new List<LanguageType>(),
+                    Hometown = request.Hometown,
+                    RegistrationMethod = "email",
+                    RegistrationTimestamp = DateTime.UtcNow
+                };
+
+                // Fire and forget analytics tracking
+                _ = Task.Run(() => _analyticsService.TrackUserRegistrationAsync(result.Data.Id, analyticsData));
+            }
+
             return HandleAuthResult(result);
         }
 
@@ -95,6 +129,22 @@ namespace MomomiAPI.Controllers
                 return BadRequest(ModelState);
 
             var result = await _userLoginService.LoginWithEmailCode(request.Email, request.Otp);
+
+            // Track successful login
+            if (((OperationResult)result).Success && result.Data != null)
+            {
+                var loginData = new LoginData
+                {
+                    Email = request.Email,
+                    LoginMethod = "email_otp",
+                    DaysSinceLastLogin = CalculateDaysSinceLastLogin(result.Data.LastActive),
+                    LoginTimestamp = DateTime.UtcNow
+                };
+
+                // Fire and forget analytics tracking
+                _ = Task.Run(() => _analyticsService.TrackUserLoginAsync(result.Data.Id, loginData));
+            }
+
             return HandleAuthResult(result);
         }
 
@@ -181,6 +231,10 @@ namespace MomomiAPI.Controllers
             return HandleOperationResult(result);
         }
 
+        private static int CalculateDaysSinceLastLogin(DateTime lastActive)
+        {
+            return (int)(DateTime.UtcNow - lastActive).TotalDays;
+        }
         /// <summary>
         /// Revoke all user sessions (security feature)
         /// </summary>

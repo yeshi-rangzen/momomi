@@ -7,12 +7,18 @@ namespace MomomiAPI.Controllers
     public class MatchesController : BaseApiController
     {
         private readonly IMatchManagementService _matchManagementService;
+        private readonly IAnalyticsService _analyticsService;
+        private readonly IUserService _userService;
 
         public MatchesController(
             IMatchManagementService matchManagementService,
+            IAnalyticsService analyticsService,
+            IUserService userService,
             ILogger<MatchesController> logger) : base(logger)
         {
             _matchManagementService = matchManagementService;
+            _analyticsService = analyticsService;
+            _userService = userService;
         }
 
         /// <summary>
