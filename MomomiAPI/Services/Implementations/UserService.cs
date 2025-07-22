@@ -89,7 +89,7 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("Retrieving user profile: {UserId}", userId);
 
                 var cacheKey = CacheKeys.Users.Profile(userId);
-                var cachedProfile = await _cacheService.GetAsync<UserProfileDTO>(cacheKey);
+                var cachedProfile = await _cacheService.GetAsync<UserProfileDTO>(cacheKey).ConfigureAwait(false);
 
                 if (cachedProfile != null)
                 {
@@ -97,7 +97,7 @@ namespace MomomiAPI.Services.Implementations
                     return OperationResult<UserProfileDTO>.Successful(cachedProfile);
                 }
 
-                var userResult = await GetUserByIdAsync(userId);
+                var userResult = await GetUserByIdAsync(userId).ConfigureAwait(false);
                 if (!userResult.Success)
                 {
                     return OperationResult<UserProfileDTO>.NotFound("User profile not found.");
@@ -107,7 +107,7 @@ namespace MomomiAPI.Services.Implementations
                 var profile = MapUserToProfileDTO(user);
 
                 // Cache the profile
-                await _cacheService.SetAsync(cacheKey, profile, CacheKeys.Duration.UserProfile);
+                await _cacheService.SetAsync(cacheKey, profile, CacheKeys.Duration.UserProfile).ConfigureAwait(false);
 
                 _logger.LogDebug("Retrieved and cached profile for user {UserId}", userId);
                 return OperationResult<UserProfileDTO>.Successful(profile);
@@ -135,7 +135,8 @@ namespace MomomiAPI.Services.Implementations
                 var user = await _dbContext.Users
                     .Include(u => u.Preferences)
                     .Include(u => u.Subscription)
-                    .FirstOrDefaultAsync(u => u.Id == userId);
+                    .FirstOrDefaultAsync(u => u.Id == userId)
+                    .ConfigureAwait(false);
 
                 if (user == null)
                 {
@@ -149,11 +150,21 @@ namespace MomomiAPI.Services.Implementations
                 UpdateUserPreferences(user, request);
 
                 user.UpdatedAt = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
+                await _dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-                // Invalidate caches
-                await _cacheInvalidation.InvalidateUserProfile(userId);
-                await _cacheInvalidation.InvalidateUserDiscovery(userId);
+                // Fire and forget cache invalidation
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _cacheInvalidation.InvalidateUserProfile(userId).ConfigureAwait(false);
+                        await _cacheInvalidation.InvalidateUserDiscovery(userId).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error invalidating cache for user {UserId}", userId);
+                    }
+                });
 
                 _logger.LogInformation("Successfully updated profile for user {UserId}", userId);
                 return OperationResult.Successful().WithMetadata("updated_at", DateTime.UtcNow);

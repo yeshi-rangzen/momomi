@@ -349,37 +349,6 @@
         }
       }
     },
-    "/api/Debug/inspect-token": {
-      "post": {
-        "tags": [
-          "Debug"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenDebugRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenDebugRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenDebugRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/api/Discovery/users": {
       "get": {
         "tags": [
@@ -393,113 +362,6 @@
               "type": "integer",
               "format": "int32",
               "default": 10
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Discovery/users/global": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "parameters": [
-          {
-            "name": "count",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 10
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Discovery/users/local": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "parameters": [
-          {
-            "name": "count",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 10
-            }
-          },
-          {
-            "name": "maxDistance",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 50
             }
           }
         ],
@@ -1863,6 +1725,8 @@
           "hometown",
           "interestedIn",
           "languagesSpoken",
+          "latitude",
+          "longitude",
           "religion",
           "verificationToken"
         ],
@@ -1900,6 +1764,19 @@
           "hometown": {
             "minLength": 1,
             "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxDistanceKm": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "heritage": {
             "type": "array",
@@ -2729,16 +2606,6 @@
         },
         "additionalProperties": false
       },
-      "TokenDebugRequest": {
-        "type": "object",
-        "properties": {
-          "token": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "UpdateDiscoverySettingsRequest": {
         "type": "object",
         "properties": {
@@ -3311,63 +3178,12 @@
           "usageLimit": {
             "$ref": "#/components/schemas/UserUsageLimit"
           },
-          "blocksMade": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserBlock"
-            },
-            "nullable": true
-          },
-          "blocksReceived": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserBlock"
-            },
-            "nullable": true
-          },
           "notifications": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PushNotification"
             },
             "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserBlock": {
-        "required": [
-          "blockedUserId",
-          "blockerUserId"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "blockerUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "blockedUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reason": {
-            "maxLength": 500,
-            "type": "string",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "blockerUser": {
-            "$ref": "#/components/schemas/User"
-          },
-          "blockedUser": {
-            "$ref": "#/components/schemas/User"
           }
         },
         "additionalProperties": false

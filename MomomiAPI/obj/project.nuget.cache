@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "q6HK7X4Sle0=",
+  "dgSpecHash": "cEf3wiYv/Ts=",
   "success": true,
   "projectFilePath": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\MomomiAPI.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\yeshi\\.nuget\\packages\\fluentvalidation\\12.0.0\\fluentvalidation.12.0.0.nupkg.sha512",
     "C:\\Users\\yeshi\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\yeshi\\.nuget\\packages\\microsoft.aspnetcore.authentication.abstractions\\2.3.0\\microsoft.aspnetcore.authentication.abstractions.2.3.0.nupkg.sha512",
     "C:\\Users\\yeshi\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.17\\microsoft.aspnetcore.authentication.jwtbearer.8.0.17.nupkg.sha512",

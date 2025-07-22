@@ -40,114 +40,57 @@ namespace MomomiAPI.Services.Implementations
 
                 var cacheKey = CacheKeys.Matching.UserMatches(userId);
                 var cachedMatches = await _cacheService.GetAsync<List<MatchDTO>>(cacheKey);
+                if (cachedMatches != null) return OperationResult<List<MatchDTO>>.Successful(cachedMatches);
 
-                if (cachedMatches != null)
-                {
-                    _logger.LogDebug("Returning cached matches for user {UserId}", userId);
-                    return OperationResult<List<MatchDTO>>.Successful(cachedMatches);
-                }
-
-                // Get all matches where user is involved and both users liked each other
+                // Single optimized query with projections
                 var matches = await _dbContext.UserLikes
-                    .Where(ul => (ul.LikerUserId == userId || ul.LikedUserId == userId) &&
-                                 ul.IsMatch && ul.IsLike)
-                    .Include(ul => ul.LikerUser)
-                        .ThenInclude(u => u.Photos)
-                    .Include(ul => ul.LikedUser)
-                        .ThenInclude(u => u.Photos)
-                    .OrderByDescending(ul => ul.CreatedAt)
+                    .Where(ul => (ul.LikerUserId == userId || ul.LikedUserId == userId) && ul.IsMatch && ul.IsLike)
+                    .Select(ul => new
+                    {
+                        Match = ul,
+                        OtherUser = ul.LikerUserId == userId ? ul.LikedUser : ul.LikerUser,
+                        PrimaryPhoto = (ul.LikerUserId == userId ? ul.LikedUser : ul.LikerUser)
+                            .Photos.Where(p => p.IsPrimary).Select(p => p.Url).FirstOrDefault(),
+                        Conversation = _dbContext.Conversations
+                            .Where(c => (c.User1Id == userId && c.User2Id == (ul.LikerUserId == userId ? ul.LikedUserId : ul.LikerUserId)) ||
+                                       (c.User1Id == (ul.LikerUserId == userId ? ul.LikedUserId : ul.LikerUserId) && c.User2Id == userId))
+                            .Select(c => new
+                            {
+                                Id = c.Id,
+                                LastMessage = c.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault(),
+                                UnreadCount = c.Messages.Count(m => m.SenderId != userId && !m.IsRead)
+                            }).FirstOrDefault()
+                    })
+                    .OrderByDescending(x => x.Match.CreatedAt)
                     .ToListAsync();
 
-                var matchDtos = new List<MatchDTO>();
-
-                foreach (var match in matches)
+                var matchDtos = matches.Where(m => m.OtherUser.IsActive).Select(m => new MatchDTO
                 {
-                    // Determine the other user (not the current user)
-                    var otherUser = match.LikerUserId == userId ? match.LikedUser : match.LikerUser;
-
-                    // Skip if other user is inactive
-                    if (!otherUser.IsActive)
-                        continue;
-
-                    // Get conversation details for last message and unread count
-                    var conversation = await _dbContext.Conversations
-                        .Include(c => c.Messages)
-                        .FirstOrDefaultAsync(c =>
-                            (c.User1Id == userId && c.User2Id == otherUser.Id) ||
-                            (c.User1Id == otherUser.Id && c.User2Id == userId));
-
-                    MessageDTO? lastMessage = null;
-                    var unreadCount = 0;
-
-                    if (conversation != null)
+                    MatchId = m.Match.Id,
+                    UserId = m.OtherUser.Id,
+                    FirstName = m.OtherUser.FirstName,
+                    LastName = m.OtherUser.LastName,
+                    Age = m.OtherUser.DateOfBirth.HasValue ? DateTime.UtcNow.Year - m.OtherUser.DateOfBirth.Value.Year : 0,
+                    PrimaryPhoto = m.PrimaryPhoto,
+                    Heritage = m.OtherUser.Heritage,
+                    MatchedAt = m.Match.CreatedAt,
+                    LastMessage = m.Conversation?.LastMessage != null ? new MessageDTO
                     {
-                        var lastMsg = conversation.Messages
-                            .OrderByDescending(m => m.SentAt)
-                            .FirstOrDefault();
+                        Id = m.Conversation.LastMessage.Id,
+                        ConversationId = m.Conversation.LastMessage.ConversationId,
+                        SenderId = m.Conversation.LastMessage.SenderId,
+                        SenderName = m.Conversation.LastMessage.SenderId == userId ? "You" : m.OtherUser.FirstName ?? "",
+                        Content = m.Conversation.LastMessage.Content,
+                        MessageType = m.Conversation.LastMessage.MessageType,
+                        IsRead = m.Conversation.LastMessage.IsRead,
+                        SentAt = m.Conversation.LastMessage.SentAt
+                    } : null,
+                    UnreadCount = m.Conversation?.UnreadCount ?? 0,
+                    IsFromSuperLike = m.Match.LikeType == LikeType.SuperLike
+                }).ToList();
 
-                        if (lastMsg != null)
-                        {
-                            lastMessage = new MessageDTO
-                            {
-                                Id = lastMsg.Id,
-                                ConversationId = lastMsg.ConversationId,
-                                SenderId = lastMsg.SenderId,
-                                SenderName = lastMsg.SenderId == userId ? "You" : otherUser.FirstName ?? "",
-                                Content = lastMsg.Content,
-                                MessageType = lastMsg.MessageType,
-                                IsRead = lastMsg.IsRead,
-                                SentAt = lastMsg.SentAt
-                            };
-                        }
-
-                        // Count unread messages from the other user
-                        unreadCount = conversation.Messages
-                            .Count(m => m.SenderId != userId && !m.IsRead);
-                    }
-
-                    // Check if this was a super like
-                    var isFromSuperLike = match.LikeType == Models.Enums.LikeType.SuperLike ||
-                                         await _dbContext.UserLikes
-                                             .AnyAsync(ul =>
-                                                 ((ul.LikerUserId == userId && ul.LikedUserId == otherUser.Id) ||
-                                                  (ul.LikerUserId == otherUser.Id && ul.LikedUserId == userId)) &&
-                                                 ul.LikeType == Models.Enums.LikeType.SuperLike);
-
-                    var matchDto = new MatchDTO
-                    {
-                        MatchId = match.Id,
-                        UserId = otherUser.Id,
-                        FirstName = otherUser.FirstName,
-                        LastName = otherUser.LastName,
-                        Age = otherUser.DateOfBirth.HasValue ?
-                            DateTime.UtcNow.Year - otherUser.DateOfBirth.Value.Year : 0,
-                        PrimaryPhoto = otherUser.Photos
-                            .FirstOrDefault(p => p.IsPrimary)?.Url ??
-                            otherUser.Photos
-                            .OrderBy(p => p.PhotoOrder)
-                            .FirstOrDefault()?.Url,
-                        Heritage = otherUser.Heritage,
-                        MatchedAt = match.CreatedAt,
-                        LastMessage = lastMessage,
-                        UnreadCount = unreadCount,
-                        IsFromSuperLike = isFromSuperLike
-                    };
-
-                    matchDtos.Add(matchDto);
-                }
-
-                // Remove duplicates based on UserId (in case there are multiple match records)
-                var uniqueMatches = matchDtos
-                    .GroupBy(m => m.UserId)
-                    .Select(g => g.OrderByDescending(m => m.MatchedAt).First())
-                    .OrderByDescending(m => m.LastMessage?.SentAt ?? m.MatchedAt)
-                    .ToList();
-
-                // Cache for 15 minutes
-                await _cacheService.SetAsync(cacheKey, uniqueMatches, CacheKeys.Duration.UserMatches);
-
-                _logger.LogInformation("Retrieved {Count} matches for user {UserId}", uniqueMatches.Count, userId);
-                return OperationResult<List<MatchDTO>>.Successful(uniqueMatches);
+                await _cacheService.SetAsync(cacheKey, matchDtos, CacheKeys.Duration.UserMatches);
+                return OperationResult<List<MatchDTO>>.Successful(matchDtos);
             }
             catch (Exception ex)
             {

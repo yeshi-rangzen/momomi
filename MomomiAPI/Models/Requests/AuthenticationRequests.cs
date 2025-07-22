@@ -52,6 +52,13 @@ namespace MomomiAPI.Models.Requests
             public string Hometown { get; set; } = string.Empty;
 
             [Required]
+            public double Latitude { get; set; }
+
+            [Required]
+            public double Longitude { get; set; }
+            public int? MaxDistanceKm { get; set; }
+
+            [Required]
             public List<HeritageType> Heritage { get; set; } = [];
 
             [Required]

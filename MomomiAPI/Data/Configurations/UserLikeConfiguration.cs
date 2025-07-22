@@ -10,22 +10,34 @@ namespace MomomiAPI.Data.Configurations
         {
             builder.HasKey(ul => ul.Id);
 
+            // Composite index for match queries
+            builder.HasIndex(ul => new { ul.LikerUserId, ul.LikedUserId, ul.IsMatch, ul.IsLike })
+                .HasDatabaseName("idx_user_likes_composite_main");
+
+            // For finding matches efficiently
+            builder.HasIndex(ul => new { ul.LikedUserId, ul.IsMatch, ul.IsLike })
+                .HasDatabaseName("index_user_likes_liked_matches")
+                .HasFilter("is_match = true AND is_like = true");
+
+            // For "users who like me" queries
+            builder.HasIndex(ul => new { ul.LikedUserId, ul.IsLike, ul.IsMatch })
+                .HasDatabaseName("idx_user_likes_received")
+                .HasFilter("is_like = true")
+                .IncludeProperties(ul => new { ul.LikerUserId, ul.CreatedAt, ul.LikeType });
+
+            // For undo last swipe functionality
+            builder.HasIndex(ul => new { ul.LikerUserId, ul.CreatedAt })
+                .HasDatabaseName("idx_user_likes_liker_recent")
+                .IsDescending(false, true);
+
+            // Index for discovery exclusion queries
+            builder.HasIndex(ul => ul.LikerUserId)
+                .HasDatabaseName("idx_user_likes_liker_discovery");
+
+            // Unique constraint to prevent duplicate likes
             builder.HasIndex(ul => new { ul.LikerUserId, ul.LikedUserId })
                 .IsUnique()
                 .HasDatabaseName("idx_user_likes_unique");
-
-            builder.HasIndex(ul => ul.LikerUserId)
-                .HasDatabaseName("idx_user_likes_liker");
-
-            builder.HasIndex(ul => ul.LikedUserId)
-                .HasDatabaseName("idx_user_likes_liked");
-
-            builder.HasIndex(ul => ul.IsMatch)
-                .HasDatabaseName("idx_user_likes_match")
-                .HasFilter("is_match = true");
-
-            builder.HasIndex(ul => new { ul.LikeType, ul.CreatedAt })
-                .HasDatabaseName("idx_user_likes_type_created");
 
             builder.Property(ul => ul.LikeType)
                 .HasConversion<string>();

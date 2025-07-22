@@ -32,18 +32,20 @@ namespace MomomiAPI.Services.Implementations
             try
             {
                 if (count < 1 || count > 50)
-                {
                     return (DiscoveryResult)DiscoveryResult.Failed("Count must be between 1 and 50.");
-                }
 
                 var currentUser = await _dbContext.Users
-                    .Include(u => u.Preferences)
-                    .FirstOrDefaultAsync(u => u.Id == userId);
+                    .Where(u => u.Id == userId)
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.EnableGlobalDiscovery,
+                        u.MaxDistanceKm
+                    })
+                    .FirstOrDefaultAsync();
 
                 if (currentUser == null)
-                {
                     return DiscoveryResult.UserNotFound();
-                }
 
                 // Route to appropriate discovery method based on user preference
                 return currentUser.EnableGlobalDiscovery

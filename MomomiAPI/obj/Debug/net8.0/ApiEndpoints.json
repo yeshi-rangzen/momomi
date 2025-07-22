@@ -192,22 +192,6 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.DebugController",
-    "Method": "InspectToken",
-    "RelativePath": "api/Debug/inspect-token",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "MomomiAPI.Controllers.TokenDebugRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
     "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
     "Method": "DiscoverUsersForSwiping",
     "RelativePath": "api/Discovery/users",
@@ -217,63 +201,6 @@
     "Parameters": [
       {
         "Name": "count",
-        "Type": "System.Int32",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
-    "Method": "DiscoverUsersGlobally",
-    "RelativePath": "api/Discovery/users/global",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "count",
-        "Type": "System.Int32",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.DiscoveryController",
-    "Method": "DiscoverUsersLocally",
-    "RelativePath": "api/Discovery/users/local",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "count",
-        "Type": "System.Int32",
-        "IsRequired": false
-      },
-      {
-        "Name": "maxDistance",
         "Type": "System.Int32",
         "IsRequired": false
       }

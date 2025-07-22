@@ -2,7 +2,6 @@
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
-using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
@@ -267,61 +266,62 @@ namespace MomomiAPI.Services.Implementations
                 if (pageSize < 1 || pageSize > 50) pageSize = 20;
 
                 // Verify user exists
-                var currentUser = await _dbContext.Users.FindAsync(userId);
-                if (currentUser == null)
-                {
-                    return OperationResult<List<UserLikeDTO>>.NotFound("User not found.");
-                }
+                var currentUser = await _dbContext.Users
+                    .Select(u => new { u.Id, u.Latitude, u.Longitude })
+                    .FirstOrDefaultAsync(u => u.Id == userId);
 
-                // Get users who liked current user (but current user hasn't liked back)
+                if (currentUser == null)
+                    return OperationResult<List<UserLikeDTO>>.NotFound("User not found.");
+
+                // Single optimized query with projection
                 var usersWhoLikedMe = await _dbContext.UserLikes
                     .Where(ul => ul.LikedUserId == userId && ul.IsLike && !ul.IsMatch)
-                    .Include(ul => ul.LikerUser)
-                        .ThenInclude(u => u.Photos)
-                    .Where(ul => ul.LikerUser.IsActive) // Only active users
-                    .OrderByDescending(ul => ul.CreatedAt)
+                    .Where(ul => ul.LikerUser.IsActive)
+                    .Select(ul => new
+                    {
+                        Like = ul,
+                        User = ul.LikerUser,
+                        PrimaryPhoto = ul.LikerUser.Photos
+                            .Where(p => p.IsPrimary)
+                            .Select(p => p.Url)
+                            .FirstOrDefault() ?? ul.LikerUser.Photos
+                            .OrderBy(p => p.PhotoOrder)
+                            .Select(p => p.Url)
+                            .FirstOrDefault()
+                    })
+                    .OrderByDescending(x => x.Like.CreatedAt)
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
                     .ToListAsync();
 
-                var result = new List<UserLikeDTO>();
 
-                foreach (var like in usersWhoLikedMe)
+                var result = usersWhoLikedMe.Select(item =>
                 {
-                    var liker = like.LikerUser;
-
-                    // Calculate distance if both users have location
                     double? distance = null;
-                    if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue &&
-                        liker.Latitude.HasValue && liker.Longitude.HasValue)
-                    {
-                        distance = LocationHelper.CalculateDistance(
-                            (double)currentUser.Latitude, (double)currentUser.Longitude,
-                            (double)liker.Latitude, (double)liker.Longitude);
-                    }
+                    // TODO: Do we need the distance here?
+                    //if (currentUser.Latitude.HasValue && currentUser.Longitude.HasValue &&
+                    //    item.User.Latitude.HasValue && item.User.Longitude.HasValue)
+                    //{
+                    //    distance = LocationHelper.CalculateDistance(
+                    //        (double)currentUser.Latitude, (double)currentUser.Longitude,
+                    //        (double)item.User.Latitude, (double)item.User.Longitude);
+                    //}
 
-                    var userLikeDto = new UserLikeDTO
+                    return new UserLikeDTO
                     {
-                        UserId = liker.Id,
-                        FirstName = liker.FirstName,
-                        LastName = liker.LastName,
-                        Age = liker.DateOfBirth.HasValue ?
-                            DateTime.UtcNow.Year - liker.DateOfBirth.Value.Year : 0,
-                        PrimaryPhoto = liker.Photos
-                            .FirstOrDefault(p => p.IsPrimary)?.Url ??
-                            liker.Photos
-                            .OrderBy(p => p.PhotoOrder)
-                            .FirstOrDefault()?.Url,
-                        Heritage = liker.Heritage,
-                        LikeType = like.LikeType,
-                        LikedAt = like.CreatedAt,
+                        UserId = item.User.Id,
+                        FirstName = item.User.FirstName,
+                        LastName = item.User.LastName,
+                        Age = item.User.DateOfBirth.HasValue ? DateTime.UtcNow.Year - item.User.DateOfBirth.Value.Year : 0,
+                        PrimaryPhoto = item.PrimaryPhoto,
+                        Heritage = item.User.Heritage,
+                        LikeType = item.Like.LikeType,
+                        LikedAt = item.Like.CreatedAt,
                         DistanceKm = distance
                     };
+                }).ToList();
 
-                    result.Add(userLikeDto);
-                }
 
-                _logger.LogInformation("Retrieved {Count} users who liked user {UserId}", result.Count, userId);
                 return OperationResult<List<UserLikeDTO>>.Successful(result)
                     .WithMetadata("page", page)
                     .WithMetadata("page_size", pageSize)

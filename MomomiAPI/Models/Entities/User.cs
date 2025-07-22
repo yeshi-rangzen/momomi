@@ -148,10 +148,6 @@ namespace MomomiAPI.Models.Entities
         public virtual UserSubscription? Subscription { get; set; }
         public virtual UserUsageLimit? UsageLimit { get; set; }
 
-        // Blocking relationships
-        public virtual ICollection<UserBlock> BlocksMade { get; set; } = [];
-        public virtual ICollection<UserBlock> BlocksReceived { get; set; } = [];
-
         // Notifications
         public virtual ICollection<PushNotification> Notifications { get; set; } = [];
     }

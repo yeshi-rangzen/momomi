@@ -10,14 +10,25 @@ namespace MomomiAPI.Data.Configurations
         {
             builder.HasKey(c => c.Id);
 
+            //  For finding user conversations efficiently
+            builder.HasIndex(c => new { c.User1Id, c.IsActive, c.UpdatedAt })
+                .HasDatabaseName("idx_conversations_user1_active")
+                .IsDescending(false, false, true)
+                .IncludeProperties(c => new { c.User2Id, c.CreatedAt });
+
+            builder.HasIndex(c => new { c.User2Id, c.IsActive, c.UpdatedAt })
+                .HasDatabaseName("idx_conversations_user2_active")
+                .IsDescending(false, false, true)
+                .IncludeProperties(c => new { c.User1Id, c.CreatedAt });
+
+            // Unique constraint to prevent duplicate conversations
             builder.HasIndex(c => new { c.User1Id, c.User2Id })
                 .IsUnique()
-                .HasDatabaseName("idx_conversations_users");
+                .HasDatabaseName("idx_conversations_users_unique");
 
-            builder.HasMany(c => c.Messages)
-                .WithOne(m => m.Conversation)
-                .HasForeignKey(m => m.ConversationId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // For finding specific conversation between two users
+            builder.HasIndex(c => new { c.User1Id, c.User2Id, c.IsActive })
+                .HasDatabaseName("idx_conversations_users_active");
 
             // Configure explicit relationships to avoid ambiguity
             builder.HasOne(c => c.User1)

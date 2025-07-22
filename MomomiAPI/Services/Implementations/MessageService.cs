@@ -184,65 +184,61 @@ namespace MomomiAPI.Services.Implementations
 
                 var cacheKey = CacheKeys.Messaging.UserConversations(userId);
                 var cachedConversations = await _cacheService.GetAsync<List<ConversationDTO>>(cacheKey);
+                if (cachedConversations != null) return OperationResult<List<ConversationDTO>>.Successful(cachedConversations);
 
-                if (cachedConversations != null)
-                {
-                    _logger.LogDebug("Returning cached conversations for user {UserId}", userId);
-                    return OperationResult<List<ConversationDTO>>.Successful(cachedConversations);
-                }
-
+                // Single optimized query with all the data
                 var conversations = await _dbContext.Conversations
                     .Where(c => (c.User1Id == userId || c.User2Id == userId) && c.IsActive)
-                    .Include(c => c.User1)
-                        .ThenInclude(u => u.Photos)
-                    .Include(c => c.User2)
-                        .ThenInclude(u => u.Photos)
-                    .Include(c => c.Messages.OrderByDescending(m => m.SentAt).Take(1)) // Get last message
-                    .OrderByDescending(c => c.UpdatedAt)
+                    .Select(c => new
+                    {
+                        Conversation = c,
+                        OtherUser = c.User1Id == userId ? c.User2 : c.User1,
+                        OtherUserPhoto = (c.User1Id == userId ? c.User2 : c.User1).Photos
+                            .Where(p => p.IsPrimary)
+                            .Select(p => p.Url)
+                            .FirstOrDefault(),
+                        LastMessage = c.Messages
+                            .OrderByDescending(m => m.SentAt)
+                            .Select(m => new
+                            {
+                                m.Id,
+                                m.ConversationId,
+                                m.SenderId,
+                                m.Content,
+                                m.MessageType,
+                                m.IsRead,
+                                m.SentAt
+                            })
+                            .FirstOrDefault(),
+                        UnreadCount = c.Messages.Count(m => m.SenderId != userId && !m.IsRead)
+                    })
+                    .Where(x => x.OtherUser.IsActive)
+                    .OrderByDescending(x => x.Conversation.UpdatedAt)
                     .ToListAsync();
 
-                var conversationDtos = new List<ConversationDTO>();
-
-                foreach (var conversation in conversations)
+                var conversationDtos = conversations.Select(item => new ConversationDTO
                 {
-                    var otherUser = conversation.User1Id == userId ? conversation.User2 : conversation.User1;
-
-                    // Skip if other user is inactive
-                    if (!otherUser.IsActive)
-                        continue;
-
-                    var unreadCount = await _dbContext.Messages
-                        .CountAsync(m => m.ConversationId == conversation.Id && m.SenderId != userId && !m.IsRead);
-
-                    var lastMessage = conversation.Messages.FirstOrDefault();
-
-                    conversationDtos.Add(new ConversationDTO
+                    Id = item.Conversation.Id,
+                    OtherUserId = item.OtherUser.Id,
+                    OtherUserName = $"{item.OtherUser.FirstName} {item.OtherUser.LastName}".Trim(),
+                    OtherUserPhoto = item.OtherUserPhoto,
+                    LastMessage = item.LastMessage != null ? new MessageDTO
                     {
-                        Id = conversation.Id,
-                        OtherUserId = otherUser.Id,
-                        OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
-                        OtherUserPhoto = otherUser.Photos.FirstOrDefault(p => p.IsPrimary)?.Url,
-                        LastMessage = lastMessage != null ? new MessageDTO
-                        {
-                            Id = lastMessage.Id,
-                            ConversationId = lastMessage.ConversationId,
-                            SenderId = lastMessage.SenderId,
-                            SenderName = lastMessage.SenderId == userId ? "You" : otherUser.FirstName ?? "",
-                            Content = lastMessage.Content,
-                            MessageType = lastMessage.MessageType,
-                            IsRead = lastMessage.IsRead,
-                            SentAt = lastMessage.SentAt
-                        } : null,
-                        UnreadCount = unreadCount,
-                        UpdatedAt = conversation.UpdatedAt,
-                        IsActive = conversation.IsActive
-                    });
-                }
+                        Id = item.LastMessage.Id,
+                        ConversationId = item.LastMessage.ConversationId,
+                        SenderId = item.LastMessage.SenderId,
+                        SenderName = item.LastMessage.SenderId == userId ? "You" : item.OtherUser.FirstName ?? "",
+                        Content = item.LastMessage.Content,
+                        MessageType = item.LastMessage.MessageType,
+                        IsRead = item.LastMessage.IsRead,
+                        SentAt = item.LastMessage.SentAt
+                    } : null,
+                    UnreadCount = item.UnreadCount,
+                    UpdatedAt = item.Conversation.UpdatedAt,
+                    IsActive = item.Conversation.IsActive
+                }).ToList();
 
-                // Cache for 10 minutes
                 await _cacheService.SetAsync(cacheKey, conversationDtos, CacheKeys.Duration.Conversations);
-
-                _logger.LogDebug("Retrieved {Count} conversations for user {UserId}", conversationDtos.Count, userId);
                 return OperationResult<List<ConversationDTO>>.Successful(conversationDtos);
             }
             catch (Exception ex)

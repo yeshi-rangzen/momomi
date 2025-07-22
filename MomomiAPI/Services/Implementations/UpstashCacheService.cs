@@ -1,5 +1,6 @@
 ﻿using MomomiAPI.Services.Interfaces;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace MomomiAPI.Services.Implementations
@@ -9,6 +10,8 @@ namespace MomomiAPI.Services.Implementations
         private readonly IDatabase _database;
         private readonly ILogger<UpstashCacheService> _logger;
         private readonly bool _isRedisAvailable;
+        private readonly SemaphoreSlim _semaphore = new(10, 10); // Allow 10 concurrent operations
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _keySemaphores = new();
 
         public UpstashCacheService(IConnectionMultiplexer redis, ILogger<UpstashCacheService> logger)
         {
@@ -34,11 +37,9 @@ namespace MomomiAPI.Services.Implementations
         public async Task<T?> GetAsync<T>(string key)
         {
             if (!_isRedisAvailable)
-            {
-                _logger.LogWarning("Redis not available, returning default value for key: {Key}", key);
                 return default(T);
-            }
 
+            await _semaphore.WaitAsync();
             try
             {
                 var value = await _database.StringGetAsync(key);
@@ -69,16 +70,21 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogError(ex, "Unexpected error getting cache key {Key}", key);
                 return default(T);
             }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public async Task SetAsync<T>(string key, T value, TimeSpan? expiry = null)
         {
             if (!_isRedisAvailable)
-            {
-                _logger.LogWarning("Redis not available, skipping cache set for key: {Key}", key);
                 return;
-            }
 
+            // Using _keySemaphores for preventing race conditions on specific keys
+            var keySemaphore = _keySemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+            await keySemaphore.WaitAsync();
             try
             {
                 var serializedValue = JsonSerializer.Serialize(value);
@@ -100,6 +106,60 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error setting cache key {Key}", key);
+            }
+            finally
+            {
+                keySemaphore.Release();
+
+                // Optional: Clean up unused semaphores
+                if (keySemaphore.CurrentCount == 1)
+                {
+                    _keySemaphores.TryRemove(key, out _);
+                }
+            }
+        }
+
+        // Cache-Aside Pattern with Locking
+        public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiry = null)
+        {
+            if (!_isRedisAvailable)
+            {
+                _logger.LogWarning("Redis not available, executing factory directly for key: {Key}", key);
+                return await factory();
+            }
+
+            // Try to get from cache first
+            var cached = await GetAsync<T>(key);
+            if (cached != null) return cached;
+
+            // Use per-key semaphore to prevent cache stampede
+            var keySemaphore = _keySemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+            await keySemaphore.WaitAsync();
+            try
+            {
+                // Double-check pattern
+                cached = await GetAsync<T>(key);
+                if (cached != null) return cached;
+
+                // Execute factory and cache result
+                var value = await factory();
+                if (value != null)
+                {
+                    await SetAsync(key, value, expiry);
+                }
+                return value;
+            }
+            finally
+            {
+                keySemaphore.Release();
+
+                // Clean up semaphore if no one is waiting
+                if (keySemaphore.CurrentCount == 1)
+                {
+                    _keySemaphores.TryRemove(key, out _);
+                    keySemaphore.Dispose();
+                }
             }
         }
 
