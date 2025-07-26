@@ -49,7 +49,7 @@
             public const bool DefaultGlobalDiscovery = true;
             public const bool DefaultIsDiscoverable = true;
             public const bool DefaultIsGloballyDiscoverable = false;
-            public const bool DefaultNotificationsEnabled = true;
+            public const bool DefaultNotificationsEnabled = false;
         }
     }
 }

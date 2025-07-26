@@ -338,6 +338,7 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 user.NotificationsEnabled = enabled;
+                user.IsActive = true;
                 user.UpdatedAt = DateTime.UtcNow;
 
                 await _dbContext.SaveChangesAsync();

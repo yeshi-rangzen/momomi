@@ -96,7 +96,7 @@ namespace MomomiAPI.Services.Implementations
                     MaxAge = AppConstants.DefaultValues.DefaultMaxAge,
                     CreatedAt = DateTime.UtcNow,
                     LastActive = DateTime.UtcNow,
-                    IsActive = true
+                    IsActive = false
                 };
 
                 _dbContext.Users.Add(user);

@@ -130,7 +130,7 @@ namespace MomomiAPI.Services.Implementations
                 // Generate verification token for registration completion
                 var verificationToken = Guid.NewGuid().ToString();
                 var verificationKey = CacheKeys.Authentication.EmailVerification(email, verificationToken);
-                var verificationExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                var verificationExpiresAt = DateTime.UtcNow.AddMinutes(30);
 
                 await _cacheService.SetAsync(verificationKey,
                     new RegisterVerificationData(email, verifyResponse.User.Id, DateTime.UtcNow),
