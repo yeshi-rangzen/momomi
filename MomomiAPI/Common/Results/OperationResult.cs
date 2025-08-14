@@ -1,66 +1,89 @@
-﻿namespace MomomiAPI.Common.Results
+﻿using System.Text.Json.Serialization;
+using static MomomiAPI.Common.Constants.AppConstants;
+
+namespace MomomiAPI.Common.Results
 {
     public class OperationResult
     {
         public bool Success { get; protected set; }
-        public string? ErrorMessage { get; protected set; }
         public string? ErrorCode { get; protected set; }
+        public string? ErrorMessage { get; protected set; }
         public Dictionary<string, object>? Metadata { get; protected set; }
 
-        protected OperationResult(bool success, string? errorMessage = null, string? errorCode = null)
+        // API-specific properties (only populated at API layer)
+        [JsonPropertyName("timestamp")]
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        [JsonIgnore] // Don't serialize for internal use
+        public Dictionary<string, object>? InternalMetadata { get; set; }
+
+        // Add constructor for derived classes
+        protected OperationResult(bool success, string? errorCode = null, string? errorMessage = null, Dictionary<string, object>? metadata = null)
         {
             Success = success;
-            ErrorMessage = errorMessage;
             ErrorCode = errorCode;
-            Metadata = new Dictionary<string, object>();
+            ErrorMessage = errorMessage;
+            Metadata = metadata;
         }
 
-        public static OperationResult Successful() => new(true);
-        public static OperationResult Failed(string errorMessage, string? errorCode = null)
-            => new(false, errorMessage, errorCode);
-        public static OperationResult ValidationFailure(string message)
-            => new(false, message, "VALIDATION_ERROR");
-        public static OperationResult BusinessRuleViolation(string message)
-            => new(false, message, "BUSINESS_RULE_VIOLATION");
-        public static OperationResult NotFound(string message)
-            => new(false, message, "NOT_FOUND");
-        public static OperationResult Unauthorized(string message)
-            => new(false, message, "UNAUTHORIZED");
+        // Parameterless constructor for static factory methods
+        protected OperationResult() { }
 
-        public OperationResult WithMetadata(string key, object value)
+        public static OperationResult Successful(Dictionary<string, object>? metadata = null)
         {
-            Metadata ??= new Dictionary<string, object>();
-            Metadata[key] = value;
-            return this;
+            return new OperationResult(true, metadata: metadata);
+        }
+
+        public static OperationResult Failed(string errorCode, string errorMessage, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult(false, errorCode, errorMessage, metadata);
+        }
+
+        public static OperationResult Failed(string errorMessage, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult(false, ErrorCodes.INTERNAL_SERVER_ERROR, errorMessage, metadata);
+        }
+
+        public static OperationResult ValidationFailure(string errorMessage, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult(false, ErrorCodes.VALIDATION_ERROR, errorMessage, metadata);
         }
     }
 
     public class OperationResult<T> : OperationResult
     {
-        public T? Data { get; private set; }
+        [JsonPropertyName("data")]
+        public T? Data { get; set; }
 
-        public OperationResult(bool success, T? data = default, string? errorMessage = null, string? errorCode = null)
-            : base(success, errorMessage, errorCode)
+        // Add constructor for derived classes
+        protected OperationResult(bool success, T? data, string? errorCode = null, string? errorMessage = null, Dictionary<string, object>? metadata = null)
+            : base(success, errorCode, errorMessage, metadata)
         {
             Data = data;
         }
 
-        public static OperationResult<T> Successful(T data) => new(true, data);
-        public static new OperationResult<T> Failed(string errorMessage, string? errorCode = null)
-            => new(false, default, errorMessage, errorCode);
-        public static new OperationResult<T> ValidationFailure(string message)
-            => new(false, default, message, "VALIDATION_ERROR");
-        public static new OperationResult<T> BusinessRuleViolation(string message)
-            => new(false, default, message, "BUSINESS_RULE_VIOLATION");
-        public static new OperationResult<T> NotFound(string message)
-            => new(false, default, message, "NOT_FOUND");
-        public static new OperationResult<T> Unauthorized(string message)
-            => new(false, default, message, "UNAUTHORIZED");
+        // Parameterless constructor for static factory methods
+        protected OperationResult() { }
 
-        public new OperationResult<T> WithMetadata(string key, object value)
+        public static OperationResult<T> Successful(T data, Dictionary<string, object>? metadata = null)
         {
-            base.WithMetadata(key, value);
-            return this;
+            return new OperationResult<T>(true, data, metadata: metadata);
+        }
+        public static OperationResult<T> SuccessResult(T data, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult<T>(true, data, metadata: metadata);
+        }
+
+        public static new OperationResult<T> FailureResult(string errorCode, string errorMessage, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult<T>(false, default(T), errorCode, errorMessage, metadata);
+
+        }
+
+        public static new OperationResult<T> Failed(string errorMessage, Dictionary<string, object>? metadata = null)
+        {
+            return new OperationResult<T>(false, default(T), ErrorCodes.INTERNAL_SERVER_ERROR, errorMessage, metadata);
+
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 
@@ -6,105 +7,98 @@ namespace MomomiAPI.Controllers
 {
     public class PhotosController : BaseApiController
     {
-        private readonly IPhotoManagementService _photoManagementService;
-        private readonly IPhotoGalleryService _photoGalleryService;
+        private readonly IPhotoService _photoService;
 
         public PhotosController(
-            IPhotoManagementService photoManagementService,
-            IPhotoGalleryService photoGalleryService,
+            IPhotoService photoService,
             ILogger<PhotosController> logger) : base(logger)
         {
-            _photoManagementService = photoManagementService;
-            _photoGalleryService = photoGalleryService;
+            _photoService = photoService;
         }
 
-        /// <summary>
         /// Upload a new photo for the current user
-        /// </summary>
         [HttpPost("upload")]
-        public async Task<ActionResult<UserPhotoDTO>> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
+        public async Task<ActionResult<OperationResult<PhotoUploadData>>> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(UploadPhoto), new { isPrimary, fileName = file?.FileName });
 
-            var result = await _photoManagementService.AddUserPhoto(userIdResult.Value, file, isPrimary);
+            var result = await _photoService.AddUserPhoto(userIdResult.Value, file, isPrimary);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Get all photos for the current user
-        /// </summary>
-        [HttpGet]
-        public async Task<ActionResult<List<UserPhotoDTO>>> GetMyPhotos()
+        [HttpPost("upload/batch")]
+        public async Task<ActionResult<OperationResult<BatchPhotoUploadData>>> UploadPhotos(
+            List<IFormFile> files,
+            [FromQuery] int? primaryPhotoIndex = null)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
-            LogControllerAction(nameof(GetMyPhotos));
+            LogControllerAction(nameof(UploadPhotos), new
+            {
+                fileCount = files?.Count,
+                primaryPhotoIndex,
+                fileNames = files?.Select(f => f.FileName).ToArray()
+            });
 
-            var result = await _photoGalleryService.GetUserPhotoGallery(userIdResult.Value);
+            var result = await _photoService.AddUserPhotos(userIdResult.Value, files, primaryPhotoIndex);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Get photo count for current user
-        /// </summary>
-        [HttpGet("count")]
-        public async Task<ActionResult<int>> GetPhotoCount()
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
-
-            LogControllerAction(nameof(GetPhotoCount));
-
-            var result = await _photoGalleryService.GetPhotoCount(userIdResult.Value);
-            return HandleOperationResult(result);
-        }
-
-        /// <summary>
         /// Delete a specific photo
-        /// </summary>
         [HttpDelete("{photoId}")]
-        public async Task<ActionResult> DeletePhoto(Guid photoId)
+        public async Task<ActionResult<OperationResult<PhotoDeletionData>>> DeletePhoto(Guid photoId)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(DeletePhoto), new { photoId });
 
-            var result = await _photoManagementService.RemovePhoto(userIdResult.Value, photoId);
+            var result = await _photoService.RemovePhoto(userIdResult.Value, photoId);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
         /// Set a photo as primary
-        /// </summary>
-        [HttpPut("{photoId}/set-primary")]
-        public async Task<ActionResult> SetPrimaryPhoto(Guid photoId)
+        [HttpPut("primary/{photoId}")]
+        public async Task<ActionResult<OperationResult<PrimaryPhotoData>>> SetPrimaryPhoto(Guid photoId)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(SetPrimaryPhoto), new { photoId });
 
-            var result = await _photoManagementService.SetPrimaryPhoto(userIdResult.Value, photoId);
+            var result = await _photoService.SetPrimaryPhoto(userIdResult.Value, photoId);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
         /// Reorder photos
-        /// </summary>
         [HttpPut("reorder")]
-        public async Task<ActionResult> ReorderPhotos([FromBody] List<Guid> photoIds)
+        public async Task<ActionResult<OperationResult<PhotoReorderData>>> ReorderPhotos([FromBody] List<Guid> photoIds)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(ReorderPhotos), new { photoCount = photoIds?.Count });
 
-            var result = await _photoManagementService.ReorderPhotos(userIdResult.Value, photoIds);
+            var result = await _photoService.ReorderPhotos(userIdResult.Value, photoIds);
+            return HandleOperationResult(result);
+        }
+
+        /// <summary>
+        /// Get all photos for the current user (useful for photo management UI)
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult<OperationResult<List<UserPhotoDTO>>>> GetUserPhotos()
+        {
+            var userIdResult = GetCurrentUserIdOrUnauthorized();
+            if (userIdResult.Result != null) return userIdResult.Result;
+
+            LogControllerAction(nameof(GetUserPhotos));
+
+            var result = await _photoService.GetUserPhotos(userIdResult.Value);
             return HandleOperationResult(result);
         }
     }

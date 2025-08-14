@@ -812,9 +812,55 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
+    "Method": "GetProfile",
+    "RelativePath": "api/User",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UserController",
+    "Method": "UpdateUser",
+    "RelativePath": "api/User",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "request",
+        "Type": "MomomiAPI.Models.Requests.UpdateProfileRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "DeactivateAccount",
-    "RelativePath": "api/Users/deactivate",
+    "RelativePath": "api/User/deactivate",
     "HttpMethod": "DELETE",
     "IsController": true,
     "Order": 0,
@@ -822,9 +868,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "DeleteAccount",
-    "RelativePath": "api/Users/delete-account",
+    "RelativePath": "api/User/delete-account",
     "HttpMethod": "DELETE",
     "IsController": true,
     "Order": 0,
@@ -832,9 +878,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "UpdateDiscoveryMode",
-    "RelativePath": "api/Users/discovery-mode",
+    "RelativePath": "api/User/discovery-mode",
     "HttpMethod": "PUT",
     "IsController": true,
     "Order": 0,
@@ -848,9 +894,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "GetDiscoverySettings",
-    "RelativePath": "api/Users/discovery-settings",
+    "RelativePath": "api/User/discovery-settings",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -868,9 +914,9 @@
     ]
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "UpdateDiscoverySettings",
-    "RelativePath": "api/Users/discovery-settings",
+    "RelativePath": "api/User/discovery-settings",
     "HttpMethod": "PUT",
     "IsController": true,
     "Order": 0,
@@ -894,9 +940,9 @@
     ]
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "UpdateDiscoveryVisibility",
-    "RelativePath": "api/Users/discovery-visibility",
+    "RelativePath": "api/User/discovery-visibility",
     "HttpMethod": "PUT",
     "IsController": true,
     "Order": 0,
@@ -910,9 +956,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
+    "ContainingType": "MomomiAPI.Controllers.UserController",
     "Method": "GetNearbyUsers",
-    "RelativePath": "api/Users/nearby",
+    "RelativePath": "api/User/nearby",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -926,52 +972,6 @@
     "ReturnTypes": [
       {
         "Type": "System.Collections.Generic.List\u00601[[MomomiAPI.Models.DTOs.UserProfileDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
-    "Method": "GetProfile",
-    "RelativePath": "api/Users/profile",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.UsersController",
-    "Method": "UpdateProfile",
-    "RelativePath": "api/Users/profile",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.UpdateProfileRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Models.DTOs.UserProfileDTO",
         "MediaTypes": [
           "text/plain",
           "application/json",

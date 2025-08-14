@@ -24,9 +24,6 @@ namespace MomomiAPI.Models.Entities
         [Column("expires_at")]
         public DateTime? ExpiresAt { get; set; }
 
-        [Column("is_active")]
-        public bool IsActive { get; set; } = true;
-
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

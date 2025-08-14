@@ -23,18 +23,18 @@ namespace MomomiAPI.Models.Requests
             public string Otp { get; set; } = string.Empty;
         }
 
-        public class CompleteRegistrationRequest
+        public class RegistrationRequest
         {
             [Required]
             [EmailAddress]
-            public string Email { get; set; } = string.Empty;
+            public required string Email { get; set; }
 
             [Required]
-            public string VerificationToken { get; set; } = string.Empty;
+            public required string VerificationToken { get; set; }
 
             [Required]
             [MaxLength(100)]
-            public string FirstName { get; set; } = string.Empty;
+            public required string FirstName { get; set; }
 
             [MaxLength(100)]
             public string? LastName { get; set; }
@@ -52,11 +52,11 @@ namespace MomomiAPI.Models.Requests
             public string Hometown { get; set; } = string.Empty;
 
             [Required]
-            public double Latitude { get; set; }
-
+            public decimal Latitude { get; set; }
             [Required]
-            public double Longitude { get; set; }
-            public int? MaxDistanceKm { get; set; }
+            public decimal Longitude { get; set; }
+            public string? Neighbourhood { get; set; } = string.Empty;
+
 
             [Required]
             public List<HeritageType> Heritage { get; set; } = [];
@@ -66,7 +66,7 @@ namespace MomomiAPI.Models.Requests
 
             [Required]
             public List<LanguageType> LanguagesSpoken { get; set; } = [];
-            public string Bio { get; set; } = String.Empty;
+            public string? Bio { get; set; }
 
             [Phone]
             public string? PhoneNumber { get; set; }

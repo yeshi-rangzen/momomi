@@ -8,6 +8,7 @@ using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
+using static MomomiAPI.Common.Constants.AppConstants;
 
 namespace MomomiAPI.Services.Implementations
 {
@@ -16,325 +17,259 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly Supabase.Client _supabaseClient;
         private readonly ICacheService _cacheService;
-        private readonly ICacheInvalidation _cacheInvalidation;
         private readonly ILogger<UserService> _logger;
 
         public UserService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            ICacheInvalidation cacheInvalidation,
             ILogger<UserService> logger,
             Supabase.Client supabaseClient)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
-            _cacheInvalidation = cacheInvalidation;
             _logger = logger;
             _supabaseClient = supabaseClient;
         }
 
-        public async Task<OperationResult<User>> GetUserByIdAsync(Guid userId)
-        {
-            try
-            {
-                _logger.LogDebug("Retrieving user by ID: {UserId}", userId);
-
-                var user = await _dbContext.Users
-                    .Include(u => u.Photos)
-                    .Include(u => u.Preferences)
-                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
-
-                if (user == null)
-                {
-                    return OperationResult<User>.NotFound("User not found or inactive");
-                }
-                return OperationResult<User>.Successful(user);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving user by ID: {UserId}", userId);
-                return OperationResult<User>.Failed("Unable to retrieve user. Please try again.");
-            }
-        }
-
-        public async Task<OperationResult<User>> GetUserBySupabaseUidAsync(Guid supabaseUid)
-        {
-            try
-            {
-                _logger.LogDebug("Retrieving user by Supabase UID: {SupabaseUID}", supabaseUid);
-
-                var user = await _dbContext.Users
-                    .Include(u => u.Photos)
-                    .Include(u => u.Preferences)
-                    .FirstOrDefaultAsync(u => u.SupabaseUid == supabaseUid && u.IsActive);
-
-                if (user == null)
-                {
-                    return OperationResult<User>.NotFound("User not found or inactive");
-                }
-
-                return OperationResult<User>.Successful(user);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving user by Supabase UID: {SupabaseUid}", supabaseUid);
-                return OperationResult<User>.Failed("Unable to retrieve user. Please try again.");
-            }
-        }
-
-        public async Task<OperationResult<UserProfileDTO>> GetUserProfileAsync(Guid userId)
+        /// <summary>
+        /// Gets user profile with optimized caching
+        /// </summary>
+        public async Task<UserProfileResult> GetUserProfileAsync(Guid userId)
         {
             try
             {
                 _logger.LogInformation("Retrieving user profile: {UserId}", userId);
 
                 var cacheKey = CacheKeys.Users.Profile(userId);
-                var cachedProfile = await _cacheService.GetAsync<UserProfileDTO>(cacheKey).ConfigureAwait(false);
 
-                if (cachedProfile != null)
+                var userDto = await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    async () => await FetchUserProfileFromDatabase(userId),
+                    CacheKeys.Duration.UserProfile
+                );
+
+                if (userDto == null)
                 {
-                    _logger.LogDebug("Returning cached profile for user {UserId}", userId);
-                    return OperationResult<UserProfileDTO>.Successful(cachedProfile);
+                    return UserProfileResult.UserNotFound();
                 }
 
-                var userResult = await GetUserByIdAsync(userId).ConfigureAwait(false);
-                if (!userResult.Success)
-                {
-                    return OperationResult<UserProfileDTO>.NotFound("User profile not found.");
-                }
-
-                var user = userResult.Data!;
-                var profile = MapUserToProfileDTO(user);
-
-                // Cache the profile
-                await _cacheService.SetAsync(cacheKey, profile, CacheKeys.Duration.UserProfile).ConfigureAwait(false);
-
-                _logger.LogDebug("Retrieved and cached profile for user {UserId}", userId);
-                return OperationResult<UserProfileDTO>.Successful(profile);
+                _logger.LogDebug("Retrieved profile for user {UserId}", userId);
+                return UserProfileResult.Successful(userDto, wasCached: true);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving user profile: {UserId}", userId);
-                return OperationResult<UserProfileDTO>.Failed("Unable to retrieve user profile. Please try again."); ;
+                return UserProfileResult.Error("Unable to retrieve user profile. Please try again.");
             }
         }
 
-        public async Task<OperationResult> UpdateUserProfileAsync(Guid userId, UpdateProfileRequest request)
+        /// <summary>
+        /// Updates user profile with optimized cache invalidation
+        /// </summary>
+        public async Task<ProfileUpdateResult> UpdateUserProfileAsync(Guid userId, UpdateProfileRequest request)
         {
             try
             {
                 _logger.LogInformation("Updating user profile: {UserId}", userId);
 
                 // Validate request
-                var validationResult = ValidateUpdateProfileRequest(request);
+                var validationResult = ValidateProfileUpdateRequest(request);
                 if (!validationResult.Success)
                 {
-                    return validationResult;
+                    return ProfileUpdateResult.ValidationError(validationResult.ErrorMessage!);
                 }
 
                 var user = await _dbContext.Users
                     .Include(u => u.Preferences)
                     .Include(u => u.Subscription)
-                    .FirstOrDefaultAsync(u => u.Id == userId)
-                    .ConfigureAwait(false);
+                    .FirstOrDefaultAsync(u => u.Id == userId);
 
                 if (user == null)
                 {
-                    return OperationResult.NotFound("User not found.");
+                    return ProfileUpdateResult.UserNotFound();
                 }
 
-                // Update basic user properties
-                UpdateBasicUserProperties(user, request);
+                // Track what fields are being updated
+                var updatedFields = new List<string>();
+                var requiresDiscoveryRefresh = false;
 
-                // Update or create preferences
-                UpdateUserPreferences(user, request);
+                // Update basic user properties
+                UpdateBasicUserProperties(user, request, updatedFields, ref requiresDiscoveryRefresh);
 
                 user.UpdatedAt = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync().ConfigureAwait(false);
+                await _dbContext.SaveChangesAsync();
 
-                // Fire and forget cache invalidation
-                _ = Task.Run(async () =>
+                // Invalidate relevant caches based on what was updated
+                await InvalidateProfileCaches(userId, updatedFields, requiresDiscoveryRefresh);
+
+                // Get updated profile
+                var updatedUser = await FetchUserProfileFromDatabase(userId);
+                if (updatedUser == null)
                 {
-                    try
-                    {
-                        await _cacheInvalidation.InvalidateUserProfile(userId).ConfigureAwait(false);
-                        await _cacheInvalidation.InvalidateUserDiscovery(userId).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error invalidating cache for user {UserId}", userId);
-                    }
-                });
+                    return ProfileUpdateResult.Error("Failed to retrieve updated profile");
+                }
 
-                _logger.LogInformation("Successfully updated profile for user {UserId}", userId);
-                return OperationResult.Successful().WithMetadata("updated_at", DateTime.UtcNow);
+                _logger.LogInformation("Successfully updated profile for user {UserId}, fields: {Fields}",
+                    userId, string.Join(", ", updatedFields));
+
+                return ProfileUpdateResult.Successful(updatedUser, updatedFields, requiresDiscoveryRefresh);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating user profile: {UserId}", userId);
-                return OperationResult.Failed("Unable to update profile. Please try again.");
+                return ProfileUpdateResult.Error("Unable to update profile. Please try again.");
             }
         }
 
-        public async Task<OperationResult> DeactivateUserAsync(Guid userId)
+        /// <summary>
+        /// Gets discovery filters with caching
+        /// </summary>
+        public async Task<OperationResult<DiscoverySettingsDTO>> GetDiscoveryFiltersAsync(Guid userId)
         {
             try
             {
-                _logger.LogInformation("Deactivate user: {UserId}", userId);
+                _logger.LogInformation("Getting discovery filters for user {UserId}", userId);
 
-                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                var cacheKey = $"discovery_filters:{userId}";
+
+                var settings = await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    async () => await FetchDiscoveryFiltersFromDatabase(userId),
+                    CacheKeys.Duration.UserProfile
+                );
+
+                if (settings == null)
+                {
+                    return OperationResult<DiscoverySettingsDTO>.FailureResult(ErrorCodes.UNAUTHORIZED, "User not found");
+                }
+
+                _logger.LogDebug("Retrieved discovery filters for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Successful(settings);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting discovery filters for user {UserId}", userId);
+                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to retrieve discovery filters. Please try again.");
+            }
+        }
+
+        /// <summary>
+        /// Updates discovery filters with comprehensive validation and cache optimization
+        /// </summary>
+        public async Task<DiscoveryFiltersUpdateResult> UpdateDiscoveryFiltersAsync(Guid userId, UpdateDiscoveryFiltersRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Updating discovery filters for user {UserId}", userId);
+
+                // Validate request
+                var validationResult = ValidateDiscoveryFiltersRequest(request);
+                if (!validationResult.Success)
+                {
+                    return DiscoveryFiltersUpdateResult.ValidationError(validationResult.ErrorMessage!);
+                }
+
+                // Get user with subscription info for premium feature validation
+                var user = await _dbContext.Users
+                    .Include(u => u.Preferences)
+                    .Include(u => u.Subscription)
+                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
 
                 if (user == null)
                 {
-                    return OperationResult.NotFound("User not found.");
+                    return DiscoveryFiltersUpdateResult.UserNotFound();
                 }
 
-                if (!user.IsActive)
+                // Check premium filters access
+                var isPremiumUser = IsActivePremiumUser(user);
+                var premiumFilters = request.GetPremiumFiltersBeingUpdated();
+
+                if (premiumFilters.Any() && !isPremiumUser)
                 {
-                    return OperationResult.BusinessRuleViolation("User is already inactive.");
+                    return DiscoveryFiltersUpdateResult.SubscriptionRequired(string.Join(", ", premiumFilters));
+                }
+
+                // Track changes
+                var updatedFilters = new List<string>();
+                var locationChanged = false;
+                var filtersChanged = false;
+
+                // Update discovery settings and preferences
+                UpdateDiscoverySettings(user, request, updatedFilters, ref locationChanged, ref filtersChanged);
+                UpdateDiscoveryPreferences(user, request, updatedFilters, isPremiumUser);
+
+                user.UpdatedAt = DateTime.UtcNow;
+                await _dbContext.SaveChangesAsync();
+
+                // Invalidate caches based on what changed
+                await InvalidateDiscoveryCaches(userId, locationChanged, filtersChanged);
+
+                // Get updated settings
+                var updatedSettings = await FetchDiscoveryFiltersFromDatabase(userId);
+                if (updatedSettings == null)
+                {
+                    return DiscoveryFiltersUpdateResult.Error("Failed to retrieve updated settings");
+                }
+
+                _logger.LogInformation("Successfully updated discovery filters for user {UserId}, filters: {Filters}",
+                    userId, string.Join(", ", updatedFilters));
+
+                return DiscoveryFiltersUpdateResult.Successful(updatedSettings, updatedFilters, locationChanged, filtersChanged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating discovery filters for user {UserId}", userId);
+                return DiscoveryFiltersUpdateResult.Error("Unable to update discovery filters. Please try again.");
+            }
+        }
+
+        /// <summary>
+        /// Deactivates user account with optimized cache cleanup
+        /// </summary>
+        public async Task<AccountDeactivationResult> DeactivateUserAccountAsync(Guid userId)
+        {
+            try
+            {
+                _logger.LogInformation("Deactivating user: {UserId}", userId);
+
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null)
+                {
+                    return AccountDeactivationResult.UserNotFound();
+                }
+
+                var wasActive = user.IsActive;
+                if (!wasActive)
+                {
+                    return AccountDeactivationResult.AlreadyInactive();
                 }
 
                 user.IsActive = false;
                 user.UpdatedAt = DateTime.UtcNow;
-
                 await _dbContext.SaveChangesAsync();
 
                 // Invalidate all user-related caches
-                await _cacheInvalidation.InvalidateUserRelatedCaches(userId);
+                await InvalidateAllUserCaches(userId);
 
-                _logger.LogInformation("Successfully deactivating user {UserId}", userId);
-                return OperationResult.Successful().WithMetadata("deactivated_at", DateTime.UtcNow);
+                _logger.LogInformation("Successfully deactivated user {UserId}", userId);
+                return AccountDeactivationResult.Successful(userId, wasActive);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deactivating user: {UserId}", userId);
-                return OperationResult.Failed("Unable to deactivate account. Please try again.");
+                return AccountDeactivationResult.Error("Unable to deactivate account. Please try again.");
             }
         }
 
-        public async Task<OperationResult> UpdateDiscoveryStatusAsync(Guid userId, bool isDiscoverable)
-        {
-            try
-            {
-                _logger.LogInformation("Updating discovery status for user {UserId} to {IsDiscoverable}", userId, isDiscoverable);
-
-                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-                if (user == null)
-                {
-                    return OperationResult.NotFound("User not found");
-                }
-
-                user.IsDiscoverable = isDiscoverable;
-                user.UpdatedAt = DateTime.UtcNow;
-
-                await _dbContext.SaveChangesAsync();
-
-                _logger.LogInformation("Updated discovery status for user {UserId} to {IsDiscoverable}", userId, isDiscoverable);
-                return OperationResult.Successful()
-                    .WithMetadata("is_discoverable", isDiscoverable)
-                    .WithMetadata("updated_at", DateTime.UtcNow);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating discovery status for user {UserId}", userId);
-                return OperationResult.Failed("Unable to update discovery settings. Please try again.");
-            }
-        }
-
-        public async Task<OperationResult<List<UserProfileDTO>>> GetNearbyUsersAsync(Guid userId, int maxDistance)
-        {
-            try
-            {
-                _logger.LogInformation("Getting nearby users for user {UserId} within {MaxDistance}km", userId, maxDistance);
-
-                var currentUser = await _dbContext.Users.FindAsync(userId);
-                if (currentUser == null)
-                {
-                    return OperationResult<List<UserProfileDTO>>.NotFound("Current user not found.");
-                }
-
-                // If global discovery is enabled, ignore location and distance
-                if (currentUser.EnableGlobalDiscovery)
-                {
-                    _logger.LogDebug("Getting global users for user {UserId} (global discovery enabled)", userId);
-                    return await GetGlobalUsersAsync(userId);
-                }
-
-                if (currentUser?.Latitude == null || currentUser.Longitude == null)
-                {
-                    return OperationResult<List<UserProfileDTO>>.BusinessRuleViolation(
-                        "Location is required for nearby user discovery.");
-                }
-
-                var cacheKey = CacheKeys.Discovery.LocalResults(userId, 30);
-                var cachedUsers = await _cacheService.GetAsync<List<UserProfileDTO>>(cacheKey);
-
-                if (cachedUsers != null)
-                {
-                    _logger.LogDebug("Returning cached nearby users for user {UserId}", userId);
-                    return OperationResult<List<UserProfileDTO>>.Successful(cachedUsers);
-                }
-
-                // Get users that haven't been liked/passed by current user
-                var excludedUserIds = await _dbContext.UserLikes
-                    .Where(ul => ul.LikerUserId == userId)
-                    .Select(ul => ul.LikedUserId)
-                    .ToListAsync();
-
-                excludedUserIds.Add(userId);
-
-                // Get nearby users
-                var nearbyUsers = await _dbContext.Users
-                    .Include(u => u.Photos)
-                    .Where(u => !excludedUserIds.Contains(u.Id) &&
-                                u.Id != userId &&
-                                u.IsActive &&
-                                u.IsDiscoverable &&
-                                u.Latitude != null &&
-                                u.Longitude != null)
-                    .Take(100) // Take more initially for distance filtering
-                    .ToListAsync();
-
-                var result = new List<UserProfileDTO>();
-
-                foreach (var user in nearbyUsers)
-                {
-                    var distance = LocationHelper.CalculateDistance(
-                        (double)currentUser.Latitude, (double)currentUser.Longitude,
-                        (double)user.Latitude!, (double)user.Longitude!);
-
-                    if (distance <= maxDistance)
-                    {
-                        var profile = MapUserToProfileDTO(user, distance);
-                        result.Add(profile);
-                    }
-
-                    // Stop when we have 30 users
-                    if (result.Count >= 30) break;
-                }
-
-                var orderedResult = result.OrderBy(u => u.DistanceKm).ToList();
-
-                // Cache results
-                await _cacheService.SetAsync(cacheKey, orderedResult, CacheKeys.Duration.DiscoveryResults);
-
-                _logger.LogInformation("Found {Count} nearby users for user {UserId}", orderedResult.Count, userId);
-                return OperationResult<List<UserProfileDTO>>.Successful(orderedResult);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving nearby users for user: {UserId}", userId);
-                return OperationResult<List<UserProfileDTO>>.Failed("Unable to find nearby users. Please try again.");
-            }
-        }
-
-        public async Task<OperationResult> DeleteUserAsync(Guid userId)
+        /// <summary>
+        /// Deletes user account and all associated data with optimized batch operations
+        /// </summary>
+        public async Task<AccountDeletionResult> DeleteUserAccountAsync(Guid userId)
         {
             try
             {
                 _logger.LogInformation("Deleting user account: {UserId}", userId);
 
-                // Use the execution strategy to handle retries and transactions
                 var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
                 return await executionStrategy.ExecuteAsync(async () =>
@@ -342,11 +277,12 @@ namespace MomomiAPI.Services.Implementations
                     using var transaction = await _dbContext.Database.BeginTransactionAsync();
                     try
                     {
+                        // Get user with all related data for counting
                         var user = await _dbContext.Users
                             .Include(u => u.Photos)
                             .Include(u => u.Preferences)
-                            .Include(u => u.LikesGiven)
-                            .Include(u => u.LikesReceived)
+                            .Include(u => u.SwipesGiven)
+                            .Include(u => u.SwipesReceived)
                             .Include(u => u.ConversationsAsUser1)
                             .Include(u => u.ConversationsAsUser2)
                             .Include(u => u.MessagesSent)
@@ -358,37 +294,28 @@ namespace MomomiAPI.Services.Implementations
 
                         if (user == null)
                         {
-                            return OperationResult.NotFound("User not found.");
+                            return AccountDeletionResult.UserNotFound();
                         }
 
-                        // 1. Delete user photos from Storage first
-                        var photoDeleteTasks = user.Photos.Select(async photo =>
-                        {
-                            try
-                            {
-                                await _supabaseClient.Storage
-                                    .From("user-photos")
-                                    .Remove(new List<string> { photo.StoragePath });
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to delete photo {PhotoId} from Storage", photo.Id);
-                            }
-                        });
+                        // Count items for reporting
+                        var photosCount = user.Photos.Count;
+                        var conversationsCount = user.ConversationsAsUser1.Count + user.ConversationsAsUser2.Count;
+                        var swipesCount = user.SwipesGiven.Count + user.SwipesReceived.Count;
 
-                        await Task.WhenAll(photoDeleteTasks);
+                        // Delete user photos from storage (fire and forget for performance)
+                        _ = Task.Run(async () => await DeleteUserPhotosFromStorage(user.Photos.ToList()));
 
                         // Delete database records in correct order
-                        await DeleteUserRelatedData(user);
+                        await DeleteUserRelatedDataOptimized(user);
 
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
                         // Invalidate all user-related caches
-                        await _cacheInvalidation.InvalidateUserRelatedCaches(userId);
+                        await InvalidateAllUserCaches(userId);
 
                         _logger.LogInformation("Successfully deleted user {UserId} and all associated data", userId);
-                        return OperationResult.Successful().WithMetadata("deleted_at", DateTime.UtcNow);
+                        return AccountDeletionResult.Successful(userId, photosCount, conversationsCount, swipesCount);
                     }
                     catch (Exception)
                     {
@@ -400,319 +327,362 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting user {UserId}", userId);
-                return OperationResult.Failed("Unable to delete account. Please try again.");
+                return AccountDeletionResult.Error("Unable to delete account. Please try again.");
             }
         }
 
-        public async Task<OperationResult<DiscoverySettingsDTO>> GetDiscoverySettingsAsync(Guid userId)
+        #region Private Helper Methods
+
+        /// <summary>
+        /// Fetches complete user profile from database
+        /// </summary>
+        private async Task<UserDTO?> FetchUserProfileFromDatabase(Guid userId)
         {
-            try
-            {
-                _logger.LogInformation("Getting discovery settings for user {UserId}", userId);
+            var user = await _dbContext.Users
+                .Include(u => u.Photos.OrderBy(p => p.PhotoOrder))
+                .Include(u => u.Preferences)
+                .Include(u => u.Subscription)
+                .Include(u => u.UsageLimit)
+                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
 
-                var user = await _dbContext.Users
-                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
-
-                if (user == null)
-                {
-                    return OperationResult<DiscoverySettingsDTO>.NotFound("User not found.");
-                }
-
-                var discoverySettings = new DiscoverySettingsDTO
-                {
-                    EnableGlobalDiscovery = user.EnableGlobalDiscovery,
-                    IsDiscoverable = user.IsDiscoverable,
-                    IsGloballyDiscoverable = user.IsGloballyDiscoverable,
-                    MaxDistanceKm = user.MaxDistanceKm,
-                    MinAge = user.MinAge,
-                    MaxAge = user.MaxAge,
-                    HasLocation = user.Latitude.HasValue && user.Longitude.HasValue
-                };
-
-                _logger.LogDebug("Retrieved discovery settings for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Successful(discoverySettings);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting discovery settings for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to retrieve discovery settings. Please try again.");
-            }
+            return user != null ? UserMapper.UserToDTO(user) : null;
         }
 
-        public async Task<OperationResult<DiscoverySettingsDTO>> UpdateDiscoverySettingsAsync(Guid userId, UpdateDiscoverySettingsRequest request)
+        /// <summary>
+        /// Fetches discovery filters from database
+        /// </summary>
+        private async Task<DiscoverySettingsDTO?> FetchDiscoveryFiltersFromDatabase(Guid userId)
         {
-            try
+            var user = await _dbContext.Users
+                .Include(u => u.Preferences)
+                .Include(u => u.Subscription)
+                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+
+            if (user == null) return null;
+
+            var isPremiumUser = IsActivePremiumUser(user);
+
+            return new DiscoverySettingsDTO
             {
-                _logger.LogInformation("Updating discovery settings for user {UserId}", userId);
+                // Basic Discovery Controls
+                EnableGlobalDiscovery = user.EnableGlobalDiscovery,
+                IsDiscoverable = user.IsDiscoverable,
+                IsGloballyDiscoverable = user.IsGloballyDiscoverable,
 
-                // Validate request
-                var validationResult = ValidateUpdateDiscoverySettingsRequest(request);
-                if (!validationResult.Success)
-                {
-                    return OperationResult<DiscoverySettingsDTO>.ValidationFailure(validationResult.ErrorMessage!);
-                }
+                // Core Matching Criteria
+                InterestedIn = user.InterestedIn,
+                MinAge = user.MinAge,
+                MaxAge = user.MaxAge,
+                MaxDistanceKm = user.MaxDistanceKm,
 
-                var user = await _dbContext.Users
-                    .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+                // Location
+                Latitude = user.Latitude,
+                Longitude = user.Longitude,
+                Neighbourhood = user.Neighbourhood,
+                HasLocation = user.Latitude != 0 && user.Longitude != 0,
 
-                if (user == null)
-                {
-                    return OperationResult<DiscoverySettingsDTO>.NotFound("User not found.");
-                }
+                // Free User Filters
+                PreferredHeritage = user.Preferences?.PreferredHeritage,
+                PreferredReligions = user.Preferences?.PreferredReligions,
+                PreferredLanguagesSpoken = user.Preferences?.LanguagePreference,
 
-                // Update discovery settings
-                if (request.EnableGlobalDiscovery.HasValue)
-                {
-                    user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
-                }
+                // Premium Subscriber Filters (only if premium)
+                PreferredHeightMin = isPremiumUser ? user.Preferences?.PreferredHeightMin : null,
+                PreferredHeightMax = isPremiumUser ? user.Preferences?.PreferredHeightMax : null,
+                PreferredEducationLevels = isPremiumUser ? user.Preferences?.PreferredEducationLevels : null,
+                PreferredChildren = isPremiumUser ? user.Preferences?.PreferredChildren : null,
+                PreferredFamilyPlans = isPremiumUser ? user.Preferences?.PreferredFamilyPlans : null,
+                PreferredDrugs = isPremiumUser ? user.Preferences?.PreferredDrugs : null,
+                PreferredSmoking = isPremiumUser ? user.Preferences?.PreferredSmoking : null,
+                PreferredDrinking = isPremiumUser ? user.Preferences?.PreferredDrinking : null,
+                PreferredMarijuana = isPremiumUser ? user.Preferences?.PreferredMarijuana : null,
 
-                if (request.IsDiscoverable.HasValue)
-                {
-                    user.IsDiscoverable = request.IsDiscoverable.Value;
-                }
-
-                if (request.IsGloballyDiscoverable.HasValue)
-                {
-                    user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
-                }
-
-                if (request.MaxDistanceKm.HasValue)
-                {
-                    user.MaxDistanceKm = request.MaxDistanceKm.Value;
-                }
-
-                if (request.MinAge.HasValue)
-                {
-                    user.MinAge = request.MinAge.Value;
-                }
-
-                if (request.MaxAge.HasValue)
-                {
-                    user.MaxAge = request.MaxAge.Value;
-                }
-
-                // Update location if provided
-                if (request.Latitude.HasValue && request.Longitude.HasValue)
-                {
-                    user.Latitude = (decimal)request.Latitude.Value;
-                    user.Longitude = (decimal)request.Longitude.Value;
-                }
-
-                user.UpdatedAt = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
-
-                // Invalidate relevant caches
-                await _cacheInvalidation.InvalidateUserProfile(userId);
-                await _cacheInvalidation.InvalidateUserDiscovery(userId);
-
-                // Return updated settings
-                var updatedSettings = new DiscoverySettingsDTO
-                {
-                    EnableGlobalDiscovery = user.EnableGlobalDiscovery,
-                    IsDiscoverable = user.IsDiscoverable,
-                    IsGloballyDiscoverable = user.IsGloballyDiscoverable,
-                    MaxDistanceKm = user.MaxDistanceKm,
-                    MinAge = user.MinAge,
-                    MaxAge = user.MaxAge,
-                    HasLocation = user.Latitude.HasValue && user.Longitude.HasValue
-                };
-
-                _logger.LogInformation("Successfully updated discovery settings for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Successful(updatedSettings)
-                    .WithMetadata("updated_at", DateTime.UtcNow);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating discovery settings for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to update discovery settings. Please try again.");
-            }
+                // Metadata
+                IsPremiumUser = isPremiumUser,
+                LastUpdated = user.UpdatedAt
+            };
         }
 
-        private static OperationResult ValidateUpdateDiscoverySettingsRequest(UpdateDiscoverySettingsRequest request)
+        /// <summary>
+        /// Validates profile update request
+        /// </summary>
+        private static OperationResult ValidateProfileUpdateRequest(UpdateProfileRequest request)
         {
-            if (request.MinAge.HasValue && request.MaxAge.HasValue && request.MinAge >= request.MaxAge)
+            if (!string.IsNullOrEmpty(request.Bio) && request.Bio.Length > 500)
             {
-                return OperationResult.ValidationFailure("Minimum age must be less than maximum age.");
-            }
-
-            if (request.MinAge.HasValue && request.MinAge < 18)
-            {
-                return OperationResult.ValidationFailure("Minimum age must be at least 18.");
-            }
-
-            if (request.MaxAge.HasValue && request.MaxAge > 100)
-            {
-                return OperationResult.ValidationFailure("Maximum age cannot exceed 100.");
-            }
-
-            if (request.MaxDistanceKm.HasValue && (request.MaxDistanceKm < 1 || request.MaxDistanceKm > 200))
-            {
-                return OperationResult.ValidationFailure("Maximum distance must be between 1 and 200 km.");
-            }
-
-            // Validate location coordinates if provided
-            if (request.Latitude.HasValue || request.Longitude.HasValue)
-            {
-                if (!request.Latitude.HasValue || !request.Longitude.HasValue)
-                {
-                    return OperationResult.ValidationFailure("Both latitude and longitude must be provided together.");
-                }
-
-                if (request.Latitude < -90 || request.Latitude > 90)
-                {
-                    return OperationResult.ValidationFailure("Latitude must be between -90 and 90.");
-                }
-
-                if (request.Longitude < -180 || request.Longitude > 180)
-                {
-                    return OperationResult.ValidationFailure("Longitude must be between -180 and 180.");
-                }
-            }
-
-            return OperationResult.Successful();
-        }
-
-        private async Task<OperationResult<List<UserProfileDTO>>> GetGlobalUsersAsync(Guid userId)
-        {
-            try
-            {
-                var cacheKey = CacheKeys.Discovery.GlobalResults(userId, 30);
-                var cachedUsers = await _cacheService.GetAsync<List<UserProfileDTO>>(cacheKey);
-
-                if (cachedUsers != null)
-                {
-                    return OperationResult<List<UserProfileDTO>>.Successful(cachedUsers);
-                }
-
-                var excludedUserIds = await _dbContext.UserLikes
-                    .Where(ul => ul.LikerUserId == userId)
-                    .Select(ul => ul.LikedUserId)
-                    .ToListAsync();
-
-                excludedUserIds.Add(userId);
-
-                var globalUsers = await _dbContext.Users
-                    .Include(u => u.Photos)
-                    .Where(u => !excludedUserIds.Contains(u.Id) &&
-                                u.IsActive &&
-                                u.IsDiscoverable)
-                    .Take(30)
-                    .ToListAsync();
-
-                var result = globalUsers.Select(user => MapUserToProfileDTO(user))
-                    .OrderBy(x => Guid.NewGuid()) // Random order
-                    .ToList();
-
-                await _cacheService.SetAsync(cacheKey, result, CacheKeys.Duration.DiscoveryResults);
-                return OperationResult<List<UserProfileDTO>>.Successful(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving global users for user: {UserId}", userId);
-                return OperationResult<List<UserProfileDTO>>.Failed("Unable to find users globally. Please try again.");
-            }
-        }
-
-        private static OperationResult ValidateUpdateProfileRequest(UpdateProfileRequest request)
-        {
-            if (request.MinAge.HasValue && request.MaxAge.HasValue && request.MinAge >= request.MaxAge)
-            {
-                return OperationResult.ValidationFailure("Minimum age must be less than maximum age.");
+                return OperationResult.ValidationFailure("Bio cannot exceed 500 characters");
             }
 
             if (request.HeightCm.HasValue && (request.HeightCm < 120 || request.HeightCm > 250))
             {
-                return OperationResult.ValidationFailure("Height must be between 120cm and 250cm.");
-            }
-
-            if (!string.IsNullOrEmpty(request.Bio) && request.Bio.Length > 500)
-            {
-                return OperationResult.ValidationFailure("Bio cannot exceed 500 characters.");
+                return OperationResult.ValidationFailure("Height must be between 120cm and 250cm");
             }
 
             return OperationResult.Successful();
         }
 
-        private static void UpdateBasicUserProperties(User user, UpdateProfileRequest request)
+        /// <summary>
+        /// Validates discovery filters request
+        /// </summary>
+        private static OperationResult ValidateDiscoveryFiltersRequest(UpdateDiscoveryFiltersRequest request)
         {
-            if (!string.IsNullOrEmpty(request.FirstName))
-                user.FirstName = request.FirstName;
+            if (!request.IsValidAgeRange())
+            {
+                return OperationResult.ValidationFailure("Minimum age must be less than maximum age");
+            }
 
-            if (!string.IsNullOrEmpty(request.LastName))
-                user.LastName = request.LastName;
+            if (!request.IsValidHeightRange())
+            {
+                return OperationResult.ValidationFailure("Minimum height must be less than maximum height");
+            }
 
-            if (!string.IsNullOrEmpty(request.Bio))
-                user.Bio = request.Bio;
+            if (!request.IsValidLocation())
+            {
+                return OperationResult.ValidationFailure("Invalid location coordinates. Both latitude and longitude must be provided together");
+            }
 
-            if (!string.IsNullOrEmpty(request.Occupation))
-                user.Occupation = request.Occupation;
+            if (request.MinAge.HasValue && request.MinAge < 18)
+            {
+                return OperationResult.ValidationFailure("Minimum age must be at least 18");
+            }
 
-            if (!string.IsNullOrEmpty(request.Hometown))
-                user.Hometown = request.Hometown;
+            if (request.MaxAge.HasValue && request.MaxAge > 100)
+            {
+                return OperationResult.ValidationFailure("Maximum age cannot exceed 100");
+            }
 
-            if (request.InterestedIn.HasValue)
-                user.InterestedIn = request.InterestedIn;
+            if (request.MaxDistanceKm.HasValue && (request.MaxDistanceKm < 1 || request.MaxDistanceKm > 200))
+            {
+                return OperationResult.ValidationFailure("Maximum distance must be between 1 and 200 km");
+            }
 
-            if (request.Heritage != null)
-                user.Heritage = request.Heritage;
-
-            if (request.Religion != null)
-                user.Religion = request.Religion;
-
-            if (request.LanguagesSpoken != null)
-                user.LanguagesSpoken = request.LanguagesSpoken;
-
-            if (request.EducationLevel.HasValue)
-                user.EducationLevel = request.EducationLevel.Value;
-
-            if (request.HeightCm.HasValue)
-                user.HeightCm = request.HeightCm.Value;
-
-            if (request.Latitude.HasValue)
-                user.Latitude = (decimal)request.Latitude.Value;
-
-            if (request.Longitude.HasValue)
-                user.Longitude = (decimal)request.Longitude.Value;
-
-            if (request.MaxDistanceKm.HasValue)
-                user.MaxDistanceKm = request.MaxDistanceKm.Value;
-
-            if (request.MinAge.HasValue)
-                user.MinAge = request.MinAge.Value;
-
-            if (request.MaxAge.HasValue)
-                user.MaxAge = request.MaxAge.Value;
-
-            if (request.EnableGlobalDiscovery.HasValue)
-                user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
-
-            if (request.IsGloballyDiscoverable.HasValue)
-                user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
-
-            if (request.IsDiscoverable.HasValue)
-                user.IsDiscoverable = request.IsDiscoverable.Value;
-
-            if (request.Children.HasValue)
-                user.Children = request.Children.Value;
-
-            if (request.FamilyPlan.HasValue)
-                user.FamilyPlan = request.FamilyPlan.Value;
-
-            if (request.Drugs.HasValue)
-                user.Drugs = request.Drugs.Value;
-
-            if (request.Smoking.HasValue)
-                user.Smoking = request.Smoking.Value;
-
-            if (request.Marijuana.HasValue)
-                user.Marijuana = request.Marijuana.Value;
-
-            if (request.Drinking.HasValue)
-                user.Drinking = request.Drinking.Value;
+            return OperationResult.Successful();
         }
 
-        private void UpdateUserPreferences(User user, UpdateProfileRequest request)
+        /// <summary>
+        /// Updates basic user properties and tracks changes
+        /// </summary>
+        private static void UpdateBasicUserProperties(User user, UpdateProfileRequest request,
+            List<string> updatedFields, ref bool requiresDiscoveryRefresh)
         {
+            if (!string.IsNullOrEmpty(request.FirstName))
+            {
+                user.FirstName = request.FirstName;
+                updatedFields.Add("FirstName");
+            }
+
+            if (!string.IsNullOrEmpty(request.LastName))
+            {
+                user.LastName = request.LastName;
+                updatedFields.Add("LastName");
+            }
+
+            if (!string.IsNullOrEmpty(request.Bio))
+            {
+                user.Bio = request.Bio;
+                updatedFields.Add("Bio");
+            }
+
+            if (!string.IsNullOrEmpty(request.Hometown))
+            {
+                user.Hometown = request.Hometown;
+                updatedFields.Add("Hometown");
+            }
+
+            if (!string.IsNullOrEmpty(request.Occupation))
+            {
+                user.Occupation = request.Occupation;
+                updatedFields.Add("Occupation");
+            }
+
+            if (request.HeightCm.HasValue)
+            {
+                user.HeightCm = request.HeightCm.Value;
+                updatedFields.Add("HeightCm");
+                requiresDiscoveryRefresh = true; // Height affects discovery filtering
+            }
+
+            if (request.Heritage != null)
+            {
+                user.Heritage = request.Heritage;
+                updatedFields.Add("Heritage");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Religion != null)
+            {
+                user.Religion = request.Religion;
+                updatedFields.Add("Religion");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.LanguagesSpoken != null)
+            {
+                user.LanguagesSpoken = request.LanguagesSpoken;
+                updatedFields.Add("LanguagesSpoken");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.EducationLevel.HasValue)
+            {
+                user.EducationLevel = request.EducationLevel.Value;
+                updatedFields.Add("EducationLevel");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Children.HasValue)
+            {
+                user.Children = request.Children.Value;
+                updatedFields.Add("Children");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.FamilyPlan.HasValue)
+            {
+                user.FamilyPlan = request.FamilyPlan.Value;
+                updatedFields.Add("FamilyPlan");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Drugs.HasValue)
+            {
+                user.Drugs = request.Drugs.Value;
+                updatedFields.Add("Drugs");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Smoking.HasValue)
+            {
+                user.Smoking = request.Smoking.Value;
+                updatedFields.Add("Smoking");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Marijuana.HasValue)
+            {
+                user.Marijuana = request.Marijuana.Value;
+                updatedFields.Add("Marijuana");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.Drinking.HasValue)
+            {
+                user.Drinking = request.Drinking.Value;
+                updatedFields.Add("Drinking");
+                requiresDiscoveryRefresh = true;
+            }
+
+            if (request.NotificationsEnabled.HasValue)
+            {
+                user.NotificationsEnabled = request.NotificationsEnabled.Value;
+                updatedFields.Add("NotificationsEnabled");
+            }
+
+            if (!string.IsNullOrEmpty(request.PushToken))
+            {
+                user.PushToken = request.PushToken;
+                updatedFields.Add("PushToken");
+            }
+        }
+
+        /// <summary>
+        /// Updates discovery settings and tracks changes
+        /// </summary>
+        private static void UpdateDiscoverySettings(User user, UpdateDiscoveryFiltersRequest request,
+            List<string> updatedFilters, ref bool locationChanged, ref bool filtersChanged)
+        {
+            if (request.IsDiscoverable.HasValue)
+            {
+                user.IsDiscoverable = request.IsDiscoverable.Value;
+                updatedFilters.Add("IsDiscoverable");
+                filtersChanged = true;
+            }
+
+            if (request.IsGloballyDiscoverable.HasValue)
+            {
+                user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
+                updatedFilters.Add("IsGloballyDiscoverable");
+                filtersChanged = true;
+            }
+
+            if (request.EnableGlobalDiscovery.HasValue)
+            {
+                user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
+                updatedFilters.Add("EnableGlobalDiscovery");
+                filtersChanged = true;
+            }
+
+            if (request.InterestedIn.HasValue)
+            {
+                user.InterestedIn = request.InterestedIn.Value;
+                updatedFilters.Add("InterestedIn");
+                filtersChanged = true;
+            }
+
+            if (request.MinAge.HasValue)
+            {
+                user.MinAge = request.MinAge.Value;
+                updatedFilters.Add("MinAge");
+                filtersChanged = true;
+            }
+
+            if (request.MaxAge.HasValue)
+            {
+                user.MaxAge = request.MaxAge.Value;
+                updatedFilters.Add("MaxAge");
+                filtersChanged = true;
+            }
+
+            if (request.MaxDistanceKm.HasValue)
+            {
+                user.MaxDistanceKm = request.MaxDistanceKm.Value;
+                updatedFilters.Add("MaxDistanceKm");
+                filtersChanged = true;
+            }
+
+            // Location updates
+            if (request.Latitude.HasValue && request.Longitude.HasValue)
+            {
+                var oldLat = user.Latitude;
+                var oldLon = user.Longitude;
+
+                user.Latitude = (decimal)request.Latitude.Value;
+                user.Longitude = (decimal)request.Longitude.Value;
+
+                // Check if location changed significantly (>1km)
+                if (oldLat != 0 && oldLon != 0)
+                {
+                    var distance = LocationHelper.CalculateDistance(
+                        oldLat, oldLon,
+                        (decimal)request.Latitude.Value, (decimal)request.Longitude.Value);
+
+                    if (distance > 1) // 1km threshold
+                    {
+                        locationChanged = true;
+                    }
+                }
+                else
+                {
+                    locationChanged = true; // First time setting location
+                }
+
+                updatedFilters.Add("Location");
+            }
+
+            if (!string.IsNullOrEmpty(request.Neighbourhood))
+            {
+                user.Neighbourhood = request.Neighbourhood;
+                updatedFilters.Add("Neighbourhood");
+            }
+        }
+
+        /// <summary>
+        /// Updates discovery preferences and tracks changes
+        /// </summary>
+        private void UpdateDiscoveryPreferences(User user, UpdateDiscoveryFiltersRequest request,
+            List<string> updatedFilters, bool isPremiumUser)
+        {
+            // Ensure preferences exist
             if (user.Preferences == null)
             {
                 user.Preferences = new UserPreference
@@ -723,59 +693,214 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserPreferences.Add(user.Preferences);
             }
 
-            // Update member filter preferences (available to all users)
+            // Free user filters
             if (request.PreferredHeritage != null)
+            {
                 user.Preferences.PreferredHeritage = request.PreferredHeritage;
+                updatedFilters.Add("PreferredHeritage");
+            }
 
             if (request.PreferredReligions != null)
+            {
                 user.Preferences.PreferredReligions = request.PreferredReligions;
+                updatedFilters.Add("PreferredReligions");
+            }
 
-            if (request.LanguagePreference != null)
-                user.Preferences.LanguagePreference = request.LanguagePreference;
+            if (request.PreferredLanguagesSpoken != null)
+            {
+                user.Preferences.LanguagePreference = request.PreferredLanguagesSpoken;
+                updatedFilters.Add("PreferredLanguagesSpoken");
+            }
 
-            // Update subscriber filter preferences (only for premium users)
-            var isSubscriber = user.Subscription?.SubscriptionType == SubscriptionType.Premium &&
-                              user.Subscription.IsActive &&
-                              (!user.Subscription.ExpiresAt.HasValue || user.Subscription.ExpiresAt > DateTime.UtcNow);
-
-            if (isSubscriber)
+            // Premium user filters (only if user has premium subscription)
+            if (isPremiumUser)
             {
                 if (request.PreferredHeightMin.HasValue)
+                {
                     user.Preferences.PreferredHeightMin = request.PreferredHeightMin.Value;
+                    updatedFilters.Add("PreferredHeightMin");
+                }
 
                 if (request.PreferredHeightMax.HasValue)
+                {
                     user.Preferences.PreferredHeightMax = request.PreferredHeightMax.Value;
-
-                if (request.PreferredChildren != null)
-                    user.Preferences.PreferredChildren = request.PreferredChildren;
-
-                if (request.PreferredFamilyPlans != null)
-                    user.Preferences.PreferredFamilyPlans = request.PreferredFamilyPlans;
-
-                if (request.PreferredDrugs != null)
-                    user.Preferences.PreferredDrugs = request.PreferredDrugs;
-
-                if (request.PreferredSmoking != null)
-                    user.Preferences.PreferredSmoking = request.PreferredSmoking;
-
-                if (request.PreferredMarijuana != null)
-                    user.Preferences.PreferredMarijuana = request.PreferredMarijuana;
-
-                if (request.PreferredDrinking != null)
-                    user.Preferences.PreferredDrinking = request.PreferredDrinking;
+                    updatedFilters.Add("PreferredHeightMax");
+                }
 
                 if (request.PreferredEducationLevels != null)
+                {
                     user.Preferences.PreferredEducationLevels = request.PreferredEducationLevels;
+                    updatedFilters.Add("PreferredEducationLevels");
+                }
+
+                if (request.PreferredChildren != null)
+                {
+                    user.Preferences.PreferredChildren = request.PreferredChildren;
+                    updatedFilters.Add("PreferredChildren");
+                }
+
+                if (request.PreferredFamilyPlans != null)
+                {
+                    user.Preferences.PreferredFamilyPlans = request.PreferredFamilyPlans;
+                    updatedFilters.Add("PreferredFamilyPlans");
+                }
+
+                if (request.PreferredDrugs != null)
+                {
+                    user.Preferences.PreferredDrugs = request.PreferredDrugs;
+                    updatedFilters.Add("PreferredDrugs");
+                }
+
+                if (request.PreferredSmoking != null)
+                {
+                    user.Preferences.PreferredSmoking = request.PreferredSmoking;
+                    updatedFilters.Add("PreferredSmoking");
+                }
+
+                if (request.PreferredDrinking != null)
+                {
+                    user.Preferences.PreferredDrinking = request.PreferredDrinking;
+                    updatedFilters.Add("PreferredDrinking");
+                }
+
+                if (request.PreferredMarijuana != null)
+                {
+                    user.Preferences.PreferredMarijuana = request.PreferredMarijuana;
+                    updatedFilters.Add("PreferredMarijuana");
+                }
             }
 
             user.Preferences.UpdatedAt = DateTime.UtcNow;
-
         }
 
-        private async Task DeleteUserRelatedData(User user)
+        /// <summary>
+        /// Checks if user has active premium subscription
+        /// </summary>
+        private static bool IsActivePremiumUser(User user)
+        {
+            return user.Subscription?.SubscriptionType == SubscriptionType.Premium &&
+                   (!user.Subscription.ExpiresAt.HasValue || user.Subscription.ExpiresAt > DateTime.UtcNow);
+        }
+
+        /// <summary>
+        /// Invalidates profile-related caches based on updated fields
+        /// </summary>
+        private async Task InvalidateProfileCaches(Guid userId, List<string> updatedFields, bool requiresDiscoveryRefresh)
+        {
+            var keysToInvalidate = new List<string>
+            {
+                CacheKeys.Users.Profile(userId),
+                CacheKeys.Discovery.GlobalResults(userId),
+                CacheKeys.Discovery.LocalResults(userId),
+            };
+
+            // Add additional caches based on what was updated
+            //if (updatedFields.Any(f => f.Contains("Photo") || f == "Bio" || f == "FirstName"))
+            //{
+            //    keysToInvalidate.Add(CacheKeys.Users.Photos(userId));
+            //}
+
+            //if (requiresDiscoveryRefresh)
+            //{
+            //    // Add discovery cache keys
+            //    for (int count = 5; count <= 30; count += 5)
+            //    {
+            //        keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId, count));
+            //        keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId, count));
+            //    }
+            //}
+
+            await _cacheService.RemoveManyAsync(keysToInvalidate);
+            _logger.LogDebug("Invalidated {Count} cache keys for user {UserId}", keysToInvalidate.Count, userId);
+        }
+
+        /// <summary>
+        /// Invalidates discovery-related caches
+        /// </summary>
+        private async Task InvalidateDiscoveryCaches(Guid userId, bool locationChanged, bool filtersChanged)
+        {
+            var keysToInvalidate = new List<string>
+            {
+                CacheKeys.Users.Profile(userId),
+                  CacheKeys.Discovery.GlobalResults(userId),
+                CacheKeys.Discovery.LocalResults(userId),
+                //$"discovery_filters:{userId}"
+            };
+
+            // If location or filters changed, invalidate discovery cache
+            //if (locationChanged || filtersChanged)
+            //{
+            //    for (int count = 5; count <= 30; count += 5)
+            //    {
+            //        keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId, count));
+            //        keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId, count));
+            //    }
+            //}
+
+            await _cacheService.RemoveManyAsync(keysToInvalidate);
+            _logger.LogDebug("Invalidated discovery caches for user {UserId}, location changed: {LocationChanged}, filters changed: {FiltersChanged}",
+                userId, locationChanged, filtersChanged);
+        }
+
+        /// <summary>
+        /// Invalidates all user-related caches
+        /// </summary>
+        private async Task InvalidateAllUserCaches(Guid userId)
+        {
+            var keysToInvalidate = new List<string>
+            {
+                CacheKeys.Users.Profile(userId),
+                //CacheKeys.Users.Photos(userId),
+                //CacheKeys.Users.Preferences(userId),
+                //CacheKeys.Users.SubscriptionStatus(userId),
+                //CacheKeys.Users.UsageLimits(userId),
+                CacheKeys.Matching.UserMatches(userId),
+                CacheKeys.Messaging.UserConversations(userId),
+                //$"discovery_filters:{userId}",
+                CacheKeys.Discovery.GlobalResults(userId),
+                CacheKeys.Discovery.LocalResults(userId),
+            };
+
+            // Add discovery cache variations
+            //keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId));
+            //keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId));
+
+            await _cacheService.RemoveManyAsync(keysToInvalidate);
+            _logger.LogDebug("Invalidated all caches for user {UserId}", userId);
+        }
+
+        /// <summary>
+        /// Deletes user photos from Supabase storage
+        /// </summary>
+        private async Task DeleteUserPhotosFromStorage(List<UserPhoto> photos)
+        {
+            try
+            {
+                if (!photos.Any()) return;
+
+                var filePaths = photos.Select(p => p.StoragePath).ToList();
+                await _supabaseClient.Storage
+                    .From("user-photos")
+                    .Remove(filePaths);
+
+                _logger.LogInformation("Deleted {Count} photos from storage", photos.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete some photos from storage");
+            }
+        }
+
+        /// <summary>
+        /// Optimized deletion of user-related data
+        /// </summary>
+        private async Task DeleteUserRelatedDataOptimized(User user)
         {
             // Delete photos
-            _dbContext.UserPhotos.RemoveRange(user.Photos);
+            if (user.Photos.Any())
+            {
+                _dbContext.UserPhotos.RemoveRange(user.Photos);
+            }
 
             // Delete preferences
             if (user.Preferences != null)
@@ -783,9 +908,12 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserPreferences.Remove(user.Preferences);
             }
 
-            // Delete likes given and received
-            _dbContext.UserLikes.RemoveRange(user.LikesGiven);
-            _dbContext.UserLikes.RemoveRange(user.LikesReceived);
+            // Delete swipes (batch operation)
+            var allSwipes = user.SwipesGiven.Concat(user.SwipesReceived).Distinct();
+            if (allSwipes.Any())
+            {
+                _dbContext.UserSwipes.RemoveRange(allSwipes);
+            }
 
             // Delete conversations and messages
             var conversations = user.ConversationsAsUser1.Concat(user.ConversationsAsUser2).Distinct();
@@ -794,7 +922,11 @@ namespace MomomiAPI.Services.Implementations
                 var messages = await _dbContext.Messages
                     .Where(m => m.ConversationId == conversation.Id)
                     .ToListAsync();
-                _dbContext.Messages.RemoveRange(messages);
+
+                if (messages.Any())
+                {
+                    _dbContext.Messages.RemoveRange(messages);
+                }
                 _dbContext.Conversations.Remove(conversation);
             }
 
@@ -809,59 +941,22 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserUsageLimits.Remove(user.UsageLimit);
             }
 
-            // TODO: Check if user.ReportsMade is working: Delete reports
-            //var userReports = _dbContext.UserReports
-            //.Where(ur => ur.ReporterId == user.Id);
-            //_dbContext.UserReports.RemoveRange(userReports);
-            _dbContext.UserReports.RemoveRange(user.ReportsMade);
+            // Delete reports
+            if (user.ReportsMade.Any())
+            {
+                _dbContext.UserReports.RemoveRange(user.ReportsMade);
+            }
 
             // Delete notifications
-            _dbContext.PushNotifications.RemoveRange(user.Notifications);
+            if (user.Notifications.Any())
+            {
+                _dbContext.PushNotifications.RemoveRange(user.Notifications);
+            }
 
             // Finally, delete the user
             _dbContext.Users.Remove(user);
         }
 
-        private static UserProfileDTO MapUserToProfileDTO(User user, double? distance = null)
-        {
-            return new UserProfileDTO
-            {
-                Id = user.Id,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Age = user.DateOfBirth.HasValue ?
-                    DateTime.UtcNow.Year - user.DateOfBirth.Value.Year : 0,
-                Gender = user.Gender,
-                Bio = user.Bio,
-                Heritage = user.Heritage,
-                Religion = user.Religion,
-                LanguagesSpoken = user.LanguagesSpoken,
-                EducationLevel = user.EducationLevel,
-                Occupation = user.Occupation,
-                HeightCm = user.HeightCm,
-                Hometown = user.Hometown,
-                Children = user.Children,
-                FamilyPlan = user.FamilyPlan,
-                Drugs = user.Drugs,
-                Smoking = user.Smoking,
-                Marijuana = user.Marijuana,
-                Drinking = user.Drinking,
-                DistanceKm = distance,
-                EnableGlobalDiscovery = user.EnableGlobalDiscovery,
-                IsDiscoverable = user.IsDiscoverable,
-                IsGloballyDiscoverable = user.IsGloballyDiscoverable,
-                IsVerified = user.IsVerified,
-                LastActive = user.LastActive,
-                Photos = user.Photos?.Select(p => new UserPhotoDTO
-                {
-                    Id = p.Id,
-                    Url = p.Url,
-                    ThumbnailUrl = p.ThumbnailUrl,
-                    PhotoOrder = p.PhotoOrder,
-                    IsPrimary = p.IsPrimary
-                }).OrderBy(p => p.PhotoOrder).ToList() ?? new List<UserPhotoDTO>()
-            };
-        }
-
+        #endregion
     }
 }

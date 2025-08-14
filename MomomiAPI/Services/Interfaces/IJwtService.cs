@@ -1,4 +1,5 @@
-﻿using MomomiAPI.Models.Entities;
+﻿using MomomiAPI.Common.Results;
+using MomomiAPI.Models.Entities;
 using System.Security.Claims;
 
 namespace MomomiAPI.Services.Interfaces
@@ -10,11 +11,10 @@ namespace MomomiAPI.Services.Interfaces
         ClaimsPrincipal? ValidateToken(string token, bool validateLifetime = true);
         Task<bool> IsTokenBlacklistedAsync(string jti);
         Task BlacklistTokenAsync(string jti, DateTime expiry);
-        Task<string?> GetStoredRefreshTokenAsync(Guid userId);
-        Task<Guid?> GetUserIdByRefreshTokenAsync(string refreshToken);
-        Task StoreRefreshTokenAsync(Guid userId, string refreshToken, DateTime expiry);
+        Task<Guid?> GetUserIdFromRefreshTokenAsync(string refreshToken);
+        Task CacheRefreshTokenAsync(Guid userId, string refreshToken);
         Task RevokeRefreshTokenAsync(Guid userId);
         Task RevokeAllUserTokensAsync(Guid userId);
-        (string jti, DateTime expiry)? GetTokenInfo(string token);
+        Task<RefreshTokenResult> RefreshUserTokenAsync(string refreshToken);
     }
 }

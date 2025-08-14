@@ -14,7 +14,7 @@ namespace MomomiAPI.Data.Configurations
                 .IsUnique()
                 .HasDatabaseName("idx_user_subscriptions_user_id");
 
-            builder.HasIndex(us => new { us.IsActive, us.ExpiresAt })
+            builder.HasIndex(us => new { us.ExpiresAt })
                 .HasDatabaseName("idx_user_subscriptions_active_expires");
 
             builder.Property(us => us.SubscriptionType)

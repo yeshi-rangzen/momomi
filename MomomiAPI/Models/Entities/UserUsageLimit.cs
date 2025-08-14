@@ -20,20 +20,12 @@ namespace MomomiAPI.Models.Entities
         [Column("super_likes_used_today")]
         public int SuperLikesUsedToday { get; set; } = 0;
 
-        [Column("super_likes_used_this_week")]
-        public int SuperLikesUsedThisWeek { get; set; } = 0;
-
         [Column("ads_watched_today")]
         public int AdsWatchedToday { get; set; } = 0;
-
-        [Column("bonus_likes_from_ads")]
-        public int BonusLikesFromAds { get; set; } = 0;
 
         [Column("last_reset_date")]
         public DateTime LastResetDate { get; set; } = DateTime.UtcNow.Date;
 
-        [Column("last_weekly_reset")]
-        public DateTime LastWeeklyReset { get; set; } = DateTime.UtcNow.Date;
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -108,15 +108,15 @@ namespace MomomiAPI.Data.Configurations
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Configure relationships - Likes Given
-            builder.HasMany(u => u.LikesGiven)
-                .WithOne(l => l.LikerUser)
-                .HasForeignKey(l => l.LikerUserId)
+            builder.HasMany(u => u.SwipesGiven)
+                .WithOne(l => l.SwiperUser)
+                .HasForeignKey(l => l.SwiperUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Configure relationships - Likes Received
-            builder.HasMany(u => u.LikesReceived)
-                .WithOne(l => l.LikedUser)
-                .HasForeignKey(l => l.LikedUserId)
+            builder.HasMany(u => u.SwipesReceived)
+                .WithOne(l => l.SwipedUser)
+                .HasForeignKey(l => l.SwipedUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Configure relationships - Conversations as User1

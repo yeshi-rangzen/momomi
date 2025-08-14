@@ -13,7 +13,7 @@ namespace MomomiAPI.Data
         public DbSet<User> Users { get; set; }
         public DbSet<UserPhoto> UserPhotos { get; set; }
         public DbSet<UserPreference> UserPreferences { get; set; }
-        public DbSet<UserLike> UserLikes { get; set; }
+        public DbSet<UserSwipe> UserSwipes { get; set; }
         public DbSet<Conversation> Conversations { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserReport> UserReports { get; set; }
@@ -29,7 +29,7 @@ namespace MomomiAPI.Data
             modelBuilder.ApplyConfiguration(new UserConfiguration());
             modelBuilder.ApplyConfiguration(new UserPhotoConfiguration());
             modelBuilder.ApplyConfiguration(new UserPreferenceConfiguration());
-            modelBuilder.ApplyConfiguration(new UserLikeConfiguration());
+            modelBuilder.ApplyConfiguration(new UserSwipeConfiguration());
             modelBuilder.ApplyConfiguration(new ConversationConfiguration());
             modelBuilder.ApplyConfiguration(new MessageConfiguration());
             modelBuilder.ApplyConfiguration(new UserReportConfiguration());

@@ -33,6 +33,9 @@ namespace MomomiAPI.Models.Entities
         [Column("preferred_height_max")]
         public int? PreferredHeightMax { get; set; } // in cm
 
+        [Column("preferred_education_levels")]
+        public List<EducationLevelType>? PreferredEducationLevels { get; set; }
+
         [Column("preferred_children")]
         public List<ChildrenStatusType>? PreferredChildren { get; set; }
 
@@ -51,8 +54,7 @@ namespace MomomiAPI.Models.Entities
         [Column("preferred_marijuana")]
         public List<ViceFrequencyType>? PreferredMarijuana { get; set; }
 
-        [Column("preferred_education_levels")]
-        public List<EducationLevelType>? PreferredEducationLevels { get; set; }
+
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -56,11 +56,24 @@ namespace MomomiAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("User2Id");
-
                     b.HasIndex("User1Id", "User2Id")
                         .IsUnique()
-                        .HasDatabaseName("idx_conversations_users");
+                        .HasDatabaseName("idx_conversations_users_unique");
+
+                    b.HasIndex("User1Id", "IsActive", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("idx_conversations_user1_active");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("User1Id", "IsActive", "UpdatedAt"), new[] { "User2Id", "CreatedAt" });
+
+                    b.HasIndex("User1Id", "User2Id", "IsActive")
+                        .HasDatabaseName("idx_conversations_users_active");
+
+                    b.HasIndex("User2Id", "IsActive", "UpdatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("idx_conversations_user2_active");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("User2Id", "IsActive", "UpdatedAt"), new[] { "User1Id", "CreatedAt" });
 
                     b.ToTable("conversations", t =>
                         {
@@ -116,15 +129,25 @@ namespace MomomiAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SenderId");
-
                     b.HasIndex("ConversationId", "IsRead")
-                        .HasDatabaseName("idx_messages_unread")
+                        .HasDatabaseName("idx_messages_conversation_read")
                         .HasFilter("is_read = false");
 
                     b.HasIndex("ConversationId", "SentAt")
                         .IsDescending(false, true)
-                        .HasDatabaseName("idx_messages_conversation");
+                        .HasDatabaseName("idx_messages_last_message");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("ConversationId", "SentAt"), new[] { "SenderId", "Content", "MessageType", "IsRead" });
+
+                    b.HasIndex("SenderId", "SentAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_messages_sender_time");
+
+                    b.HasIndex("ConversationId", "SenderId", "IsRead")
+                        .HasDatabaseName("idx_messages_unread_count")
+                        .HasFilter("is_read = false");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("ConversationId", "SenderId", "IsRead"), new[] { "SentAt" });
 
                     b.ToTable("messages");
                 });
@@ -218,7 +241,7 @@ namespace MomomiAPI.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("NOW()");
 
-                    b.Property<DateTime?>("DateOfBirth")
+                    b.Property<DateTime>("DateOfBirth")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date_of_birth");
 
@@ -244,7 +267,7 @@ namespace MomomiAPI.Migrations
                     b.Property<bool>("EnableGlobalDiscovery")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true)
+                        .HasDefaultValue(false)
                         .HasColumnName("enable_global_discovery");
 
                     b.Property<string>("FamilyPlan")
@@ -252,28 +275,33 @@ namespace MomomiAPI.Migrations
                         .HasColumnName("family_plan");
 
                     b.Property<string>("FirstName")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
                     b.Property<string>("Gender")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("gender");
 
-                    b.Property<int?>("HeightCm")
+                    b.Property<int>("HeightCm")
                         .HasColumnType("integer")
                         .HasColumnName("height_cm");
 
                     b.Property<string>("Heritage")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("heritage");
 
                     b.Property<string>("Hometown")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("hometown");
 
                     b.Property<string>("InterestedIn")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("interested_in");
 
@@ -290,14 +318,19 @@ namespace MomomiAPI.Migrations
                     b.Property<bool>("IsGloballyDiscoverable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true)
+                        .HasDefaultValue(false)
                         .HasColumnName("is_globally_discoverable");
+
+                    b.Property<bool>("IsOnboarding")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_onboarding");
 
                     b.Property<bool>("IsVerified")
                         .HasColumnType("boolean")
                         .HasColumnName("is_verified");
 
                     b.Property<string>("LanguagesSpoken")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("languages_spoken");
 
@@ -310,11 +343,11 @@ namespace MomomiAPI.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
-                    b.Property<decimal?>("Latitude")
+                    b.Property<decimal>("Latitude")
                         .HasColumnType("decimal(10,8)")
                         .HasColumnName("latitude");
 
-                    b.Property<decimal?>("Longitude")
+                    b.Property<decimal>("Longitude")
                         .HasColumnType("decimal(11,8)")
                         .HasColumnName("longitude");
 
@@ -333,6 +366,11 @@ namespace MomomiAPI.Migrations
                     b.Property<int>("MinAge")
                         .HasColumnType("integer")
                         .HasColumnName("min_age");
+
+                    b.Property<string>("Neighbourhood")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("neighbourhood");
 
                     b.Property<bool>("NotificationsEnabled")
                         .HasColumnType("boolean")
@@ -354,6 +392,7 @@ namespace MomomiAPI.Migrations
                         .HasColumnName("push_token");
 
                     b.Property<string>("Religion")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("religion");
 
@@ -373,142 +412,36 @@ namespace MomomiAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DateOfBirth")
-                        .HasDatabaseName("idx_users_age")
-                        .HasFilter("is_active = true");
-
-                    b.HasIndex("EnableGlobalDiscovery")
-                        .HasDatabaseName("idx_users_global_discovery")
-                        .HasFilter("is_active = true");
-
-                    b.HasIndex("Heritage")
-                        .HasDatabaseName("idx_users_heritage")
-                        .HasFilter("is_active = true");
-
-                    b.HasIndex("IsDiscoverable")
-                        .HasDatabaseName("idx_users_discoverable")
-                        .HasFilter("is_active = true");
-
-                    b.HasIndex("IsGloballyDiscoverable")
-                        .HasDatabaseName("idx_users_globally_discoverable")
-                        .HasFilter("is_active = true");
-
                     b.HasIndex("SupabaseUid")
                         .IsUnique()
                         .HasDatabaseName("idx_users_supabase_uid");
 
                     b.HasIndex("IsActive", "LastActive")
-                        .HasDatabaseName("idx_users_active")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_users_active_last")
                         .HasFilter("is_active = true");
 
-                    b.HasIndex("Latitude", "Longitude")
-                        .HasDatabaseName("idx_users_location")
+                    b.HasIndex("IsActive", "DateOfBirth", "Gender")
+                        .HasDatabaseName("idx_users_age_gender")
                         .HasFilter("is_active = true");
+
+                    b.HasIndex("IsActive", "IsDiscoverable", "Gender", "InterestedIn")
+                        .HasDatabaseName("idx_users_discovery_main")
+                        .HasFilter("is_active = true AND is_discoverable = true");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsActive", "IsDiscoverable", "Gender", "InterestedIn"), new[] { "DateOfBirth", "Heritage", "Latitude", "Longitude", "EnableGlobalDiscovery", "IsGloballyDiscoverable", "LastActive" });
+
+                    b.HasIndex("IsActive", "IsDiscoverable", "Latitude", "Longitude")
+                        .HasDatabaseName("idx_users_location_discovery")
+                        .HasFilter("is_active = true AND is_discoverable = true AND latitude IS NOT NULL AND longitude IS NOT NULL");
+
+                    b.HasIndex("IsActive", "IsGloballyDiscoverable", "EnableGlobalDiscovery", "Gender")
+                        .HasDatabaseName("idx_users_global_discovery")
+                        .HasFilter("is_active = true AND is_globally_discoverable = true");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsActive", "IsGloballyDiscoverable", "EnableGlobalDiscovery", "Gender"), new[] { "DateOfBirth", "Heritage", "InterestedIn", "LastActive" });
 
                     b.ToTable("users");
-                });
-
-            modelBuilder.Entity("MomomiAPI.Models.Entities.UserBlock", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("BlockedUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("blocked_user_id");
-
-                    b.Property<Guid>("BlockerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("blocker_user_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("reason");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BlockedUserId")
-                        .HasDatabaseName("idx_user_blocks_blocked");
-
-                    b.HasIndex("BlockerUserId")
-                        .HasDatabaseName("idx_user_blocks_blocker");
-
-                    b.HasIndex("BlockerUserId", "BlockedUserId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_user_blocks_unique");
-
-                    b.ToTable("user_blocks");
-                });
-
-            modelBuilder.Entity("MomomiAPI.Models.Entities.UserLike", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<bool>("IsLike")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_like");
-
-                    b.Property<bool>("IsMatch")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_match");
-
-                    b.Property<string>("LikeType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("like_type");
-
-                    b.Property<Guid>("LikedUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("liked_user_id");
-
-                    b.Property<Guid>("LikerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("liker_user_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsMatch")
-                        .HasDatabaseName("idx_user_likes_match")
-                        .HasFilter("is_match = true");
-
-                    b.HasIndex("LikedUserId")
-                        .HasDatabaseName("idx_user_likes_liked");
-
-                    b.HasIndex("LikerUserId")
-                        .HasDatabaseName("idx_user_likes_liker");
-
-                    b.HasIndex("LikeType", "CreatedAt")
-                        .HasDatabaseName("idx_user_likes_type_created");
-
-                    b.HasIndex("LikerUserId", "LikedUserId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_user_likes_unique");
-
-                    b.ToTable("user_likes");
                 });
 
             modelBuilder.Entity("MomomiAPI.Models.Entities.UserPhoto", b =>
@@ -563,8 +496,17 @@ namespace MomomiAPI.Migrations
                         .HasDatabaseName("idx_user_photos_primary")
                         .HasFilter("is_primary = true");
 
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId"), new[] { "Url" });
+
                     b.HasIndex("UserId", "PhotoOrder")
-                        .HasDatabaseName("idx_user_photos_user_id");
+                        .HasDatabaseName("idx_user_photos_order");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId", "PhotoOrder"), new[] { "IsPrimary", "Url" });
+
+                    b.HasIndex("UserId", "IsPrimary", "PhotoOrder")
+                        .HasDatabaseName("idx_user_photos_display");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId", "IsPrimary", "PhotoOrder"), new[] { "Url", "CreatedAt" });
 
                     b.ToTable("user_photos");
                 });
@@ -733,10 +675,6 @@ namespace MomomiAPI.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expires_at");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
                     b.Property<DateTime>("StartsAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("starts_at");
@@ -758,14 +696,66 @@ namespace MomomiAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_user_subscriptions_active_expires");
+
                     b.HasIndex("UserId")
                         .IsUnique()
                         .HasDatabaseName("idx_user_subscriptions_user_id");
 
-                    b.HasIndex("IsActive", "ExpiresAt")
-                        .HasDatabaseName("idx_user_subscriptions_active_expires");
-
                     b.ToTable("user_subscriptions");
+                });
+
+            modelBuilder.Entity("MomomiAPI.Models.Entities.UserSwipe", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("SwipeType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("swipe_type");
+
+                    b.Property<Guid>("SwipedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("swiped_user_id");
+
+                    b.Property<Guid>("SwiperUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("swiper_user_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SwipedUserId");
+
+                    b.HasIndex("SwiperUserId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_user_swipes_recent");
+
+                    b.HasIndex("SwiperUserId", "SwipeType")
+                        .HasDatabaseName("idx_user_swipes_received");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("SwiperUserId", "SwipeType"), new[] { "SwipedUserId", "CreatedAt" });
+
+                    b.HasIndex("SwiperUserId", "SwipedUserId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_user_swipes_unique");
+
+                    b.ToTable("user_swipes");
                 });
 
             modelBuilder.Entity("MomomiAPI.Models.Entities.UserUsageLimit", b =>
@@ -779,10 +769,6 @@ namespace MomomiAPI.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("ads_watched_today");
 
-                    b.Property<int>("BonusLikesFromAds")
-                        .HasColumnType("integer")
-                        .HasColumnName("bonus_likes_from_ads");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -793,17 +779,9 @@ namespace MomomiAPI.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_reset_date");
 
-                    b.Property<DateTime>("LastWeeklyReset")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_weekly_reset");
-
                     b.Property<int>("LikesUsedToday")
                         .HasColumnType("integer")
                         .HasColumnName("likes_used_today");
-
-                    b.Property<int>("SuperLikesUsedThisWeek")
-                        .HasColumnType("integer")
-                        .HasColumnName("super_likes_used_this_week");
 
                     b.Property<int>("SuperLikesUsedToday")
                         .HasColumnType("integer")
@@ -880,44 +858,6 @@ namespace MomomiAPI.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("MomomiAPI.Models.Entities.UserBlock", b =>
-                {
-                    b.HasOne("MomomiAPI.Models.Entities.User", "BlockedUser")
-                        .WithMany("BlocksReceived")
-                        .HasForeignKey("BlockedUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("MomomiAPI.Models.Entities.User", "BlockerUser")
-                        .WithMany("BlocksMade")
-                        .HasForeignKey("BlockerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("BlockedUser");
-
-                    b.Navigation("BlockerUser");
-                });
-
-            modelBuilder.Entity("MomomiAPI.Models.Entities.UserLike", b =>
-                {
-                    b.HasOne("MomomiAPI.Models.Entities.User", "LikedUser")
-                        .WithMany("LikesReceived")
-                        .HasForeignKey("LikedUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("MomomiAPI.Models.Entities.User", "LikerUser")
-                        .WithMany("LikesGiven")
-                        .HasForeignKey("LikerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("LikedUser");
-
-                    b.Navigation("LikerUser");
-                });
-
             modelBuilder.Entity("MomomiAPI.Models.Entities.UserPhoto", b =>
                 {
                     b.HasOne("MomomiAPI.Models.Entities.User", "User")
@@ -970,6 +910,25 @@ namespace MomomiAPI.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MomomiAPI.Models.Entities.UserSwipe", b =>
+                {
+                    b.HasOne("MomomiAPI.Models.Entities.User", "SwipedUser")
+                        .WithMany("SwipesReceived")
+                        .HasForeignKey("SwipedUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MomomiAPI.Models.Entities.User", "SwiperUser")
+                        .WithMany("SwipesGiven")
+                        .HasForeignKey("SwiperUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SwipedUser");
+
+                    b.Navigation("SwiperUser");
+                });
+
             modelBuilder.Entity("MomomiAPI.Models.Entities.UserUsageLimit", b =>
                 {
                     b.HasOne("MomomiAPI.Models.Entities.User", "User")
@@ -988,17 +947,9 @@ namespace MomomiAPI.Migrations
 
             modelBuilder.Entity("MomomiAPI.Models.Entities.User", b =>
                 {
-                    b.Navigation("BlocksMade");
-
-                    b.Navigation("BlocksReceived");
-
                     b.Navigation("ConversationsAsUser1");
 
                     b.Navigation("ConversationsAsUser2");
-
-                    b.Navigation("LikesGiven");
-
-                    b.Navigation("LikesReceived");
 
                     b.Navigation("MessagesSent");
 
@@ -1013,6 +964,10 @@ namespace MomomiAPI.Migrations
                     b.Navigation("ReportsReceived");
 
                     b.Navigation("Subscription");
+
+                    b.Navigation("SwipesGiven");
+
+                    b.Navigation("SwipesReceived");
 
                     b.Navigation("UsageLimit");
                 });

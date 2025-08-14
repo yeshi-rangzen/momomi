@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 using System.Security.Claims;
@@ -13,6 +14,9 @@ namespace MomomiAPI.Hubs
         private readonly ICacheService _cacheService;
         private readonly ILogger<ChatHub> _logger;
 
+        // Cache TTL for online status
+        private static readonly TimeSpan OnlineStatusTTL = TimeSpan.FromMinutes(5);
+
         public ChatHub(IMessageService messageService, ICacheService cacheService, ILogger<ChatHub> logger)
         {
             _messageService = messageService;
@@ -20,39 +24,80 @@ namespace MomomiAPI.Hubs
             _logger = logger;
         }
 
-        public async Task JoinConversation(string conversationId)
+        #region Connection Management
+
+        /// <summary>
+        /// User joins a specific conversation room
+        /// </summary>
+        public async Task JoinConversationRoom(string conversationId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    await Clients.Caller.SendAsync("Error", "User not authenticated");
+                    return;
+                }
+
+                // Verify user has access to this conversation
+                var conversationResult = await _messageService.GetConversationDetailsAsync(userId.Value, Guid.Parse(conversationId));
+                if (!conversationResult.Success)
+                {
+                    await Clients.Caller.SendAsync("Error", "Access denied to conversation");
+                    return;
+                }
+
+                await Groups.AddToGroupAsync(Context.ConnectionId, GetConversationGroupName(conversationId));
+
+                // Update user's online status
+                await SetUserOnlineStatus(userId.Value, true);
+
+                // Notify other users in conversation that this user is online
+                await Clients.OthersInGroup(GetConversationGroupName(conversationId))
+                    .SendAsync("UserJoinedConversation", userId.Value);
+
+                _logger.LogInformation("User {UserId} joined conversation {ConversationId}", userId, conversationId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error joining conversation {ConversationId}", conversationId);
+                await Clients.Caller.SendAsync("Error", "Failed to join conversation");
+            }
+        }
+
+        /// <summary>
+        /// User leaves a specific conversation room
+        /// </summary>
+        public async Task LeaveConversationRoom(string conversationId)
         {
             try
             {
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
 
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"conversation_{conversationId}");
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetConversationGroupName(conversationId));
 
-                // Track online users
-                await _cacheService.SetStringAsync($"user_online_{userId}", "true", TimeSpan.FromMinutes(5));
+                // Notify others that user left
+                await Clients.OthersInGroup(GetConversationGroupName(conversationId))
+                    .SendAsync("UserLeftConversation", userId.Value);
 
-                _logger.LogInformation("User {UserId} joined conversation {ConversationId}", userId, conversationId);
+                _logger.LogInformation("User {UserId} left conversation {ConversationId}", userId, conversationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error joining conversation {ConversationId} for user {UserId}", conversationId, Context.UserIdentifier);
+                _logger.LogError(ex, "Error leaving conversation {ConversationId}", conversationId);
             }
         }
 
-        public async Task LeaveConversation(string conversationId)
-        {
-            try
-            {
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"conversation_{conversationId}");
-                _logger.LogInformation("User left conversation {ConversationId}", conversationId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error leaving conversation {ConversationId} for user {UserId}", conversationId, Context.UserIdentifier);
-            }
-        }
-        public async Task SendMessage(string conversationId, string content, string messageType = "text")
+        #endregion
+
+        #region Message Operations
+
+        /// <summary>
+        /// Send a real-time message through SignalR
+        /// </summary>
+        public async Task SendRealtimeMessage(string conversationId, string content, string messageType = "text")
         {
             try
             {
@@ -70,54 +115,84 @@ namespace MomomiAPI.Hubs
                     MessageType = messageType
                 };
 
-                var messageDto = await _messageService.SendMessageAsync(userId.Value, request);
-                if (messageDto == null)
+                // Send message using the service
+                var result = await _messageService.SendMessageAsync(userId.Value, request);
+                if (!result.Success)
                 {
-                    await Clients.Caller.SendAsync("Error", "Failed to send message");
+                    await Clients.Caller.SendAsync("MessageSendError", result.ErrorMessage);
                     return;
                 }
 
-                // Send to all users in the conversation
-                await Clients.Group($"conversation_{conversationId}").SendAsync("ReceiveMessage", messageDto);
+                var messageData = result.Data!;
 
-                // Send notification to the other user if they're not in the conversation
-                var conversationResult = await _messageService.GetConversationAsync(userId.Value, Guid.Parse(conversationId));
-                var conversation = conversationResult.Data;
-
-                if (conversation != null)
-                {
-                    var isOtherUserOnline = await _cacheService.ExistsAsync($"user_online_{conversation.OtherUserId}");
-                    if (!isOtherUserOnline)
+                // Send to all users in the conversation room
+                await Clients.Group(GetConversationGroupName(conversationId))
+                    .SendAsync("MessageReceived", new
                     {
-                        await Clients.User(conversation.OtherUserId.ToString()).SendAsync("NewMessageNotification", messageDto);
-                    }
-                }
+                        message = messageData.Message,
+                        isFirstMessage = messageData.IsFirstMessage,
+                        messageCount = messageData.ConversationMessageCount
+                    });
+
+                // Send push notification to offline users
+                await SendOfflineNotification(conversationId, messageData.ReceiverId, messageData.Message);
+
+                _logger.LogDebug("Real-time message {MessageId} sent in conversation {ConversationId}",
+                    messageData.Message.Id, conversationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending message in conversation {ConversationId} for user {UserId}", conversationId, Context.UserIdentifier);
+                _logger.LogError(ex, "Error sending real-time message in conversation {ConversationId}", conversationId);
+                await Clients.Caller.SendAsync("MessageSendError", "Failed to send message");
             }
         }
 
-        public async Task MarkMessageAsRead(string conversationId)
+        /// <summary>
+        /// Mark messages as read in real-time
+        /// </summary>
+        public async Task MarkConversationAsRead(string conversationId)
         {
             try
             {
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
 
-                await _messageService.MarkMessagesAsReadAsync(userId.Value, Guid.Parse(conversationId));
+                var result = await _messageService.MarkMessagesAsReadAsync(userId.Value, Guid.Parse(conversationId));
+                if (!result.Success)
+                {
+                    await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                    return;
+                }
 
-                // Notify other user that messages were read
-                await Clients.OthersInGroup($"conversation_{conversationId}")
-                    .SendAsync("MessagesMarkedAsRead", conversationId, userId.Value);
+                var readData = result.Data!;
+
+                // Notify other users in conversation that messages were read
+                await Clients.OthersInGroup(GetConversationGroupName(conversationId))
+                    .SendAsync("MessagesMarkedAsRead", new
+                    {
+                        conversationId,
+                        userId = userId.Value,
+                        messagesMarkedCount = readData.MessagesMarkedCount,
+                        lastReadMessageId = readData.LastReadMessageId,
+                        markedAt = readData.MarkedAt
+                    });
+
+                _logger.LogDebug("User {UserId} marked {Count} messages as read in conversation {ConversationId}",
+                    userId, readData.MessagesMarkedCount, conversationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking message as read in conversation {ConversationId} for user {UserId}", conversationId, Context.UserIdentifier);
+                _logger.LogError(ex, "Error marking messages as read in conversation {ConversationId}", conversationId);
             }
         }
 
+        #endregion
+
+        #region Typing Indicators
+
+        /// <summary>
+        /// User started typing in a conversation
+        /// </summary>
         public async Task StartTyping(string conversationId)
         {
             try
@@ -125,15 +200,25 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
 
-                await Clients.OthersInGroup($"conversation_{conversationId}")
-                    .SendAsync("UserStartedTyping", userId);
+                await Clients.OthersInGroup(GetConversationGroupName(conversationId))
+                    .SendAsync("UserStartedTyping", new
+                    {
+                        userId = userId.Value,
+                        conversationId,
+                        timestamp = DateTime.UtcNow
+                    });
+
+                _logger.LogDebug("User {UserId} started typing in conversation {ConversationId}", userId, conversationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error starting typing in conversation {ConversationId} for user {UserId}", conversationId, Context.UserIdentifier);
+                _logger.LogError(ex, "Error handling start typing in conversation {ConversationId}", conversationId);
             }
         }
 
+        /// <summary>
+        /// User stopped typing in a conversation
+        /// </summary>
         public async Task StopTyping(string conversationId)
         {
             try
@@ -141,14 +226,25 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
 
-                await Clients.OthersInGroup($"conversation_{conversationId}")
-                    .SendAsync("UserStoppedTyping", userId);
+                await Clients.OthersInGroup(GetConversationGroupName(conversationId))
+                    .SendAsync("UserStoppedTyping", new
+                    {
+                        userId = userId.Value,
+                        conversationId,
+                        timestamp = DateTime.UtcNow
+                    });
+
+                _logger.LogDebug("User {UserId} stopped typing in conversation {ConversationId}", userId, conversationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error stopping typing in conversation {ConversationId}", conversationId);
+                _logger.LogError(ex, "Error handling stop typing in conversation {ConversationId}", conversationId);
             }
         }
+
+        #endregion
+
+        #region Connection Events
 
         public override async Task OnConnectedAsync()
         {
@@ -157,8 +253,13 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId != null)
                 {
-                    await _cacheService.SetStringAsync($"user_online_{userId}", "true", TimeSpan.FromMinutes(5));
-                    _logger.LogInformation("User {UserId} connected to chat hub", userId);
+                    await SetUserOnlineStatus(userId.Value, true);
+
+                    // Join user to their personal notification group
+                    await Groups.AddToGroupAsync(Context.ConnectionId, GetUserGroupName(userId.Value));
+
+                    _logger.LogInformation("User {UserId} connected to chat hub with connection {ConnectionId}",
+                        userId, Context.ConnectionId);
                 }
                 await base.OnConnectedAsync();
             }
@@ -175,8 +276,10 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId != null)
                 {
-                    await _cacheService.RemoveAsync($"user_online_{userId}");
-                    _logger.LogInformation("User {UserId} disconnected from chat hub", userId);
+                    await SetUserOnlineStatus(userId.Value, false);
+
+                    _logger.LogInformation("User {UserId} disconnected from chat hub with connection {ConnectionId}",
+                        userId, Context.ConnectionId);
                 }
                 await base.OnDisconnectedAsync(exception);
             }
@@ -186,11 +289,136 @@ namespace MomomiAPI.Hubs
             }
         }
 
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Gets current user ID from JWT claims
+        /// </summary>
         private Guid? GetCurrentUserId()
         {
-            var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst("sub")?.Value;
+            var userIdClaim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                             Context.User?.FindFirst("sub")?.Value;
 
             return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
+
+        /// <summary>
+        /// Sets user online/offline status in cache
+        /// </summary>
+        private async Task SetUserOnlineStatus(Guid userId, bool isOnline)
+        {
+            try
+            {
+                var cacheKey = $"user_online_{userId}";
+
+                if (isOnline)
+                {
+                    await _cacheService.SetStringAsync(cacheKey, "true", OnlineStatusTTL);
+                }
+                else
+                {
+                    await _cacheService.RemoveAsync(cacheKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update online status for user {UserId}", userId);
+            }
+        }
+
+        /// <summary>
+        /// Sends notification to offline users
+        /// </summary>
+        private async Task SendOfflineNotification(string conversationId, Guid receiverId, MessageDTO message)
+        {
+            try
+            {
+                // Check if receiver is online
+                var isReceiverOnline = await _messageService.IsUserOnlineAsync(receiverId);
+
+                if (!isReceiverOnline)
+                {
+                    // Send to user's personal notification group (they might have the app open but not in this conversation)
+                    await Clients.Group(GetUserGroupName(receiverId))
+                        .SendAsync("NewMessageNotification", new
+                        {
+                            conversationId,
+                            message = new
+                            {
+                                id = message.Id,
+                                senderName = message.SenderName,
+                                content = message.Content.Length > 50 ?
+                                    message.Content.Substring(0, 47) + "..." :
+                                    message.Content,
+                                sentAt = message.SentAt
+                            }
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send offline notification for conversation {ConversationId}", conversationId);
+            }
+        }
+
+        /// <summary>
+        /// Gets conversation group name for SignalR groups
+        /// </summary>
+        private static string GetConversationGroupName(string conversationId) => $"conversation_{conversationId}";
+
+        /// <summary>
+        /// Gets user group name for personal notifications
+        /// </summary>
+        private static string GetUserGroupName(Guid userId) => $"user_{userId}";
+
+        #endregion
+
+        #region Admin/Monitoring Methods (Optional)
+
+        /// <summary>
+        /// Gets connection info for monitoring (admin only)
+        /// </summary>
+        public async Task GetConnectionInfo()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null) return;
+
+                var connectionInfo = new
+                {
+                    userId = userId.Value,
+                    connectionId = Context.ConnectionId,
+                    userAgent = Context.GetHttpContext()?.Request.Headers["User-Agent"].ToString(),
+                    ipAddress = Context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString(),
+                    connectedAt = DateTime.UtcNow
+                };
+
+                await Clients.Caller.SendAsync("ConnectionInfo", connectionInfo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting connection info");
+            }
+        }
+
+        /// <summary>
+        /// Ping method for connection health checks
+        /// </summary>
+        public async Task Ping()
+        {
+            try
+            {
+                await Clients.Caller.SendAsync("Pong", DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling ping");
+            }
+        }
+
+        #endregion
     }
 }

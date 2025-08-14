@@ -1,22 +1,22 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MomomiAPI.Models.DTOs;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
 {
     public class MatchesController : BaseApiController
     {
-        private readonly IMatchManagementService _matchManagementService;
+        private readonly IMatchService _matchService;
         private readonly IAnalyticsService _analyticsService;
         private readonly IUserService _userService;
 
         public MatchesController(
-            IMatchManagementService matchManagementService,
+            IMatchService matchService,
             IAnalyticsService analyticsService,
             IUserService userService,
             ILogger<MatchesController> logger) : base(logger)
         {
-            _matchManagementService = matchManagementService;
+            _matchService = matchService;
             _analyticsService = analyticsService;
             _userService = userService;
         }
@@ -25,14 +25,14 @@ namespace MomomiAPI.Controllers
         /// Get current user's matches
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<List<MatchDTO>>> GetUserMatches()
+        public async Task<ActionResult<OperationResult<MatchData>>> GetUserMatches()
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(GetUserMatches));
 
-            var result = await _matchManagementService.GetUserMatches(userIdResult.Value);
+            var result = await _matchService.GetMatchConversations(userIdResult.Value);
             return HandleOperationResult(result);
         }
 
@@ -47,7 +47,7 @@ namespace MomomiAPI.Controllers
 
             LogControllerAction(nameof(RemoveMatch), new { matchedUserId = userId });
 
-            var result = await _matchManagementService.RemoveMatch(currentUserIdResult.Value, userId);
+            var result = await _matchService.RemoveMatchConversation(currentUserIdResult.Value, userId, Models.Enums.SwipeType.Unmatched);
             return HandleOperationResult(result);
         }
     }

@@ -1419,10 +1419,10 @@
         }
       }
     },
-    "/api/Users/profile": {
+    "/api/User": {
       "get": {
         "tags": [
-          "Users"
+          "User"
         ],
         "responses": {
           "200": {
@@ -1449,7 +1449,7 @@
       },
       "put": {
         "tags": [
-          "Users"
+          "User"
         ],
         "requestBody": {
           "content": {
@@ -1494,10 +1494,10 @@
         }
       }
     },
-    "/api/Users/discovery-mode": {
+    "/api/User/discovery-mode": {
       "put": {
         "tags": [
-          "Users"
+          "User"
         ],
         "requestBody": {
           "content": {
@@ -1525,10 +1525,10 @@
         }
       }
     },
-    "/api/Users/discovery-visibility": {
+    "/api/User/discovery-visibility": {
       "put": {
         "tags": [
-          "Users"
+          "User"
         ],
         "requestBody": {
           "content": {
@@ -1556,10 +1556,10 @@
         }
       }
     },
-    "/api/Users/nearby": {
+    "/api/User/nearby": {
       "get": {
         "tags": [
-          "Users"
+          "User"
         ],
         "parameters": [
           {
@@ -1605,10 +1605,10 @@
         }
       }
     },
-    "/api/Users/discovery-settings": {
+    "/api/User/discovery-settings": {
       "get": {
         "tags": [
-          "Users"
+          "User"
         ],
         "responses": {
           "200": {
@@ -1635,7 +1635,7 @@
       },
       "put": {
         "tags": [
-          "Users"
+          "User"
         ],
         "requestBody": {
           "content": {
@@ -1680,10 +1680,10 @@
         }
       }
     },
-    "/api/Users/delete-account": {
+    "/api/User/delete-account": {
       "delete": {
         "tags": [
-          "Users"
+          "User"
         ],
         "responses": {
           "200": {
@@ -1692,10 +1692,10 @@
         }
       }
     },
-    "/api/Users/deactivate": {
+    "/api/User/deactivate": {
       "delete": {
         "tags": [
-          "Users"
+          "User"
         ],
         "responses": {
           "200": {
@@ -1764,6 +1764,10 @@
           "hometown": {
             "minLength": 1,
             "type": "string"
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
           },
           "latitude": {
             "type": "number",
@@ -1965,15 +1969,24 @@
             "type": "string",
             "nullable": true
           },
-          "expiresAt": {
+          "verificationToken": {
             "type": "string",
-            "format": "date-time",
             "nullable": true,
+            "readOnly": true
+          },
+          "isEmailRegistered": {
+            "type": "boolean",
             "readOnly": true
           },
           "remainingAttempts": {
             "type": "integer",
             "format": "int32",
+            "nullable": true,
+            "readOnly": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true,
             "readOnly": true
           }
@@ -2027,6 +2040,7 @@
           "Byangsi",
           "Chaudangsi",
           "Rangkas",
+          "Bhutia",
           "Bhoti",
           "Drenjongke",
           "Lepcha",
@@ -2665,10 +2679,18 @@
         "additionalProperties": false
       },
       "UpdateNotificationSettingsRequest": {
+        "required": [
+          "notificationsEnabled"
+        ],
         "type": "object",
         "properties": {
           "notificationsEnabled": {
             "type": "boolean"
+          },
+          "pushToken": {
+            "maxLength": 500,
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3048,6 +3070,11 @@
             "type": "string",
             "nullable": true
           },
+          "neighbourhood": {
+            "maxLength": 200,
+            "type": "string",
+            "nullable": true
+          },
           "children": {
             "$ref": "#/components/schemas/ChildrenStatusType"
           },
@@ -3099,6 +3126,9 @@
             "type": "boolean"
           },
           "isActive": {
+            "type": "boolean"
+          },
+          "isOnboarding": {
             "type": "boolean"
           },
           "lastActive": {
@@ -3478,7 +3508,13 @@
           },
           "age": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "gender": {
             "$ref": "#/components/schemas/GenderType"
@@ -3538,6 +3574,10 @@
             "type": "string",
             "nullable": true
           },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          },
           "children": {
             "$ref": "#/components/schemas/ChildrenStatusType"
           },
@@ -3564,6 +3604,9 @@
             "nullable": true
           },
           "isVerified": {
+            "type": "boolean"
+          },
+          "isOnboarding": {
             "type": "boolean"
           },
           "lastActive": {

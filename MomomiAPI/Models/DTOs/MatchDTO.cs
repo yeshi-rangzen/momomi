@@ -1,19 +1,14 @@
-﻿using MomomiAPI.Models.Enums;
-
-namespace MomomiAPI.Models.DTOs
+﻿namespace MomomiAPI.Models.DTOs
 {
     public class MatchDTO
     {
-        public Guid MatchId { get; set; }
+        public Guid Id { get; set; }
         public Guid UserId { get; set; }
-        public string? FirstName { get; set; }
-        public string? LastName { get; set; }
-        public int Age { get; set; }
-        public string? PrimaryPhoto { get; set; }
-        public List<HeritageType>? Heritage { get; set; }
-        public DateTime MatchedAt { get; set; }
-        public MessageDTO? LastMessage { get; set; }
+        public required string Name { get; set; }
+        public string? Photo { get; set; }
+        public bool IsSuperLiked { get; set; }
         public int UnreadCount { get; set; }
-        public bool IsFromSuperLike { get; set; }
+        public MessageDTO? LastMessage { get; set; }
+        public DateTime LastActivity { get; set; }
     }
 }

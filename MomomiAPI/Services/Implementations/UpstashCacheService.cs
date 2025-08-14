@@ -50,24 +50,9 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogDebug("Cache hit for key: {Key}", key);
                 return result;
             }
-            catch (RedisConnectionException ex)
-            {
-                _logger.LogError(ex, "Redis connection error getting cache key {Key}", key);
-                return default(T);
-            }
-            catch (RedisTimeoutException ex)
-            {
-                _logger.LogError(ex, "Redis timeout error getting cache key {Key}", key);
-                return default(T);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "JSON deserialization error for cache key {Key}", key);
-                return default(T);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error getting cache key {Key}", key);
+                _logger.LogError(ex, "Error getting cache key {Key}", key);
                 return default(T);
             }
             finally
@@ -91,21 +76,9 @@ namespace MomomiAPI.Services.Implementations
                 await _database.StringSetAsync(key, serializedValue, expiry);
                 _logger.LogDebug("Cache set for key: {Key}", key);
             }
-            catch (RedisConnectionException ex)
-            {
-                _logger.LogError(ex, "Redis connection error setting cache key {Key}", key);
-            }
-            catch (RedisTimeoutException ex)
-            {
-                _logger.LogError(ex, "Redis timeout error setting cache key {Key}", key);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "JSON serialization error for cache key {Key}", key);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error setting cache key {Key}", key);
+                _logger.LogError(ex, "Error setting cache key {Key}", key);
             }
             finally
             {
@@ -116,6 +89,108 @@ namespace MomomiAPI.Services.Implementations
                 {
                     _keySemaphores.TryRemove(key, out _);
                 }
+            }
+        }
+
+        // Set multiple key-value pairs with individual TTLs in a single operation
+        public async Task SetManyAsync<T>(Dictionary<string, T> keyValuePairs, Dictionary<string, TimeSpan>? expiries = null)
+        {
+            if (!_isRedisAvailable || !keyValuePairs.Any())
+            {
+                return;
+            }
+
+            try
+            {
+                // OPTION 1: Pipeline approach (most efficient for mixed TTLs)
+                await SetManyWithPipeline(keyValuePairs, expiries);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting multiple cache keys");
+                // Fallback to individual operations
+                await FallbackToIndividualSets(keyValuePairs, expiries);
+            }
+        }
+
+        // Get multiple keys in a single operation
+        public async Task<Dictionary<string, T?>> GetManyAsync<T>(IEnumerable<string> keys)
+        {
+            var result = new Dictionary<string, T?>();
+            var keyList = keys.ToList();
+
+            if (!_isRedisAvailable || !keyList.Any())
+            {
+                foreach (var key in keyList)
+                {
+                    result[key] = default(T);
+                }
+
+                return result;
+            }
+
+            try
+            {
+                // Use MGET for batch retrieval
+                var redisKeys = keyList.Select(k => (RedisKey)k).ToArray();
+                var values = await _database.StringGetAsync(redisKeys);
+
+                for (int i = 0; i < keyList.Count; i++)
+                {
+                    var key = keyList[i];
+                    var value = values[i];
+
+                    if (value.HasValue)
+                    {
+                        try
+                        {
+                            result[key] = JsonSerializer.Deserialize<T>(value!);
+                            _logger.LogDebug("Batch cache hit for key: {Key}", key);
+                        }
+                        catch (JsonException jsonEx)
+                        {
+                            _logger.LogError(jsonEx, "Error deserializing cache value for key {Key}", key);
+                            result[key] = default(T);
+                        }
+                    }
+                    else
+                    {
+                        result[key] = default(T);
+                        _logger.LogDebug("Batch cache miss for key: {Key}", key);
+                    }
+                }
+
+                _logger.LogInformation("Batch get completed for {Count} keys", keyList.Count);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting multiple cache keys");
+                // Fallback to individual gets
+                return await FallbackToIndividualGets<T>(keyList);
+            }
+        }
+
+        // Remove multiple keys in a single operation
+        public async Task RemoveManyAsync(IEnumerable<string> keys)
+        {
+            var keyList = keys.ToList();
+            if (!_isRedisAvailable || !keyList.Any())
+            {
+                _logger.LogWarning("Redis not available or no keys provided for removal");
+                return;
+            }
+
+            try
+            {
+                var redisKeys = keyList.Select(k => (RedisKey)k).ToArray();
+                var deletedCount = await _database.KeyDeleteAsync(redisKeys);
+
+                _logger.LogInformation("Batch removed {DeletedCount}/{TotalCount} cache keys", deletedCount, keyList.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing multiple cache keys");
             }
         }
 
@@ -176,17 +251,9 @@ namespace MomomiAPI.Services.Implementations
                 await _database.KeyDeleteAsync(key);
                 _logger.LogDebug("Cache removed for key: {Key}", key);
             }
-            catch (RedisConnectionException ex)
-            {
-                _logger.LogError(ex, "Redis connection error removing cache key {Key}", key);
-            }
-            catch (RedisTimeoutException ex)
-            {
-                _logger.LogError(ex, "Redis timeout error removing cache key {Key}", key);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error removing cache key {Key}", key);
+                _logger.LogError(ex, "Error removing cache key {Key}", key);
             }
         }
 
@@ -295,5 +362,64 @@ namespace MomomiAPI.Services.Implementations
                 return false;
             }
         }
+
+        #region Private Helper Methods
+        // Pipleline approach for mixed TTLs
+        private async Task SetManyWithPipeline<T>(Dictionary<string, T> keyValuePairs, Dictionary<string, TimeSpan>? expiries)
+        {
+            var batch = _database.CreateBatch();
+            var tasks = new List<Task>();
+
+            foreach (var kvp in keyValuePairs)
+            {
+                var serializedValue = JsonSerializer.Serialize(kvp.Value);
+                var expiry = expiries?.GetValueOrDefault(kvp.Key);
+
+                // Add SET operation to batch
+                tasks.Add(batch.StringSetAsync(kvp.Key, serializedValue, expiry));
+            }
+
+            // Execute all operations in parallel
+            batch.Execute();
+            await Task.WhenAll(tasks);
+
+            _logger.LogInformation("Pipeline batch set completed for {Count} keys", keyValuePairs.Count);
+        }
+
+        // Fallback to individual SET operations
+        private async Task FallbackToIndividualSets<T>(Dictionary<string, T> keyValuePairs, Dictionary<string, TimeSpan>? expiries)
+        {
+            _logger.LogWarning("Falling back to individual SET operations for {Count} keys", keyValuePairs.Count);
+
+            var tasks = keyValuePairs.Select(async kvp =>
+            {
+                var expiry = expiries?.GetValueOrDefault(kvp.Key);
+                await SetAsync(kvp.Key, kvp.Value, expiry);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// Fallback to individual GET operations if batch fails
+        private async Task<Dictionary<string, T?>> FallbackToIndividualGets<T>(List<string> keys)
+        {
+            _logger.LogWarning("Falling back to individual GET operations for {Count} keys", keys.Count);
+
+            var result = new Dictionary<string, T?>();
+            var tasks = keys.Select(async key =>
+            {
+                var value = await GetAsync<T>(key);
+                return new { Key = key, Value = value };
+            });
+
+            var results = await Task.WhenAll(tasks);
+            foreach (var item in results)
+            {
+                result[item.Key] = item.Value;
+            }
+
+            return result;
+        }
+        #endregion
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MomomiAPI.Common.Caching;
+using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
 using MomomiAPI.Models.DTOs;
@@ -13,329 +14,273 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
-        private readonly ICacheInvalidation _cacheInvalidation;
         private readonly ILogger<MessageService> _logger;
 
         public MessageService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            ICacheInvalidation cacheInvalidation,
             ILogger<MessageService> logger)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
-            _cacheInvalidation = cacheInvalidation;
             _logger = logger;
         }
 
-        public async Task<OperationResult<MessageDTO>> SendMessageAsync(Guid senderId, SendMessageRequest request)
+        // Sends a message in a conversation with optimized operations
+        public async Task<MessageSendResult> SendMessageAsync(Guid senderId, SendMessageRequest request)
         {
             try
             {
-                _logger.LogInformation("User {SenderId} sending message to conversation {ConversationId}", senderId, request.ConversationId);
+                _logger.LogInformation("User {SenderId} is sending a message to conversation {ConversationId}", senderId, request.ConversationId);
 
                 // Validate message content
-                if (string.IsNullOrWhiteSpace(request.Content))
+                var validationResult = ValidateMessageContent(request.Content, request.MessageType);
+                if (!validationResult.Success)
                 {
-                    return OperationResult<MessageDTO>.ValidationFailure("Message content cannot be empty.");
+                    return MessageSendResult.ValidationError(validationResult.ErrorMessage!);
                 }
 
-                if (request.Content.Length > 1000)
+                // Get conversation data and validate access in a single query
+                var conversationData = await GetConversationDataForSending(senderId, request.ConversationId);
+                if (!conversationData.IsValid)
                 {
-                    return OperationResult<MessageDTO>.ValidationFailure("Message cannot exceed 1000 characters.");
+                    return conversationData.ErrorResult!;
                 }
 
-                // Verify conversation exists and user is part of it
-                var conversation = await _dbContext.Conversations
-                    .FirstOrDefaultAsync(c => c.Id == request.ConversationId &&
-                        (c.User1Id == senderId || c.User2Id == senderId) && c.IsActive);
+                var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
-                if (conversation == null)
+                return await executionStrategy.ExecuteAsync(async () =>
                 {
-                    return OperationResult<MessageDTO>.NotFound("Conversation not found or you don't have access to it.");
-                }
 
-                var message = new Message
-                {
-                    ConversationId = request.ConversationId,
-                    SenderId = senderId,
-                    Content = request.Content,
-                    MessageType = request.MessageType,
-                    IsRead = false,
-                    SentAt = DateTime.UtcNow
-                };
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
+                    {
+                        // Create message
+                        var message = new Message
+                        {
+                            SenderId = senderId,
+                            ConversationId = request.ConversationId,
+                            Content = request.Content,
+                            MessageType = request.MessageType,
+                            IsRead = false,
+                            SentAt = DateTime.UtcNow
+                        };
 
-                _dbContext.Messages.Add(message);
+                        _dbContext.Messages.Add(message);
 
-                // Update conversation timestamp
-                conversation.UpdatedAt = DateTime.UtcNow;
+                        // Update conversation timestamp
+                        conversationData.Conversation!.UpdatedAt = DateTime.UtcNow;
 
-                await _dbContext.SaveChangesAsync();
+                        await _dbContext.SaveChangesAsync();
+                        await transaction.CommitAsync();
 
-                // Clear conversation cache
-                await _cacheInvalidation.InvalidateConversationCache(request.ConversationId);
-                await _cacheInvalidation.InvalidateUserConversations(senderId);
+                        // Get final message count
+                        var messageCount = await GetConversationMessageCount(request.ConversationId);
 
-                var receiverId = conversation.User1Id == senderId ? conversation.User2Id : conversation.User1Id;
-                await _cacheInvalidation.InvalidateUserConversations(receiverId);
+                        // Create DTO for response
+                        var messageDto = CreateMessageDTO(message, conversationData.SenderName!, senderId);
 
-                // Get sender info for response;
-                var sender = await _dbContext.Users.FindAsync(senderId);
+                        // Invalidate relevant caches (fire and forget for performance)
+                        _ = Task.Run(async () => await InvalidateMessagingCaches(request.ConversationId, senderId, conversationData.ReceiverId!.Value));
 
-                var messageDto = new MessageDTO
-                {
-                    Id = message.Id,
-                    ConversationId = message.ConversationId,
-                    SenderId = message.SenderId,
-                    SenderName = $"{sender?.FirstName} {sender?.LastName}".Trim(),
-                    Content = message.Content,
-                    MessageType = message.MessageType,
-                    IsRead = message.IsRead,
-                    SentAt = message.SentAt
-                };
+                        _logger.LogInformation("Message {MessageId} sent successfully from user {SenderId}", message.Id, senderId);
 
-                _logger.LogInformation("Message {MessageId} sent successfully from user {SenderId}", message.Id, senderId);
-                return OperationResult<MessageDTO>.Successful(messageDto)
-                    .WithMetadata("conversation_id", request.ConversationId)
-                    .WithMetadata("receiver_id", receiverId);
+                        return MessageSendResult.Successful(messageDto, conversationData.ReceiverId!.Value, conversationData.IsFirstMessage, messageCount);
+                    }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
 
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending message from user {SenderId} in conversation {ConversationId}", senderId, request.ConversationId);
-                return OperationResult<MessageDTO>.Failed("Unable to send message. Please try again.");
+                _logger.LogError(ex, "Error sending message from user {SenderId} in conversation {ConversationId}",
+                    senderId, request.ConversationId);
+                return MessageSendResult.Error("Unable to send message. Please try again.");
             }
         }
 
-        public async Task<OperationResult<List<MessageDTO>>> GetConversationMessagesAsync(Guid userId, Guid conversationId, int page = 1, int pageSize = 50)
+        // Gets conversation messages with optimized caching and pagination
+        public async Task<ConversationMessagesResult> GetConversationMessagesAsync(Guid userId, Guid conversationId, int page = 1, int pageSize = 50)
         {
             try
             {
                 _logger.LogDebug("Retrieving messages for conversation {ConversationId}, page {Page}", conversationId, page);
 
                 // Validate pagination parameters
-                if (page < 1) page = 1;
-                if (pageSize < 1 || pageSize > 100) pageSize = 50;
+                page = Math.Max(1, page);
+                pageSize = Math.Clamp(pageSize, 1, 100);
 
-                // Verify user is part of the conversation
-                var conversation = await _dbContext.Conversations
-                                    .FirstOrDefaultAsync(c => c.Id == conversationId &&
-                                                            (c.User1Id == userId || c.User2Id == userId));
-
-                if (conversation == null)
+                // Very user access to conversation
+                var hasAccess = await VerifyConversationAccess(userId, conversationId);
+                if (!hasAccess)
                 {
-                    return OperationResult<List<MessageDTO>>.NotFound("Conversation not found or you don't have access to it.");
+                    return ConversationMessagesResult.ConversationNotFound();
                 }
 
                 var cacheKey = CacheKeys.Messaging.ConversationMessages(conversationId, page);
-                var cachedMessages = await _cacheService.GetAsync<List<MessageDTO>>(cacheKey);
+                var messagesData = await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    async () => await FetchConversationMessagesFromDatabase(userId, conversationId, page, pageSize),
+                    CacheKeys.Duration.Conversations);
 
-                if (cachedMessages != null)
+                if (messagesData == null)
                 {
-                    _logger.LogDebug("Returning cached messages for conversation {ConversationId}, page {Page}", conversationId, page);
-                    return OperationResult<List<MessageDTO>>.Successful(cachedMessages);
+                    return ConversationMessagesResult.Error("Failed to retrieve messages");
                 }
 
-                var messages = await _dbContext.Messages
-                    .Where(m => m.ConversationId == conversationId)
-                    .Include(m => m.Sender)
-                    .OrderByDescending(m => m.SentAt)
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .Select(m => new MessageDTO
-                    {
-                        Id = m.Id,
-                        ConversationId = m.ConversationId,
-                        SenderId = m.SenderId,
-                        SenderName = m.Sender.Id == userId ? "You" : m.Sender.FirstName ?? "",
-                        Content = m.Content,
-                        MessageType = m.MessageType,
-                        IsRead = m.IsRead,
-                        SentAt = m.SentAt
-                    })
-                    .ToListAsync();
-
-                // Order by sent time for display (newest first becomes oldest first for chat display)
-                var orderedMessages = messages.OrderBy(m => m.SentAt).ToList();
-
-                // Cache for 5 minutes
-                await _cacheService.SetAsync(cacheKey, orderedMessages, CacheKeys.Duration.Conversations);
-
                 _logger.LogDebug("Retrieved {Count} messages for conversation {ConversationId}, page {Page}",
-                    orderedMessages.Count, conversationId, page);
+                                   messagesData.Messages.Count, conversationId, page);
 
-                return OperationResult<List<MessageDTO>>.Successful(orderedMessages)
-                    .WithMetadata("page", page)
-                    .WithMetadata("page_size", pageSize)
-                    .WithMetadata("has_more", messages.Count == pageSize);
+                return ConversationMessagesResult.Successful(
+                    messagesData.Messages,
+                    messagesData.Page,
+                    messagesData.PageSize,
+                    messagesData.HasMore,
+                    messagesData.TotalCount,
+                    messagesData.LastMessageAt,
+                    fromCache: true
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting messages for conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return OperationResult<List<MessageDTO>>.Failed("Unable to retrieve messages. Please try again.");
+                _logger.LogError(ex, "Error getting messages for conversation {ConversationId} for user {UserId}",
+                    conversationId, userId);
+                return ConversationMessagesResult.Error("Unable to retrieve messages. Please try again.");
             }
         }
 
-        public async Task<OperationResult<List<ConversationDTO>>> GetUserConversationsAsync(Guid userId)
+        // Gets user conversations with optimized caching and metadata
+        public async Task<UserConversationsResult> GetUserConversationsAsync(Guid userId)
         {
             try
             {
                 _logger.LogDebug("Retrieving conversations for user {UserId}", userId);
-
                 var cacheKey = CacheKeys.Messaging.UserConversations(userId);
-                var cachedConversations = await _cacheService.GetAsync<List<ConversationDTO>>(cacheKey);
-                if (cachedConversations != null) return OperationResult<List<ConversationDTO>>.Successful(cachedConversations);
 
-                // Single optimized query with all the data
-                var conversations = await _dbContext.Conversations
-                    .Where(c => (c.User1Id == userId || c.User2Id == userId) && c.IsActive)
-                    .Select(c => new
-                    {
-                        Conversation = c,
-                        OtherUser = c.User1Id == userId ? c.User2 : c.User1,
-                        OtherUserPhoto = (c.User1Id == userId ? c.User2 : c.User1).Photos
-                            .Where(p => p.IsPrimary)
-                            .Select(p => p.Url)
-                            .FirstOrDefault(),
-                        LastMessage = c.Messages
-                            .OrderByDescending(m => m.SentAt)
-                            .Select(m => new
-                            {
-                                m.Id,
-                                m.ConversationId,
-                                m.SenderId,
-                                m.Content,
-                                m.MessageType,
-                                m.IsRead,
-                                m.SentAt
-                            })
-                            .FirstOrDefault(),
-                        UnreadCount = c.Messages.Count(m => m.SenderId != userId && !m.IsRead)
-                    })
-                    .Where(x => x.OtherUser.IsActive)
-                    .OrderByDescending(x => x.Conversation.UpdatedAt)
-                    .ToListAsync();
+                var conversationsData = await _cacheService.GetOrSetAsync(
+                    cacheKey,
+                    async () => await FetchUserConversationsFromDatabase(userId),
+                    CacheKeys.Duration.Conversations);
 
-                var conversationDtos = conversations.Select(item => new ConversationDTO
+                if (conversationsData == null)
                 {
-                    Id = item.Conversation.Id,
-                    OtherUserId = item.OtherUser.Id,
-                    OtherUserName = $"{item.OtherUser.FirstName} {item.OtherUser.LastName}".Trim(),
-                    OtherUserPhoto = item.OtherUserPhoto,
-                    LastMessage = item.LastMessage != null ? new MessageDTO
-                    {
-                        Id = item.LastMessage.Id,
-                        ConversationId = item.LastMessage.ConversationId,
-                        SenderId = item.LastMessage.SenderId,
-                        SenderName = item.LastMessage.SenderId == userId ? "You" : item.OtherUser.FirstName ?? "",
-                        Content = item.LastMessage.Content,
-                        MessageType = item.LastMessage.MessageType,
-                        IsRead = item.LastMessage.IsRead,
-                        SentAt = item.LastMessage.SentAt
-                    } : null,
-                    UnreadCount = item.UnreadCount,
-                    UpdatedAt = item.Conversation.UpdatedAt,
-                    IsActive = item.Conversation.IsActive
-                }).ToList();
+                    conversationsData = new UserConversationsData { Conversations = [] };
+                }
 
-                await _cacheService.SetAsync(cacheKey, conversationDtos, CacheKeys.Duration.Conversations);
-                return OperationResult<List<ConversationDTO>>.Successful(conversationDtos);
+                return UserConversationsResult.Successful(
+                    conversationsData.Conversations,
+                    conversationsData.TotalCount,
+                    conversationsData.UnreadConversationsCount,
+                    conversationsData.TotalUnreadMessages,
+                    fromCache: true
+                );
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting conversations for user {UserId}", userId);
-                return OperationResult<List<ConversationDTO>>.Failed("Unable to retrieve conversations. Please try again.");
+                return UserConversationsResult.Error("Unable to retrieve conversations. Please try again.");
             }
         }
 
-        public async Task<OperationResult> MarkMessagesAsReadAsync(Guid userId, Guid conversationId)
+        // Mark messages as read with optimized batch operations
+        public async Task<MessagesReadResult> MarkMessagesAsReadAsync(Guid userId, Guid conversationId)
         {
             try
             {
                 _logger.LogDebug("Marking messages as read for user {UserId} in conversation {ConversationId}", userId, conversationId);
 
-                // Verify user is part of the conversation
-                var conversation = await _dbContext.Conversations.FirstOrDefaultAsync(c => c.Id == conversationId &&
-                (c.User1Id == userId || c.User2Id == userId));
-
-                if (conversation == null)
+                // Verify user has access to conversation
+                var hasAccess = await VerifyConversationAccess(userId, conversationId);
+                if (!hasAccess)
                 {
-                    return OperationResult.NotFound("Conversation not found or you don't have access to it.");
+                    return MessagesReadResult.ConversationNotFound();
                 }
 
+                // Get unread messages for this user
                 var unreadMessages = await _dbContext.Messages
                     .Where(m => m.ConversationId == conversationId && m.SenderId != userId && !m.IsRead)
                     .ToListAsync();
 
                 if (!unreadMessages.Any())
                 {
-                    return OperationResult.Successful().WithMetadata("messages_marked", 0);
+                    return MessagesReadResult.Successful(conversationId, 0);
                 }
 
+                // Mark all as read
                 foreach (var message in unreadMessages)
                 {
                     message.IsRead = true;
+                    message.UpdatedAt = DateTime.UtcNow;
                 }
 
                 await _dbContext.SaveChangesAsync();
 
-                // Clear relevant caches
-                await _cacheInvalidation.InvalidateUserConversations(userId);
-                await _cacheInvalidation.InvalidateConversationCache(conversationId);
+                // Get the last read message ID
+                var lastReadMessageId = unreadMessages.OrderByDescending(m => m.SentAt).FirstOrDefault()?.Id ?? Guid.Empty;
 
+                // Invalidate relevant caches
+                await InvalidateReadStatusCaches(userId, conversationId);
                 _logger.LogDebug("Marked {Count} messages as read for user {UserId}", unreadMessages.Count, userId);
-                return OperationResult.Successful()
-                    .WithMetadata("messages_marked", unreadMessages.Count)
-                    .WithMetadata("marked_at", DateTime.UtcNow);
+
+                return MessagesReadResult.Successful(conversationId, unreadMessages.Count, lastReadMessageId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking messages as read for conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return OperationResult.Failed("Unable to mark messages as read. Please try again.");
+                _logger.LogError(ex, "Error marking messages as read for conversation {ConversationId} for user {UserId}",
+                    conversationId, userId);
+                return MessagesReadResult.Error("Unable to mark messages as read. Please try again.");
             }
         }
 
-        public async Task<OperationResult> DeleteMessageAsync(Guid userId, Guid messageId)
+        // Deletes a message with time-based restrictions
+        public async Task<MessageDeletionResult> DeleteMessageAsync(Guid userId, Guid messageId)
         {
             try
             {
                 _logger.LogInformation("User {UserId} attempting to delete message {MessageId}", userId, messageId);
 
-                var message = await _dbContext.Messages.FirstOrDefaultAsync(m => m.Id == messageId && m.SenderId == userId);
+                var message = await _dbContext.Messages
+                    .FirstOrDefaultAsync(m => m.Id == messageId && m.SenderId == userId);
 
                 if (message == null)
                 {
-                    return OperationResult.NotFound("Message not found or you don't have permission to delete it.");
+                    return MessageDeletionResult.MessageNotFound();
                 }
 
-                // Check if message is too old to delete (e.g., older than 1 hour)
-                if (DateTime.UtcNow - message.SentAt > TimeSpan.FromHours(1))
+                // Check if message is within deletion time limit
+                var isWithinTimeLimit = DateTime.UtcNow - message.SentAt <= AppConstants.Limits.MessageDeletionTimeLimit;
+                if (!isWithinTimeLimit)
                 {
-                    return OperationResult.BusinessRuleViolation("Cannot delete messages older than 1 hour.");
+                    return MessageDeletionResult.TimeExpired();
                 }
 
-                // Soft delete - just update content
+                // Soft delete - update content to indicate deletion
                 message.Content = "[Message deleted]";
-                message.MessageType = "deleted"; // Indicate this is a deleted message
+                message.MessageType = "deleted";
+                message.UpdatedAt = DateTime.UtcNow;
 
                 await _dbContext.SaveChangesAsync();
 
-                // Clear cache
-                await _cacheInvalidation.InvalidateConversationCache(message.ConversationId);
+                // Invalidate conversation caches
+                await InvalidateConversationCaches(message.ConversationId);
 
                 _logger.LogInformation("Message {MessageId} deleted by user {UserId}", messageId, userId);
-                return OperationResult.Successful()
-                    .WithMetadata("deleted_at", DateTime.UtcNow)
-                    .WithMetadata("conversation_id", message.ConversationId);
+
+                return MessageDeletionResult.Successful(messageId, message.ConversationId, isWithinTimeLimit);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}", messageId, userId);
-                return OperationResult.Failed("Unable to delete message. Please try again.");
+                return MessageDeletionResult.Error("Unable to delete message. Please try again.");
             }
         }
 
-        public async Task<OperationResult<ConversationDTO>> GetConversationAsync(Guid userId, Guid conversationId)
+        // Gets conversatoin details with online status and restrictions
+        public async Task<ConversationDetailsResult> GetConversationDetailsAsync(Guid userId, Guid conversationId)
         {
             try
             {
@@ -343,7 +288,8 @@ namespace MomomiAPI.Services.Implementations
 
                 var conversation = await _dbContext.Conversations
                     .Where(c => c.Id == conversationId &&
-                       (c.User1Id == userId || c.User2Id == userId) && c.IsActive)
+                               (c.User1Id == userId || c.User2Id == userId) &&
+                               c.IsActive)
                     .Include(c => c.User1)
                         .ThenInclude(u => u.Photos)
                     .Include(c => c.User2)
@@ -352,23 +298,21 @@ namespace MomomiAPI.Services.Implementations
 
                 if (conversation == null)
                 {
-                    return OperationResult<ConversationDTO>.NotFound("Conversation not found or you don't have access to it.");
+                    return ConversationDetailsResult.ConversationNotFound();
                 }
 
                 var otherUser = conversation.User1Id == userId ? conversation.User2 : conversation.User1;
 
                 if (!otherUser.IsActive)
                 {
-                    return OperationResult<ConversationDTO>.NotFound("The other user is no longer active.");
+                    return ConversationDetailsResult.UserInactive();
                 }
 
-                var unreadCount = await _dbContext.Messages
-                    .CountAsync(m => m.ConversationId == conversationId && m.SenderId != userId && !m.IsRead);
+                // Check if other user is online
+                var isOtherUserOnline = await IsUserOnline(otherUser.Id);
 
-                var lastMessage = await _dbContext.Messages
-                    .Where(m => m.ConversationId == conversationId)
-                    .OrderByDescending(m => m.SentAt)
-                    .FirstOrDefaultAsync();
+                // Get conversation summary data
+                var summaryData = await GetConversationSummaryData(conversationId, userId);
 
                 var conversationDto = new ConversationDTO
                 {
@@ -377,30 +321,403 @@ namespace MomomiAPI.Services.Implementations
                     OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
                     OtherUserPhoto = otherUser.Photos.FirstOrDefault(p => p.IsPrimary)?.Url ??
                                    otherUser.Photos.OrderBy(p => p.PhotoOrder).FirstOrDefault()?.Url,
-                    LastMessage = lastMessage != null ? new MessageDTO
-                    {
-                        Id = lastMessage.Id,
-                        ConversationId = lastMessage.ConversationId,
-                        SenderId = lastMessage.SenderId,
-                        SenderName = lastMessage.SenderId == userId ? "You" : otherUser.FirstName ?? "",
-                        Content = lastMessage.Content,
-                        MessageType = lastMessage.MessageType,
-                        IsRead = lastMessage.IsRead,
-                        SentAt = lastMessage.SentAt
-                    } : null,
-                    UnreadCount = unreadCount,
+                    LastMessage = summaryData.LastMessage,
+                    UnreadCount = summaryData.UnreadCount,
                     UpdatedAt = conversation.UpdatedAt,
                     IsActive = conversation.IsActive
                 };
 
-                return OperationResult<ConversationDTO>.Successful(conversationDto);
+                return ConversationDetailsResult.Successful(
+                    conversationDto,
+                    isOtherUserOnline,
+                    lastSeen: null, // Could implement last seen tracking
+                    canSendMessages: true // Could implement blocking/restriction checks
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting conversation {ConversationId} for user {UserId}", conversationId, userId);
-                return OperationResult<ConversationDTO>.Failed("Unable to retrieve conversation. Please try again.");
+                _logger.LogError(ex, "Error getting conversation {ConversationId} for user {UserId}",
+                    conversationId, userId);
+                return ConversationDetailsResult.Error("Unable to retrieve conversation. Please try again.");
             }
         }
 
+        /// Checks if a user is currently online (cached check)
+        public async Task<bool> IsUserOnlineAsync(Guid userId)
+        {
+            try
+            {
+                return await IsUserOnline(userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking online status for user {UserId}", userId);
+                return false; // Assume offline on error
+            }
+        }
+
+        #region Private Helper Methods
+        // Validates message content and type
+        private static OperationResult ValidateMessageContent(string content, string messageType)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return OperationResult.ValidationFailure("Message content cannot be empty");
+            }
+
+            if (content.Length > 1000)
+            {
+                return OperationResult.ValidationFailure("Message cannot exceed 1000 characters");
+            }
+
+            var allowedMessageTypes = new[] { "text", "image", "emoji", "deleted" };
+            if (!allowedMessageTypes.Contains(messageType))
+            {
+                return OperationResult.ValidationFailure("Invalid message type");
+            }
+
+            return OperationResult.Successful();
+        }
+
+        // Gets conversation data needed for sending messages in a single optimized query
+        private async Task<ConversationSendData> GetConversationDataForSending(Guid senderId, Guid conversationId)
+        {
+            var conversationQuery = await _dbContext.Conversations
+                .Where(c => c.Id == conversationId &&
+                    (c.User1Id == senderId || c.User2Id == senderId) &&
+                    c.IsActive)
+                .Select(c => new
+                {
+                    Conversation = c,
+                    ReceiverId = c.User1Id == senderId ? c.User2Id : c.User1Id,
+                    SenderUserName = c.User1Id == senderId ? c.User1.FirstName : c.User2.FirstName,
+                    IsReceiverActive = c.User1Id == senderId ? c.User2.IsActive : c.User1.IsActive,
+                    IsFirstMessage = c.Messages.Count() == 0,
+                })
+                .FirstOrDefaultAsync();
+
+            if (conversationQuery?.Conversation == null)
+            {
+                return ConversationSendData.Invalid(MessageSendResult.ConversationNotFound());
+            }
+
+            if (!conversationQuery.IsReceiverActive)
+            {
+                return ConversationSendData.Invalid(MessageSendResult.ConversationBlocked());
+            }
+
+            return ConversationSendData.Valid(
+                conversationQuery.Conversation, conversationQuery.ReceiverId, conversationQuery.SenderUserName ?? "User", conversationQuery.IsFirstMessage);
+        }
+
+        // Verifies if user has access to conversation
+        private async Task<bool> VerifyConversationAccess(Guid userId, Guid conversationId)
+        {
+            return await _dbContext.Conversations
+                .AnyAsync(c => c.Id == conversationId &&
+                            (c.User1Id == userId || c.User2Id == userId) &&
+                            c.IsActive);
+        }
+
+        // Fetches conversation message from database with pagination
+        private async Task<ConversationMessagesData> FetchConversationMessagesFromDatabase(
+            Guid userId, Guid conversationId, int page, int pageSize)
+        {
+            var totalCount = await _dbContext.Messages.CountAsync(m => m.ConversationId == conversationId);
+
+            var messages = await _dbContext.Messages
+                .Where(m => m.ConversationId == conversationId)
+                .Include(m => m.Sender)
+                .OrderByDescending(m => m.SentAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    ConversationId = m.ConversationId,
+                    SenderId = m.SenderId,
+                    SenderName = m.Sender.FirstName ?? "",
+                    Content = m.Content,
+                    MessageType = m.MessageType,
+                    IsRead = m.IsRead,
+                    SentAt = m.SentAt
+                })
+                .ToListAsync();
+
+            // Order by sent time for display (newest first becomes oldest first for chat display)
+            var orderedMessages = messages.OrderBy(m => m.SentAt).ToList();
+
+            return new ConversationMessagesData
+            {
+                Messages = orderedMessages,
+                Page = page,
+                PageSize = pageSize,
+                HasMore = (page * pageSize) < totalCount,
+                TotalCount = totalCount,
+                LastMessageAt = orderedMessages.LastOrDefault()?.SentAt ?? DateTime.MinValue,
+                FromCache = false
+            };
+        }
+
+        // Fetches user conversations from database with all metadata
+        private async Task<UserConversationsData> FetchUserConversationsFromDatabase(Guid userId)
+        {
+            // Single optimized query with all the data
+            var conversations = await _dbContext.Conversations
+                .Where(c => (c.User1Id == userId || c.User2Id == userId) && c.IsActive)
+                .Select(c => new
+                {
+                    Conversation = c,
+                    OtherUser = c.User1Id == userId ? c.User2 : c.User1,
+                    OtherUserPhoto = (c.User1Id == userId ? c.User2 : c.User1).Photos
+                        .Where(p => p.IsPrimary)
+                        .Select(p => p.Url)
+                        .FirstOrDefault(),
+                    LastMessage = c.Messages
+                        .OrderByDescending(m => m.SentAt)
+                        .Select(m => new
+                        {
+                            m.Id,
+                            m.ConversationId,
+                            m.SenderId,
+                            m.Content,
+                            m.MessageType,
+                            m.IsRead,
+                            m.SentAt
+                        })
+                        .FirstOrDefault(),
+                    UnreadCount = c.Messages.Count(m => m.SenderId != userId && !m.IsRead)
+                })
+                .Where(x => x.OtherUser.IsActive)
+                .OrderByDescending(x => x.Conversation.UpdatedAt)
+                .ToListAsync();
+
+            var conversationDtos = conversations.Select(item => new ConversationDTO
+            {
+                Id = item.Conversation.Id,
+                OtherUserId = item.OtherUser.Id,
+                OtherUserName = $"{item.OtherUser.FirstName} {item.OtherUser.LastName}".Trim(),
+                OtherUserPhoto = item.OtherUserPhoto,
+                LastMessage = item.LastMessage != null ? new MessageDTO
+                {
+                    Id = item.LastMessage.Id,
+                    ConversationId = item.LastMessage.ConversationId,
+                    SenderId = item.LastMessage.SenderId,
+                    SenderName = item.LastMessage.SenderId == userId ? "You" : item.OtherUser.FirstName ?? "",
+                    Content = item.LastMessage.Content,
+                    MessageType = item.LastMessage.MessageType,
+                    IsRead = item.LastMessage.IsRead,
+                    SentAt = item.LastMessage.SentAt
+                } : null,
+                UnreadCount = item.UnreadCount,
+                UpdatedAt = item.Conversation.UpdatedAt,
+                IsActive = item.Conversation.IsActive
+            }).ToList();
+
+            return new UserConversationsData
+            {
+                Conversations = conversationDtos,
+                TotalCount = conversationDtos.Count,
+                UnreadConversationsCount = conversationDtos.Count(c => c.UnreadCount > 0),
+                TotalUnreadMessages = conversationDtos.Sum(c => c.UnreadCount),
+                LastUpdated = DateTime.UtcNow,
+                FromCache = false
+            };
+        }
+
+        // Gets conversation summary data (last message and unread count)
+        private async Task<ConversationSummaryData> GetConversationSummaryData(Guid conversationId, Guid userId)
+        {
+            var summaryQuery = await _dbContext.Messages
+               .Where(m => m.ConversationId == conversationId)
+               .GroupBy(m => m.ConversationId)
+               .Select(g => new
+               {
+                   LastMessage = g.OrderByDescending(m => m.SentAt).FirstOrDefault(),
+                   UnreadCount = g.Count(m => m.SenderId != userId && !m.IsRead)
+               })
+               .FirstOrDefaultAsync();
+
+            MessageDTO? lastMessageDto = null;
+            if (summaryQuery?.LastMessage != null)
+            {
+                var sender = await _dbContext.Users.FindAsync(summaryQuery.LastMessage.SenderId);
+                lastMessageDto = new MessageDTO
+                {
+                    Id = summaryQuery.LastMessage.Id,
+                    ConversationId = summaryQuery.LastMessage.ConversationId,
+                    SenderId = summaryQuery.LastMessage.SenderId,
+                    SenderName = summaryQuery.LastMessage.SenderId == userId ? "You" : sender?.FirstName ?? "",
+                    Content = summaryQuery.LastMessage.Content,
+                    MessageType = summaryQuery.LastMessage.MessageType,
+                    IsRead = summaryQuery.LastMessage.IsRead,
+                    SentAt = summaryQuery.LastMessage.SentAt
+                };
+            }
+
+            return new ConversationSummaryData
+            {
+                LastMessage = lastMessageDto,
+                UnreadCount = summaryQuery?.UnreadCount ?? 0
+            };
+        }
+
+        /// Gets conversation message count (cached)
+        private async Task<int> GetConversationMessageCount(Guid conversationId)
+        {
+            var cacheKey = CacheKeys.Messaging.ConversationCount(conversationId);
+
+            return await _cacheService.GetOrSetAsync(
+                cacheKey,
+                async () => await _dbContext.Messages.CountAsync(m => m.ConversationId == conversationId),
+                TimeSpan.FromMinutes(5)
+            );
+        }
+
+        // Checks if online using cache
+        private async Task<bool> IsUserOnline(Guid userId)
+        {
+            return await _cacheService.ExistsAsync(CacheKeys.Messaging.UserOnline(userId));
+        }
+
+        /// Creates MessageDTO from Message entity
+        private static MessageDTO CreateMessageDTO(Message message, string senderName, Guid currentUserId)
+        {
+            return new MessageDTO
+            {
+                Id = message.Id,
+                ConversationId = message.ConversationId,
+                SenderId = message.SenderId,
+                SenderName = message.SenderId == currentUserId ? "You" : senderName,
+                Content = message.Content,
+                MessageType = message.MessageType,
+                IsRead = message.IsRead,
+                SentAt = message.SentAt
+            };
+        }
+
+        /// Invalidates messaging-related caches after sending a message
+        /// Used when a message is sent 
+        private async Task InvalidateMessagingCaches(Guid conversationId, Guid senderId, Guid receiverId)
+        {
+            try
+            {
+                var keysToInvalidate = new List<string>
+                {
+                    CacheKeys.Messaging.UserConversations(senderId),
+                    CacheKeys.Messaging.UserConversations(receiverId),
+                    CacheKeys.Messaging.ConversationDetails(conversationId),
+                    CacheKeys.Messaging.ConversationCount(conversationId),
+                };
+
+                // Invalidate conversation message cache pages (first few pages likely to change)
+                for (int page = 1; page <= 3; page++)
+                {
+                    keysToInvalidate.Add(CacheKeys.Messaging.ConversationMessages(conversationId, page));
+                }
+
+                await _cacheService.RemoveManyAsync(keysToInvalidate);
+                _logger.LogDebug("Invalidated {Count} messaging cache keys for conversation {ConversationId}",
+                    keysToInvalidate.Count, conversationId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate messaging caches for conversation {ConversationId}",
+                    conversationId);
+            }
+        }
+
+        /// Invalidates read status related caches
+        /// Used when messages are marked as read
+        private async Task InvalidateReadStatusCaches(Guid userId, Guid conversationId)
+        {
+            try
+            {
+                var keysToInvalidate = new List<string>
+                {
+                    CacheKeys.Messaging.UserConversations(userId),
+                    CacheKeys.Messaging.ConversationDetails(conversationId)
+                };
+
+                // Invalidate message cache pages as read status changed
+                for (int page = 1; page <= 5; page++)
+                {
+                    keysToInvalidate.Add(CacheKeys.Messaging.ConversationMessages(conversationId, page));
+                }
+
+                await _cacheService.RemoveManyAsync(keysToInvalidate);
+                _logger.LogDebug("Invalidated read status caches for user {UserId} in conversation {ConversationId}",
+                    userId, conversationId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate read status caches for user {UserId}", userId);
+            }
+        }
+
+        /// Invalidates conversation-specific caches
+        /// Used when message is deleted 
+        private async Task InvalidateConversationCaches(Guid conversationId)
+        {
+            try
+            {
+                var keysToInvalidate = new List<string>
+                {
+                    CacheKeys.Messaging.ConversationDetails(conversationId),
+                    CacheKeys.Messaging.ConversationCount(conversationId),
+                };
+
+                // Invalidate all message pages for this conversation
+                for (int page = 1; page <= 10; page++)
+                {
+                    keysToInvalidate.Add(CacheKeys.Messaging.ConversationMessages(conversationId, page));
+                }
+
+                await _cacheService.RemoveManyAsync(keysToInvalidate);
+                _logger.LogDebug("Invalidated conversation caches for {ConversationId}", conversationId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate conversation caches for {ConversationId}", conversationId);
+            }
+        }
+        #endregion
+
+        #region Helper Classes
+
+        // Helper class for conversation sending data validation
+        private class ConversationSendData
+        {
+            public bool IsValid { get; set; }
+            public Conversation? Conversation { get; set; }
+            public Guid? ReceiverId { get; set; }
+            public string? SenderName { get; set; }
+            public bool IsFirstMessage { get; set; }
+            public MessageSendResult? ErrorResult { get; set; }
+
+            public static ConversationSendData Valid(Conversation conversation, Guid receiverId,
+                string senderName, bool isFirstMessage) => new()
+                {
+                    IsValid = true,
+                    Conversation = conversation,
+                    ReceiverId = receiverId,
+                    SenderName = senderName,
+                    IsFirstMessage = isFirstMessage
+                };
+
+            public static ConversationSendData Invalid(MessageSendResult errorResult) => new()
+            {
+                IsValid = false,
+                ErrorResult = errorResult
+            };
+        }
+
+        // Helper class for conversation summary data
+        private class ConversationSummaryData
+        {
+            public MessageDTO? LastMessage { get; set; }
+            public int UnreadCount { get; set; }
+        }
+        #endregion
     }
 }

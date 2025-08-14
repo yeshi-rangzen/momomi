@@ -14,4 +14,16 @@ namespace MomomiAPI.Models.DTOs
         public DateTime ReportedAt { get; set; }
         public DateTime? ResolvedAt { get; set; }
     }
+
+    public class BlockedUserDTO
+    {
+        public Guid UserId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string? LastName { get; set; }
+        public string? PrimaryPhotoUrl { get; set; }
+        public string? ThumbnailUrl { get; set; }
+        public DateTime BlockedAt { get; set; }
+        public bool IsActive { get; set; }
+    }
+
 }

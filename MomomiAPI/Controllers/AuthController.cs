@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MomomiAPI.Common.Results;
-using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
@@ -13,84 +12,82 @@ namespace MomomiAPI.Controllers
     [Route("api/[controller]")]
     public class AuthController : BaseApiController
     {
-        private readonly IEmailVerificationService _emailVerificationService;
-        private readonly IUserRegistrationService _userRegistrationService;
-        private readonly IUserLoginService _userLoginService;
-        private readonly ITokenManagementService _tokenManagementService;
+        private readonly IAuthService _authService;
+        private readonly IJwtService _jwtService;
         private readonly IAnalyticsService _analyticsService;
 
         public AuthController(
-            IEmailVerificationService emailVerificationService,
-            IUserRegistrationService userRegistrationService,
-            IUserLoginService userLoginService,
-            ITokenManagementService tokenManagementService,
+            IAuthService authService,
+            IJwtService jwtService,
             IAnalyticsService analyticsService,
             ILogger<AuthController> logger) : base(logger)
         {
-            _emailVerificationService = emailVerificationService;
-            _userRegistrationService = userRegistrationService;
-            _userLoginService = userLoginService;
-            _tokenManagementService = tokenManagementService;
+            _authService = authService;
             _analyticsService = analyticsService;
+            _jwtService = jwtService;
         }
 
-        /// <summary>
-        /// Send verification code to email address
-        /// </summary>
-        [HttpPost("send-verification-code")]
+        [HttpPost("send-otp-code")]
         [EnableRateLimiting("OtpPolicy")]
         [AllowAnonymous]
-        public async Task<ActionResult<EmailVerificationResult>> SendVerificationCode([FromBody] SendOtpRequest request)
+        public async Task<ActionResult<OperationResult<EmailVerificationData>>> SendOTPCode([FromBody] SendOtpRequest request)
         {
-            LogControllerAction(nameof(SendVerificationCode), new { request.Email });
+            LogControllerAction(nameof(SendOTPCode), new { request.Email });
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var result = await _emailVerificationService.SendVerificationCode(request.Email);
+            var result = await _authService.SendOTPCode(request.Email);
 
             // Track email verification sent
             if (result.Success)
             {
                 _ = Task.Run(() => _analyticsService.TrackEmailVerificationSentAsync(
                     request.Email,
-                    result.RemainingAttempts ?? 0));
+                    result.Data.RemainingAttempts ?? 0));
             }
 
-            return HandleAuthResult(result);
+            return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Verify email code for registration process
-        /// </summary>
-        [HttpPost("verify-email-code")]
-        [EnableRateLimiting("AuthPolicy")]
+        [HttpPost("verify-otp-code")]
+        [EnableRateLimiting("OtpPolicy")]
         [AllowAnonymous]
-        public async Task<IActionResult> VerifyEmailCode([FromBody] VerifyOtpRequest request)
+        public async Task<ActionResult<OperationResult<EmailVerificationData>>> VerifyOTPCode([FromBody] VerifyOtpRequest request)
         {
-            LogControllerAction(nameof(VerifyEmailCode), new { request.Email });
+            LogControllerAction(nameof(VerifyOTPCode), new { request.Email });
 
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var result = await _emailVerificationService.VerifyEmailCode(request.Email, request.Otp);
-            return HandleAuthResult(result);
+            var result = await _authService.VerifyOTPCode(request.Email, request.Otp);
+            return HandleOperationResult(result);
         }
 
+        [HttpPost("resend-otp-code")]
+        [EnableRateLimiting("OtpPolicy")]
+        [AllowAnonymous]
+        public async Task<ActionResult<OperationResult<EmailVerificationData>>> ResendOTPCode([FromBody] ResendOtpRequest request)
+        {
+            LogControllerAction(nameof(ResendOTPCode), new { request.Email });
 
-        /// <summary>
-        /// Complete user registration with verified email
-        /// </summary>
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await _authService.ResendOTPCode(request.Email);
+            return HandleOperationResult(result);
+        }
+
         [HttpPost("register")]
         [EnableRateLimiting("AuthPolicy")]
         [AllowAnonymous]
-        public async Task<ActionResult<RegistrationResult>> RegisterUser([FromBody] CompleteRegistrationRequest request)
+        public async Task<ActionResult<OperationResult<RegistrationData>>> RegisterUser([FromBody] RegistrationRequest request)
         {
             LogControllerAction(nameof(RegisterUser), new { request.Email, request.FirstName });
 
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var result = await _userRegistrationService.RegisterNewUser(request);
+            var result = await _authService.RegisterNewUser(request);
 
             // Track successful registration
             if (((OperationResult)result).Success && result.Data != null)
@@ -109,145 +106,117 @@ namespace MomomiAPI.Controllers
                 };
 
                 // Fire and forget analytics tracking
-                _ = Task.Run(() => _analyticsService.TrackUserRegistrationAsync(result.Data.Id, analyticsData));
+                _ = Task.Run(() => _analyticsService.TrackUserRegistrationAsync(result.Data.User.Id, analyticsData));
             }
 
-            return HandleAuthResult(result);
+            return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Login user with email and verification code
-        /// </summary>
         [HttpPost("login")]
         [EnableRateLimiting("AuthPolicy")]
         [AllowAnonymous]
-        public async Task<ActionResult<LoginResult>> LoginUser([FromBody] LoginWithOtpRequest request)
+        public async Task<ActionResult<OperationResult<LoginData>>> LoginUser([FromBody] LoginWithOtpRequest request)
         {
             LogControllerAction(nameof(LoginUser), new { request.Email });
 
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var result = await _userLoginService.LoginWithEmailCode(request.Email, request.Otp);
+            var result = await _authService.LoginWithEmailCode(request.Email, request.Otp);
 
             // Track successful login
             if (((OperationResult)result).Success && result.Data != null)
             {
-                var loginData = new LoginData
+                var loginData = new LoginDataAnalytics
                 {
                     Email = request.Email,
                     LoginMethod = "email_otp",
-                    DaysSinceLastLogin = CalculateDaysSinceLastLogin(result.Data.LastActive),
+                    DaysSinceLastLogin = CalculateDaysSinceLastLogin(result.Data.User.LastActive),
                     LoginTimestamp = DateTime.UtcNow
                 };
 
                 // Fire and forget analytics tracking
-                _ = Task.Run(() => _analyticsService.TrackUserLoginAsync(result.Data.Id, loginData));
+                _ = Task.Run(() => _analyticsService.TrackUserLoginAsync(result.Data.User.Id, loginData));
             }
 
-            return HandleAuthResult(result);
-        }
-
-        /// <summary>
-        /// Resend verification code to email
-        /// </summary>
-        [HttpPost("resend-verification-code")]
-        [EnableRateLimiting("OtpPolicy")]
-        [AllowAnonymous]
-        public async Task<ActionResult<EmailVerificationResult>> ResendVerificationCode([FromBody] ResendOtpRequest request)
-        {
-            LogControllerAction(nameof(ResendVerificationCode), new { request.Email });
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var result = await _emailVerificationService.ResendVerificationCode(request.Email);
-            return HandleAuthResult(result);
-        }
-
-        /// <summary>
-        /// Check if email is already registered
-        /// </summary>
-        [HttpPost("check-email")]
-        [EnableRateLimiting("GeneralPolicy")]
-        [AllowAnonymous]
-        public async Task<ActionResult> CheckEmailRegistration([FromBody] SendOtpRequest request)
-        {
-            LogControllerAction(nameof(CheckEmailRegistration), new { request.Email });
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var isRegistered = await _emailVerificationService.IsEmailAlreadyRegistered(request.Email);
-
-            return Ok(new
-            {
-                email = request.Email,
-                isRegistered = isRegistered,
-                suggestedAction = isRegistered ? "login" : "register"
-            });
-        }
-
-        /// <summary>
-        /// Refresh access token using refresh token
-        /// </summary>
-        [HttpPost("refresh-token")]
-        [EnableRateLimiting("AuthPolicy")]
-        [AllowAnonymous]
-        public async Task<ActionResult<LoginResult>> RefreshToken([FromBody] RefreshTokenRequest request)
-        {
-            LogControllerAction(nameof(RefreshToken));
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var result = await _tokenManagementService.RefreshUserToken(request.RefreshToken);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Logout current user
-        /// </summary>
+        [HttpPost("refresh")]
+        [EnableRateLimiting("AuthPolicy")]
+        [AllowAnonymous]
+        public async Task<ActionResult<OperationResult<RefreshTokenData>>> RefreshToken([FromBody] RefreshTokenRequest request)
+        {
+            try
+            {
+                LogControllerAction(nameof(RefreshToken));
+
+                if (!ModelState.IsValid)
+                    return ValidationError("Invalid request data");
+
+                if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                    return ValidationError("Refresh token is required");
+
+                // Process token refresh
+                var result = await _jwtService.RefreshUserTokenAsync(request.RefreshToken);
+
+                if (result.Success)
+                {
+                    // Add security headers for token response
+                    Response.Headers.Append("Cache-Control", "no-store, no-cache, must-revalidate");
+                    Response.Headers.Append("Pragma", "no-cache");
+                }
+
+                return HandleOperationResult(result);
+            }
+            catch (Exception ex)
+            {
+                return HandleException(ex, "Token refresh failed");
+            }
+        }
+
         [HttpPost("logout")]
         public async Task<ActionResult> LogoutUser()
         {
             LogControllerAction(nameof(LogoutUser));
 
-            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-            var result = await _tokenManagementService.InvalidateUserToken(token);
-            return HandleOperationResult(result);
+            var userId = GetCurrentUserId();
+
+            // Only revoke refresh token
+            if (userId == null)
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            await _jwtService.RevokeRefreshTokenAsync((Guid)userId);
+
+            // Blacklist current access token for immediate effect
+            //var token = ExtractTokenFromRequest();
+            //if (token != null)
+            //{
+            //    var tokenInfo = _jwtService.GetTokenInfo(token);
+            //    if (tokenInfo != null)
+            //    {
+            //        await _jwtService.BlacklistTokenAsync(tokenInfo.Value.jti, tokenInfo.Value.expiry);
+            //    }
+            //}
+
+            return Ok(new { message = "Logged out successfully" });
         }
 
-        /// <summary>
-        /// Get current user information
-        /// </summary>
-        [HttpGet("me")]
-        public async Task<ActionResult<User>> GetCurrentUser()
+        /// Extract token from Authorization header
+        private string? ExtractTokenFromRequest()
         {
-            LogControllerAction(nameof(GetCurrentUser));
+            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+                return null;
 
-            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-            var result = await _tokenManagementService.ValidateAndGetUser(token);
-            return HandleOperationResult(result);
+            return authHeader.Substring("Bearer ".Length).Trim();
         }
 
         private static int CalculateDaysSinceLastLogin(DateTime lastActive)
         {
             return (int)(DateTime.UtcNow - lastActive).TotalDays;
         }
-        /// <summary>
-        /// Revoke all user sessions (security feature)
-        /// </summary>
-        //[HttpPost("revoke-all-sessions")]
-        //public async Task<ActionResult> RevokeAllSessions()
-        //{
-        //    var userIdResult = GetCurrentUserIdOrUnauthorized();
-        //    if (userIdResult.Result != null) return userIdResult.Result;
-
-        //    LogControllerAction(nameof(RevokeAllSessions));
-
-        //    var result = await _tokenManagementService.InvalidateAllUserTokens(userIdResult.Value);
-        //    return HandleOperationResult(result);
-        //}
     }
 }

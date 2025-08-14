@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using MomomiAPI.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MomomiAPI.Models.Entities
@@ -20,6 +21,9 @@ namespace MomomiAPI.Models.Entities
 
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
+
+        [Column("swipe_type")]
+        public SwipeType SwipeType { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

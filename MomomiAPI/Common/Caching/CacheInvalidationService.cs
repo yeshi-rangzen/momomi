@@ -69,7 +69,6 @@ namespace MomomiAPI.Common.Caching
             await Task.WhenAll(
                 InvalidateUserMatches(user1Id),
                 InvalidateUserMatches(user2Id),
-                _cacheService.RemoveAsync(CacheKeys.Matching.MatchCompatibility(user1Id, user2Id))
             );
         }
 

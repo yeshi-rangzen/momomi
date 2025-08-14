@@ -91,6 +91,15 @@ namespace MomomiAPI.Models.Enums
         SuperLike
     }
 
+    public enum SwipeType
+    {
+        Like,
+        SuperLike,
+        Pass,
+        Unmatched,
+        Reported
+    }
+
     public enum ReportReason
     {
         Block,
@@ -135,6 +144,7 @@ namespace MomomiAPI.Models.Enums
         Rangkas,
 
         // 🏔️ Sikkim
+        Bhutia,
         Bhoti,
         Drenjongke,
         Lepcha,

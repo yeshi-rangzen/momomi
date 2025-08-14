@@ -212,7 +212,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
                 try
                 {
-                    // Check if token is blacklisted
+                    //Check if token is blacklisted
                     var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
                     if (!string.IsNullOrEmpty(jti))
                     {
@@ -230,7 +230,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     if (Guid.TryParse(userIdClaim, out var userId))
                     {
                         // Validate user exists and is active
-                        var userResult = await userService.GetUserByIdAsync(userId);
+                        var userResult = await userService.GetUserAsync(userId);
                         if (userResult.Data == null)
                         {
                             logger.LogWarning("Token valid but user not found: {UserId}", userId);

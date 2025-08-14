@@ -1,7 +1,6 @@
 ﻿using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
 using MomomiAPI.HealthChecks;
-using MomomiAPI.Helpers;
 using MomomiAPI.Services.Implementations;
 using MomomiAPI.Services.Interfaces;
 
@@ -13,27 +12,25 @@ namespace MomomiAPI.Extensions
         {
             // Core infrastructure services
             services.AddScoped<ICacheInvalidation, CacheInvalidationService>();
-            services.AddScoped<IJwtService, JwtService>();
 
             // Authentication services
-            services.AddScoped<IEmailVerificationService, EmailVerificationService>();
-            services.AddScoped<IUserRegistrationService, UserRegistrationService>();
-            services.AddScoped<IUserLoginService, UserLoginService>();
-            services.AddScoped<ITokenManagementService, TokenManagementService>();
+            services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IJwtService, JwtService>();
+
+
+            // Discovery and matching services
+            services.AddScoped<ISwipeService, SwipeService>();
+            services.AddScoped<IDiscoveryService, DiscoveryService>();
 
             // User management services
             services.AddScoped<IUserService, UserService>();
-
-            // Discovery and matching services
-            services.AddScoped<IUserDiscoveryService, UserDiscoveryService>();
-            services.AddScoped<IUserInteractionService, UserInteractionService>();
-            services.AddScoped<IMatchManagementService, MatchManagementService>();
 
             // Photo services
             services.AddScoped<IPhotoManagementService, SupabasePhotoService>();
             services.AddScoped<IPhotoGalleryService, PhotoGalleryService>();
 
             // Messaging services
+            //services.AddScoped<IMatchManagementService, MatchManagementService>();
             services.AddScoped<IMessageService, MessageService>();
 
             // Subscription and usage services
@@ -47,9 +44,6 @@ namespace MomomiAPI.Extensions
 
             // Cache service (existing)
             services.AddScoped<ICacheService, UpstashCacheService>();
-
-            // Helpers
-            services.AddScoped<MatchingAlgorithm>();
 
             // HTTP Client for push notifications
             services.AddHttpClient<IPushNotificationService, PushNotificationService>();

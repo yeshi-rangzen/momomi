@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Common.Results;
 using System.Security.Claims;
+using static MomomiAPI.Common.Constants.AppConstants;
 
 namespace MomomiAPI.Controllers
 {
@@ -36,136 +37,47 @@ namespace MomomiAPI.Controllers
             var userId = GetCurrentUserId();
             if (userId == null)
             {
-                return Unauthorized(new { message = "Invalid or missing user authentication" });
+                var errorResult = OperationResult.Failed(
+                                    ErrorCodes.UNAUTHORIZED,
+                                    "Invalid or missing user authentication");
+
+                return Unauthorized(errorResult);
             }
             return userId.Value;
         }
 
         /// <summary>
-        /// Converts OperationResult to appropriate HTTP response
+        /// Handles OperationResult and converts to appropriate HTTP response
         /// </summary>
         protected ActionResult HandleOperationResult(OperationResult result)
         {
-            if (result.Success)
-            {
-                if (result is LikeResult likeResult)
-                {
-                    return Ok(new { data = likeResult, message = "Operation completed successfully", metadata = result.Metadata });
-                }
-                return Ok(new { message = "Operation completed successfully", metadata = result.Metadata });
-            }
+            // Set timestamp for API response
+            result.Timestamp = DateTime.UtcNow;
 
-            return result.ErrorCode switch
-            {
-                "VALIDATION_ERROR" => BadRequest(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "BUSINESS_RULE_VIOLATION" => BadRequest(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "NOT_FOUND" => NotFound(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "UNAUTHORIZED" => Unauthorized(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                _ => StatusCode(500, new { message = result.ErrorMessage ?? "An error occurred", errorCode = result.ErrorCode })
-            };
-        }
-
-        /// <summary>
-        /// Converts OperationResult<T> to appropriate HTTP response
-        /// </summary>
-        protected ActionResult<T> HandleOperationResult<T>(OperationResult<T> result)
-        {
-            if (result.Success)
-            {
-                return Ok(new { data = result.Data, metadata = result.Metadata });
-            }
-
-            return result.ErrorCode switch
-            {
-                "VALIDATION_ERROR" => BadRequest(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "BUSINESS_RULE_VIOLATION" => BadRequest(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "NOT_FOUND" => NotFound(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                "UNAUTHORIZED" => Unauthorized(new { message = result.ErrorMessage, errorCode = result.ErrorCode }),
-                _ => StatusCode(500, new { message = result.ErrorMessage ?? "An error occurred", errorCode = result.ErrorCode })
-            };
-        }
-
-        /// <summary>
-        /// Handles API responses for authentication results
-        /// </summary>
-        protected ActionResult HandleAuthResult<T>(T result) where T : OperationResult
-        {
             if (result.Success)
             {
                 return Ok(result);
             }
 
-            return result.ErrorCode switch
-            {
-                "VALIDATION_ERROR" => BadRequest(result),
-                "BUSINESS_RULE_VIOLATION" => BadRequest(result),
-                "NOT_FOUND" => NotFound(result),
-                "UNAUTHORIZED" => Unauthorized(result),
-                _ => StatusCode(500, result)
-            };
+            LogApiError(result.ErrorCode, result.ErrorMessage);
+            return ConvertErrorCodeToHttpResponse(result);
         }
 
         /// <summary>
-        /// Handles InteractionResult responses consistently
+        /// Handles OperationResult<T> and converts to appropriate HTTP response
         /// </summary>
-        protected ActionResult HandleInteractionResult(InteractionResult result)
+        protected ActionResult<OperationResult<T>> HandleOperationResult<T>(OperationResult<T> result)
         {
+            // Set timestamp for API response
+            result.Timestamp = DateTime.UtcNow;
+
             if (result.Success)
             {
-                var response = new
-                {
-                    success = true,
-                    outcome = result.Outcome.ToString(),
-                    isMatch = result.IsMatch,
-                    targetUserId = result.TargetUserId,
-                    interactionType = result.InteractionType?.ToString(),
-                    updatedLimits = result.UpdatedLimits,
-                    metadata = result.Metadata
-                };
-
-                return Ok(response);
+                return Ok(result);
             }
 
-            return result.ErrorCode switch
-            {
-                "VALIDATION_ERROR" => BadRequest(new
-                {
-                    success = false,
-                    outcome = result.Outcome.ToString(),
-                    message = result.ErrorMessage,
-                    errorCode = result.ErrorCode,
-                    updatedLimits = result.UpdatedLimits
-                }),
-                "BUSINESS_RULE_VIOLATION" => BadRequest(new
-                {
-                    success = false,
-                    outcome = result.Outcome.ToString(),
-                    message = result.ErrorMessage,
-                    errorCode = result.ErrorCode,
-                    updatedLimits = result.UpdatedLimits
-                }),
-                "NOT_FOUND" => NotFound(new
-                {
-                    success = false,
-                    outcome = result.Outcome.ToString(),
-                    message = result.ErrorMessage,
-                    errorCode = result.ErrorCode
-                }),
-                "UNAUTHORIZED" => Unauthorized(new
-                {
-                    success = false,
-                    outcome = result.Outcome.ToString(),
-                    message = result.ErrorMessage,
-                    errorCode = result.ErrorCode
-                }),
-                _ => StatusCode(500, new
-                {
-                    success = false,
-                    outcome = result.Outcome.ToString(),
-                    message = result.ErrorMessage ?? "An error occurred",
-                    errorCode = result.ErrorCode
-                })
-            };
+            LogApiError(result.ErrorCode, result.ErrorMessage);
+            return ConvertErrorCodeToHttpResponse(result);
         }
 
         /// <summary>
@@ -176,6 +88,100 @@ namespace MomomiAPI.Controllers
             var userId = GetCurrentUserId();
             _logger.LogInformation("Controller action {Action} called by user {UserId} with parameters {@Parameters}",
                 action, userId, parameters);
+        }
+
+        /// <summary>
+        /// Logs API errors for monitoring and debugging
+        /// </summary>
+        private void LogApiError(string? errorCode, string? errorMessage)
+        {
+            var userId = GetCurrentUserId();
+            _logger.LogWarning("API Error for user {UserId}: {ErrorCode} - {Message}",
+                userId, errorCode, errorMessage);
+        }
+
+        /// <summary>
+        /// Converts error codes to appropriate HTTP status codes and responses
+        /// </summary>
+        private ActionResult ConvertErrorCodeToHttpResponse(OperationResult result)
+        {
+            return result.ErrorCode switch
+            {
+                // Authentication & Authorization (401)
+                ErrorCodes.UNAUTHORIZED or
+                ErrorCodes.INVALID_CREDENTIALS or
+                ErrorCodes.TOKEN_EXPIRED => Unauthorized(result),
+
+                // Forbidden (403)
+                ErrorCodes.FORBIDDEN => Forbid(),
+
+                // Not Found (404)
+                ErrorCodes.NOT_FOUND or
+                ErrorCodes.USER_NOT_FOUND or
+                ErrorCodes.RESOURCE_NOT_FOUND => NotFound(result),
+
+                // Bad Request (400) - Validation and Business Logic
+                ErrorCodes.VALIDATION_ERROR or
+                ErrorCodes.INVALID_INPUT or
+                ErrorCodes.REQUIRED_FIELD_MISSING or
+                ErrorCodes.BUSINESS_RULE_VIOLATION or
+                ErrorCodes.OPERATION_NOT_ALLOWED or
+                ErrorCodes.USER_ALREADY_PROCESSED or
+                ErrorCodes.USER_BLOCKED or
+                ErrorCodes.LIKE_LIMIT_REACHED or
+                ErrorCodes.SUPER_LIKE_LIMIT_REACHED or
+                ErrorCodes.NO_RECENT_PASS_TO_UNDO => BadRequest(result),
+
+                // Too Many Requests (429)
+                ErrorCodes.RATE_LIMIT_EXCEEDED => StatusCode(429, result),
+
+                // Internal Server Error (500)
+                ErrorCodes.INTERNAL_SERVER_ERROR or
+                ErrorCodes.DATABASE_ERROR or
+                ErrorCodes.EXTERNAL_SERVICE_ERROR => StatusCode(500, result),
+
+                // Default to 500 for unknown error codes
+                _ => StatusCode(500, result)
+            };
+        }
+
+        /// <summary>
+        /// Helper method to handle exceptions and convert to consistent error response
+        /// </summary>
+        protected ActionResult HandleException(Exception ex, string userMessage = "An error occurred")
+        {
+            var userId = GetCurrentUserId();
+            _logger.LogError(ex, "Unhandled exception in controller for user {UserId}", userId);
+
+            var errorResult = OperationResult.Failed(
+                ErrorCodes.INTERNAL_SERVER_ERROR,
+                userMessage);
+
+            return StatusCode(500, errorResult);
+        }
+
+        /// <summary>
+        /// Helper method to create validation error responses
+        /// </summary>
+        protected ActionResult ValidationError(string message)
+        {
+            var errorResult = OperationResult.Failed(
+                ErrorCodes.VALIDATION_ERROR,
+                message);
+
+            return BadRequest(errorResult);
+        }
+
+        /// <summary>
+        /// Helper method to create not found responses
+        /// </summary>
+        protected ActionResult NotFoundError(string message = "Resource not found")
+        {
+            var errorResult = OperationResult.Failed(
+                ErrorCodes.NOT_FOUND,
+                message);
+
+            return NotFound(errorResult);
         }
     }
 }

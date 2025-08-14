@@ -1,28 +1,38 @@
 ﻿using MomomiAPI.Models.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace MomomiAPI.Models.Requests
 {
+    /// Request for updating basic profile information (non-discovery related)
     public class UpdateProfileRequest
     {
+        // Personal Information
+        [MaxLength(100)]
         public string? FirstName { get; set; }
+
+        [MaxLength(100)]
         public string? LastName { get; set; }
+
+        [MaxLength(500)]
         public string? Bio { get; set; }
+
+        [MaxLength(200)]
         public string? Hometown { get; set; }
-        public GenderType? InterestedIn { get; set; }
+
+        [MaxLength(100)]
+        public string? Occupation { get; set; }
+
+        // Physical Attributes
+        [Range(120, 250)]
+        public int? HeightCm { get; set; }
+
+        // Cultural & Background
         public List<HeritageType>? Heritage { get; set; }
         public List<ReligionType>? Religion { get; set; }
         public List<LanguageType>? LanguagesSpoken { get; set; }
         public EducationLevelType? EducationLevel { get; set; }
-        public string? Occupation { get; set; }
-        public int? HeightCm { get; set; }
-        public double? Latitude { get; set; }
-        public double? Longitude { get; set; }
-        public int? MaxDistanceKm { get; set; }
-        public int? MinAge { get; set; }
-        public int? MaxAge { get; set; }
-        public bool? EnableGlobalDiscovery { get; set; }
-        public bool? IsGloballyDiscoverable { get; set; }
-        public bool? IsDiscoverable { get; set; }
+
+        // Family & Lifestyle
         public ChildrenStatusType? Children { get; set; }
         public FamilyPlanType? FamilyPlan { get; set; }
         public ViceFrequencyType? Drugs { get; set; }
@@ -30,21 +40,8 @@ namespace MomomiAPI.Models.Requests
         public ViceFrequencyType? Marijuana { get; set; }
         public ViceFrequencyType? Drinking { get; set; }
 
-        // MEMBER FILTER PREFERENCES (Free users)
-        public List<HeritageType>? PreferredHeritage { get; set; }
-        public List<ReligionType>? PreferredReligions { get; set; }
-        public List<LanguageType>? LanguagePreference { get; set; }
-
-
-        // SUBCRIBER FILTER PREFERENCES (Premium users only)
-        public int? PreferredHeightMin { get; set; }
-        public int? PreferredHeightMax { get; set; }
-        public List<ChildrenStatusType>? PreferredChildren { get; set; }
-        public List<FamilyPlanType>? PreferredFamilyPlans { get; set; }
-        public List<ViceFrequencyType>? PreferredDrugs { get; set; }
-        public List<ViceFrequencyType>? PreferredSmoking { get; set; }
-        public List<ViceFrequencyType>? PreferredMarijuana { get; set; }
-        public List<ViceFrequencyType>? PreferredDrinking { get; set; }
-        public List<EducationLevelType>? PreferredEducationLevels { get; set; }
+        // Notifications
+        public bool? NotificationsEnabled { get; set; }
+        public string? PushToken { get; set; }
     }
 }
