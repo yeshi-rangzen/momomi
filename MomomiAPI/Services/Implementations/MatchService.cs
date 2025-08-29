@@ -142,43 +142,72 @@ namespace MomomiAPI.Services.Implementations
         // Single query with proper joins and minimal data transfer
         private async Task<List<MatchConversationData>> GetUserMatchesFromDatabase(Guid currentUserId)
         {
-            return await _dbContext.Conversations
+            // First, get the base conversation data with related entities
+            var conversations = await _dbContext.Conversations
                 .Where(conv => conv.User1Id == currentUserId || conv.User2Id == currentUserId)
-                .Select(conv => new MatchConversationData
+                .Include(conv => conv.User1)
+                    .ThenInclude(u => u.Photos.Where(p => p.IsPrimary))
+                .Include(conv => conv.User2)
+                    .ThenInclude(u => u.Photos.Where(p => p.IsPrimary))
+                .Include(conv => conv.Messages.OrderByDescending(m => m.SentAt).Take(1))
+                .Where(conv => (conv.User1Id == currentUserId ? conv.User2.IsActive : conv.User1.IsActive))
+                .ToListAsync();
+
+            // Get unread message counts for all conversations in a single query
+            var conversationIds = conversations.Select(c => c.Id).ToList();
+            var unreadCounts = await _dbContext.Messages
+                .Where(m => conversationIds.Contains(m.ConversationId) &&
+                           m.SenderId != currentUserId &&
+                           !m.IsRead)
+                .GroupBy(m => m.ConversationId)
+                .Select(g => new { ConversationId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ConversationId, x => x.Count);
+
+            // Get super like information for all user pairs in a single query
+            var otherUserIds = conversations.Select(conv =>
+                conv.User1Id == currentUserId ? conv.User2Id : conv.User1Id).ToList();
+
+            var superLikes = await _dbContext.UserSwipes
+                .Where(swipe =>
+                    ((swipe.SwiperUserId == currentUserId && otherUserIds.Contains(swipe.SwipedUserId)) ||
+                     (otherUserIds.Contains(swipe.SwiperUserId) && swipe.SwipedUserId == currentUserId)) &&
+                    swipe.SwipeType == SwipeType.SuperLike)
+                .Select(swipe => new { swipe.SwiperUserId, swipe.SwipedUserId })
+                .ToListAsync();
+
+            // Transform to MatchConversationData in memory
+            var matchConversations = conversations.Select(conv =>
+            {
+                var otherUser = conv.User1Id == currentUserId ? conv.User2 : conv.User1;
+                var otherUserId = conv.User1Id == currentUserId ? conv.User2Id : conv.User1Id;
+                var lastMessage = conv.Messages.FirstOrDefault();
+
+                return new MatchConversationData
                 {
                     ConversationId = conv.Id,
                     MatchedAt = conv.CreatedAt,
+                    OtherUserId = otherUserId,
+                    IsOtherUserActive = otherUser.IsActive,
+                    PrimaryPhotoUrl = otherUser.Photos.FirstOrDefault()?.Url,
+                    LastMessage = lastMessage != null ? new LastMessageData
+                    {
+                        Id = lastMessage.Id,
+                        SenderId = lastMessage.SenderId,
+                        Content = lastMessage.Content,
+                        MessageType = lastMessage.MessageType,
+                        IsRead = lastMessage.IsRead,
+                        SentAt = lastMessage.SentAt
+                    } : null,
+                    UnreadCount = unreadCounts.GetValueOrDefault(conv.Id, 0),
+                    IsFromSuperLike = superLikes.Any(sl =>
+                        (sl.SwiperUserId == currentUserId && sl.SwipedUserId == otherUserId) ||
+                        (sl.SwiperUserId == otherUserId && sl.SwipedUserId == currentUserId))
+                };
+            })
+            .OrderByDescending(match => match.LastMessage?.SentAt ?? match.MatchedAt)
+            .ToList();
 
-                    OtherUserId = conv.User1Id == currentUserId ? conv.User2Id : conv.User1Id,
-                    IsOtherUserActive = conv.User1Id == currentUserId ? conv.User2.IsActive : conv.User1.IsActive,
-                    PrimaryPhotoUrl = (conv.User1Id == currentUserId ? conv.User2 : conv.User1)
-                        .Photos.Where(p => p.IsPrimary)
-                        .Select(p => p.Url)
-                        .FirstOrDefault(),
-
-                    LastMessage = conv.Messages
-                    .OrderByDescending(m => m.SentAt)
-                            .Select(m => new LastMessageData
-                            {
-                                Id = m.Id,
-                                SenderId = m.SenderId,
-                                Content = m.Content,
-                                MessageType = m.MessageType,
-                                IsRead = m.IsRead,
-                                SentAt = m.SentAt
-                            })
-                            .FirstOrDefault(),
-
-                    UnreadCount = conv.Messages.Count(m => m.SenderId != currentUserId && !m.IsRead),
-
-                    IsFromSuperLike = _dbContext.UserSwipes.Any(swipe =>
-                                               ((swipe.SwiperUserId == currentUserId && swipe.SwipedUserId == (conv.User1Id == currentUserId ? conv.User2Id : conv.User1Id)) ||
-                                                (swipe.SwiperUserId == (conv.User1Id == currentUserId ? conv.User2Id : conv.User1Id) && swipe.SwipedUserId == currentUserId)) &&
-                                               swipe.SwipeType == SwipeType.SuperLike)
-                })
-                .Where(match => match.IsOtherUserActive == true)
-                .OrderByDescending(match => match.LastMessage != null ? match.LastMessage.SentAt : match.MatchedAt)
-                .ToListAsync();
+            return matchConversations;
         }
         #endregion
     }

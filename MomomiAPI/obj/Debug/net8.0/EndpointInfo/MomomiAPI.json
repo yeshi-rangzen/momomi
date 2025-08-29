@@ -6,7 +6,7 @@
     "version": "v1"
   },
   "paths": {
-    "/api/Auth/send-verification-code": {
+    "/api/Auth/send-otp-code": {
       "post": {
         "tags": [
           "Auth"
@@ -36,17 +36,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
                 }
               }
             }
@@ -54,7 +54,7 @@
         }
       }
     },
-    "/api/Auth/verify-email-code": {
+    "/api/Auth/verify-otp-code": {
       "post": {
         "tags": [
           "Auth"
@@ -80,7 +80,72 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/resend-otp-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOtpRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOtpRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailVerificationDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -94,17 +159,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteRegistrationRequest"
+                "$ref": "#/components/schemas/RegistrationRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteRegistrationRequest"
+                "$ref": "#/components/schemas/RegistrationRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteRegistrationRequest"
+                "$ref": "#/components/schemas/RegistrationRequest"
               }
             }
           }
@@ -115,17 +180,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationResult"
+                  "$ref": "#/components/schemas/RegistrationDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationResult"
+                  "$ref": "#/components/schemas/RegistrationDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationResult"
+                  "$ref": "#/components/schemas/RegistrationDataOperationResult"
                 }
               }
             }
@@ -163,17 +228,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/LoginDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/LoginDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/LoginDataOperationResult"
                 }
               }
             }
@@ -181,86 +246,7 @@
         }
       }
     },
-    "/api/Auth/resend-verification-code": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResendOtpRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResendOtpRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResendOtpRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmailVerificationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Auth/check-email": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendOtpRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendOtpRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/SendOtpRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Auth/refresh-token": {
+    "/api/Auth/refresh": {
       "post": {
         "tags": [
           "Auth"
@@ -290,17 +276,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/RefreshTokenDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/RefreshTokenDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/RefreshTokenDataOperationResult"
                 }
               }
             }
@@ -320,35 +306,6 @@
         }
       }
     },
-    "/api/Auth/me": {
-      "get": {
-        "tags": [
-          "Auth"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/Discovery/users": {
       "get": {
         "tags": [
@@ -361,7 +318,7 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 10
+              "default": 30
             }
           }
         ],
@@ -371,160 +328,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
+                  "$ref": "#/components/schemas/DiscoveryDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
+                  "$ref": "#/components/schemas/DiscoveryDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Interactions/users/like": {
-      "post": {
-        "tags": [
-          "Interactions"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LikeUserRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LikeUserRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/LikeUserRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Interactions/users/{userId}/pass": {
-      "post": {
-        "tags": [
-          "Interactions"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Interactions/undo-last-swipe": {
-      "post": {
-        "tags": [
-          "Interactions"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Interactions/users-who-liked-me": {
-      "get": {
-        "tags": [
-          "Interactions"
-        ],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserLikeDTO"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserLikeDTO"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserLikeDTO"
-                  }
+                  "$ref": "#/components/schemas/DiscoveryDataOperationResult"
                 }
               }
             }
@@ -543,26 +357,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MatchDTO"
-                  }
+                  "$ref": "#/components/schemas/MatchDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MatchDTO"
-                  }
+                  "$ref": "#/components/schemas/MatchDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MatchDTO"
-                  }
+                  "$ref": "#/components/schemas/MatchDataOperationResult"
                 }
               }
             }
@@ -604,26 +409,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ConversationDTO"
-                  }
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ConversationDTO"
-                  }
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ConversationDTO"
-                  }
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
                 }
               }
             }
@@ -653,17 +449,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationDTO"
+                  "$ref": "#/components/schemas/ConversationDetailsDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationDTO"
+                  "$ref": "#/components/schemas/ConversationDetailsDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationDTO"
+                  "$ref": "#/components/schemas/ConversationDetailsDataOperationResult"
                 }
               }
             }
@@ -711,26 +507,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MessageDTO"
-                  }
+                  "$ref": "#/components/schemas/ConversationMessagesDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MessageDTO"
-                  }
+                  "$ref": "#/components/schemas/ConversationMessagesDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MessageDTO"
-                  }
+                  "$ref": "#/components/schemas/ConversationMessagesDataOperationResult"
                 }
               }
             }
@@ -768,17 +555,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageDTO"
+                  "$ref": "#/components/schemas/MessageSendDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageDTO"
+                  "$ref": "#/components/schemas/MessageSendDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageDTO"
+                  "$ref": "#/components/schemas/MessageSendDataOperationResult"
                 }
               }
             }
@@ -786,7 +573,7 @@
         }
       }
     },
-    "/api/Messages/conversations/{conversationId}/read": {
+    "/api/Messages/conversations/{conversationId}/mark-read": {
       "put": {
         "tags": [
           "Messages"
@@ -804,12 +591,29 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesReadDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesReadDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesReadDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/Messages/{messageId}": {
+    "/api/Messages/messages/{messageId}": {
       "delete": {
         "tags": [
           "Messages"
@@ -827,62 +631,21 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Notifications": {
-      "get": {
-        "tags": [
-          "Notifications"
-        ],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
             "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/NotificationDTO"
-                  }
+                  "$ref": "#/components/schemas/MessageDeletionDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/NotificationDTO"
-                  }
+                  "$ref": "#/components/schemas/MessageDeletionDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/NotificationDTO"
-                  }
+                  "$ref": "#/components/schemas/MessageDeletionDataOperationResult"
                 }
               }
             }
@@ -890,46 +653,14 @@
         }
       }
     },
-    "/api/Notifications/unread-count": {
+    "/api/Messages/users/{userId}/online-status": {
       "get": {
         "tags": [
-          "Notifications"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Notifications/{notificationId}/read": {
-      "put": {
-        "tags": [
-          "Notifications"
+          "Messages"
         ],
         "parameters": [
           {
-            "name": "notificationId",
+            "name": "userId",
             "in": "path",
             "required": true,
             "schema": {
@@ -940,81 +671,53 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Notifications/mark-all-read": {
-      "put": {
-        "tags": [
-          "Notifications"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Notifications/push-token": {
-      "put": {
-        "tags": [
-          "Notifications"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePushTokenRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePushTokenRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePushTokenRequest"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "boolean"
+                }
               }
             }
           }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
         }
       }
     },
-    "/api/Notifications/settings": {
-      "put": {
+    "/api/Messages/statistics": {
+      "get": {
         "tags": [
-          "Notifications"
+          "Messages"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateNotificationSettingsRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateNotificationSettingsRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateNotificationSettingsRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserConversationsDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -1060,17 +763,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserPhotoDTO"
+                  "$ref": "#/components/schemas/PhotoUploadDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserPhotoDTO"
+                  "$ref": "#/components/schemas/PhotoUploadDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserPhotoDTO"
+                  "$ref": "#/components/schemas/PhotoUploadDataOperationResult"
                 }
               }
             }
@@ -1078,48 +781,20 @@
         }
       }
     },
-    "/api/Photos": {
-      "get": {
+    "/api/Photos/upload/batch": {
+      "post": {
         "tags": [
           "Photos"
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserPhotoDTO"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserPhotoDTO"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserPhotoDTO"
-                  }
-                }
-              }
+        "parameters": [
+          {
+            "name": "primaryPhotoIndex",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
-        }
-      }
-    },
-    "/api/Photos/count": {
-      "get": {
-        "tags": [
-          "Photos"
         ],
         "responses": {
           "200": {
@@ -1127,20 +802,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "integer",
-                  "format": "int32"
+                  "$ref": "#/components/schemas/BatchPhotoUploadDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "integer",
-                  "format": "int32"
+                  "$ref": "#/components/schemas/BatchPhotoUploadDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "integer",
-                  "format": "int32"
+                  "$ref": "#/components/schemas/BatchPhotoUploadDataOperationResult"
                 }
               }
             }
@@ -1166,12 +838,29 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoDeletionDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoDeletionDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoDeletionDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/Photos/{photoId}/set-primary": {
+    "/api/Photos/primary/{photoId}": {
       "put": {
         "tags": [
           "Photos"
@@ -1189,7 +878,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrimaryPhotoDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrimaryPhotoDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrimaryPhotoDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -1232,7 +938,53 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoReorderDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoReorderDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoReorderDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Photos": {
+      "get": {
+        "tags": [
+          "Photos"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTOListOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTOListOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhotoDTOListOperationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -1263,42 +1015,168 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserReportDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserReportDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserReportDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/Reporting/my-reports": {
+    "/api/Reporting/block": {
+      "post": {
+        "tags": [
+          "Reporting"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Reporting/unblock": {
+      "post": {
+        "tags": [
+          "Reporting"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnblockUserRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnblockUserRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnblockUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Reporting/reports": {
       "get": {
         "tags": [
           "Reporting"
         ],
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserReportDTO"
-                  }
+                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserReportDTO"
-                  }
+                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserReportDTO"
-                  }
+                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
                 }
               }
             }
@@ -1306,269 +1184,30 @@
         }
       }
     },
-    "/api/Subscription/status": {
+    "/api/Reporting/blocked-users": {
       "get": {
         "tags": [
-          "Subscription"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionStatusDTO"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Subscription/usage-limits": {
-      "get": {
-        "tags": [
-          "Subscription"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UsageLimitsDTO"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UsageLimitsDTO"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UsageLimitsDTO"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Subscription/upgrade": {
-      "post": {
-        "tags": [
-          "Subscription"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscriptionUpgradeRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscriptionUpgradeRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscriptionUpgradeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Subscription/cancel": {
-      "post": {
-        "tags": [
-          "Subscription"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/Subscription/watch-ad": {
-      "post": {
-        "tags": [
-          "Subscription"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/User": {
-      "get": {
-        "tags": [
-          "User"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateProfileRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateProfileRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateProfileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDTO"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/User/discovery-mode": {
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DiscoveryModeRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DiscoveryModeRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/DiscoveryModeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/User/discovery-visibility": {
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoveryVisibilityRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoveryVisibilityRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoveryVisibilityRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/api/User/nearby": {
-      "get": {
-        "tags": [
-          "User"
+          "Reporting"
         ],
         "parameters": [
           {
-            "name": "maxDistance",
+            "name": "Page",
             "in": "query",
             "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
               "type": "integer",
-              "format": "int32",
-              "default": 50
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -1578,26 +1217,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
+                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
+                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserProfileDTO"
-                  }
+                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
                 }
               }
             }
@@ -1605,7 +1235,204 @@
         }
       }
     },
-    "/api/User/discovery-settings": {
+    "/api/Reporting/blocked-status/{userId}": {
+      "get": {
+        "tags": [
+          "Reporting"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Reporting/quick-block/{userId}": {
+      "put": {
+        "tags": [
+          "Reporting"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Reporting/quick-unblock/{userId}": {
+      "put": {
+        "tags": [
+          "Reporting"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Swipe": {
+      "post": {
+        "tags": [
+          "Swipe"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwipeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwipeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwipeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Swipe/undo": {
+      "post": {
+        "tags": [
+          "Swipe"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwipeResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User/profile": {
       "get": {
         "tags": [
           "User"
@@ -1616,17 +1443,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/UserProfileDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/UserProfileDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/UserProfileDataOperationResult"
                 }
               }
             }
@@ -1641,17 +1468,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+                "$ref": "#/components/schemas/UpdateProfileRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+                "$ref": "#/components/schemas/UpdateProfileRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDiscoverySettingsRequest"
+                "$ref": "#/components/schemas/UpdateProfileRequest"
               }
             }
           }
@@ -1662,17 +1489,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/ProfileUpdateDataOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/ProfileUpdateDataOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DiscoverySettingsDTO"
+                  "$ref": "#/components/schemas/ProfileUpdateDataOperationResult"
                 }
               }
             }
@@ -1680,26 +1507,231 @@
         }
       }
     },
-    "/api/User/delete-account": {
-      "delete": {
+    "/api/User/discovery-filters": {
+      "get": {
         "tags": [
           "User"
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTOOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTOOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverySettingsDTOOperationResult"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoveryFiltersRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoveryFiltersRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDiscoveryFiltersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/User/deactivate": {
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeactivationDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeactivationDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeactivationDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User/delete": {
       "delete": {
         "tags": [
           "User"
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User/discoverable": {
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "boolean"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "boolean"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User/location": {
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationUpdateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationUpdateRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryFiltersUpdateDataOperationResult"
+                }
+              }
+            }
           }
         }
       }
@@ -1707,6 +1739,342 @@
   },
   "components": {
     "schemas": {
+      "AccountDeactivationData": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wasActive": {
+            "type": "boolean"
+          },
+          "deactivatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeactivationDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccountDeactivationData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionData": {
+        "type": "object",
+        "properties": {
+          "deletedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "photosDeleted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "conversationsDeleted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "swipesDeleted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccountDeletionData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BatchPhotoUploadData": {
+        "type": "object",
+        "properties": {
+          "successfulPhotos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
+          },
+          "failedPhotos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoUploadError"
+            },
+            "nullable": true
+          },
+          "totalPhotosCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "successfulCount": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "failedCount": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BatchPhotoUploadDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BatchPhotoUploadData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockUserData": {
+        "type": "object",
+        "properties": {
+          "blockedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "matchRemoved": {
+            "type": "boolean"
+          },
+          "conversationDeleted": {
+            "type": "boolean"
+          },
+          "messagesDeleted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blockedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockUserDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BlockUserData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockUserRequest": {
+        "required": [
+          "blockedUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "blockedUserId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockedUserDTO": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryPhotoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockedUsersListData": {
+        "type": "object",
+        "properties": {
+          "blockedUsers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedUserDTO"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BlockedUsersListDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BlockedUsersListData"
+          }
+        },
+        "additionalProperties": false
+      },
       "ChildrenStatusType": {
         "enum": [
           "DontHaveChildren",
@@ -1714,149 +2082,6 @@
           "PreferNotToSay"
         ],
         "type": "string"
-      },
-      "CompleteRegistrationRequest": {
-        "required": [
-          "dateOfBirth",
-          "email",
-          "firstName",
-          "gender",
-          "heritage",
-          "hometown",
-          "interestedIn",
-          "languagesSpoken",
-          "latitude",
-          "longitude",
-          "religion",
-          "verificationToken"
-        ],
-        "type": "object",
-        "properties": {
-          "email": {
-            "minLength": 1,
-            "type": "string",
-            "format": "email"
-          },
-          "verificationToken": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "firstName": {
-            "maxLength": 100,
-            "minLength": 1,
-            "type": "string"
-          },
-          "lastName": {
-            "maxLength": 100,
-            "type": "string",
-            "nullable": true
-          },
-          "dateOfBirth": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "gender": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "interestedIn": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "hometown": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "neighbourhood": {
-            "type": "string",
-            "nullable": true
-          },
-          "latitude": {
-            "type": "number",
-            "format": "double"
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double"
-          },
-          "maxDistanceKm": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "heritage": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HeritageType"
-            }
-          },
-          "religion": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReligionType"
-            }
-          },
-          "languagesSpoken": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LanguageType"
-            }
-          },
-          "bio": {
-            "type": "string",
-            "nullable": true
-          },
-          "phoneNumber": {
-            "type": "string",
-            "format": "tel",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "Conversation": {
-        "required": [
-          "user1Id",
-          "user2Id"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "user1Id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "user2Id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user1": {
-            "$ref": "#/components/schemas/User"
-          },
-          "user2": {
-            "$ref": "#/components/schemas/User"
-          },
-          "messages": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Message"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
       },
       "ConversationDTO": {
         "type": "object",
@@ -1894,11 +2119,247 @@
         },
         "additionalProperties": false
       },
-      "DiscoveryModeRequest": {
+      "ConversationDetailsData": {
         "type": "object",
         "properties": {
-          "enableGlobalDiscovery": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationDTO"
+          },
+          "isOtherUserOnline": {
             "type": "boolean"
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canSendMessages": {
+            "type": "boolean"
+          },
+          "restrictionReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationDetailsDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationDetailsData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationMessagesData": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageDTO"
+            },
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fromCache": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationMessagesDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationMessagesData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryData": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryUserDTO"
+            },
+            "nullable": true
+          },
+          "discoveryMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "actualCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromCache": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DiscoveryData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryFiltersUpdateData": {
+        "type": "object",
+        "properties": {
+          "updatedSettings": {
+            "$ref": "#/components/schemas/DiscoverySettingsDTO"
+          },
+          "updatedFilters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "locationChanged": {
+            "type": "boolean"
+          },
+          "filtersChanged": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryFiltersUpdateDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DiscoveryFiltersUpdateData"
           }
         },
         "additionalProperties": false
@@ -1915,9 +2376,8 @@
           "isGloballyDiscoverable": {
             "type": "boolean"
           },
-          "maxDistanceKm": {
-            "type": "integer",
-            "format": "int32"
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
           },
           "minAge": {
             "type": "integer",
@@ -1927,8 +2387,254 @@
             "type": "integer",
             "format": "int32"
           },
+          "maxDistanceKm": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          },
           "hasLocation": {
             "type": "boolean"
+          },
+          "preferredHeritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "preferredReligions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "preferredLanguagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "preferredHeightMin": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredHeightMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredEducationLevels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationLevelType"
+            },
+            "nullable": true
+          },
+          "preferredChildren": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChildrenStatusType"
+            },
+            "nullable": true
+          },
+          "preferredFamilyPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FamilyPlanType"
+            },
+            "nullable": true
+          },
+          "preferredDrugs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredSmoking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredDrinking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredMarijuana": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "isPremiumUser": {
+            "type": "boolean"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoverySettingsDTOOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DiscoverySettingsDTO"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryUserDTO": {
+        "required": [
+          "firstName",
+          "hometown"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "heightCm": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "hometown": {
+            "type": "string",
+            "nullable": true
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          },
+          "occupation": {
+            "type": "string",
+            "nullable": true
+          },
+          "educationLevel": {
+            "$ref": "#/components/schemas/EducationLevelType"
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "familyPlan": {
+            "$ref": "#/components/schemas/FamilyPlanType"
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildrenStatusType"
+          },
+          "drugs": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "smoking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "marijuana": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -1942,19 +2648,53 @@
         ],
         "type": "string"
       },
-      "EmailVerificationResult": {
+      "EmailVerificationData": {
+        "type": "object",
+        "properties": {
+          "verificationToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "isEmailRegistered": {
+            "type": "boolean"
+          },
+          "remainingAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/VerificationType"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmailVerificationDataOperationResult": {
         "type": "object",
         "properties": {
           "success": {
             "type": "boolean",
             "readOnly": true
           },
-          "errorMessage": {
+          "errorCode": {
             "type": "string",
             "nullable": true,
             "readOnly": true
           },
-          "errorCode": {
+          "errorMessage": {
             "type": "string",
             "nullable": true,
             "readOnly": true
@@ -1965,30 +2705,12 @@
             "nullable": true,
             "readOnly": true
           },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
           "data": {
-            "type": "string",
-            "nullable": true
-          },
-          "verificationToken": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "isEmailRegistered": {
-            "type": "boolean",
-            "readOnly": true
-          },
-          "remainingAttempts": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true,
-            "readOnly": true
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "readOnly": true
+            "$ref": "#/components/schemas/EmailVerificationData"
           }
         },
         "additionalProperties": false
@@ -2018,6 +2740,7 @@
           "Bhutanese",
           "Himachali",
           "Ladakhi",
+          "Lepcha",
           "Nepali",
           "Sikkimese",
           "Tibetan",
@@ -2078,42 +2801,93 @@
         ],
         "type": "string"
       },
-      "LikeType": {
-        "enum": [
-          "Regular",
-          "SuperLike"
-        ],
-        "type": "string"
-      },
-      "LikeUserRequest": {
-        "required": [
-          "userId"
-        ],
+      "LastMessageData": {
         "type": "object",
         "properties": {
-          "userId": {
+          "id": {
             "type": "string",
             "format": "uuid"
           },
-          "likeType": {
-            "$ref": "#/components/schemas/LikeType"
+          "senderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageType": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
       },
-      "LoginResult": {
+      "LocationUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginData": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDTO"
+          },
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginDataOperationResult": {
         "type": "object",
         "properties": {
           "success": {
             "type": "boolean",
             "readOnly": true
           },
-          "errorMessage": {
+          "errorCode": {
             "type": "string",
             "nullable": true,
             "readOnly": true
           },
-          "errorCode": {
+          "errorMessage": {
             "type": "string",
             "nullable": true,
             "readOnly": true
@@ -2124,24 +2898,12 @@
             "nullable": true,
             "readOnly": true
           },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
           "data": {
-            "$ref": "#/components/schemas/User"
-          },
-          "accessToken": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "refreshToken": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "tokenExpiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "readOnly": true
+            "$ref": "#/components/schemas/LoginData"
           }
         },
         "additionalProperties": false
@@ -2166,46 +2928,38 @@
         },
         "additionalProperties": false
       },
-      "MatchDTO": {
+      "MatchConversationData": {
         "type": "object",
         "properties": {
-          "matchId": {
+          "conversationId": {
             "type": "string",
             "format": "uuid"
-          },
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "age": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "primaryPhoto": {
-            "type": "string",
-            "nullable": true
-          },
-          "heritage": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HeritageType"
-            },
-            "nullable": true
           },
           "matchedAt": {
             "type": "string",
             "format": "date-time"
           },
+          "otherUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isOtherUserActive": {
+            "type": "boolean"
+          },
+          "primaryPhotoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "otherUserFirstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "otherUserLastName": {
+            "type": "string",
+            "nullable": true
+          },
           "lastMessage": {
-            "$ref": "#/components/schemas/MessageDTO"
+            "$ref": "#/components/schemas/LastMessageData"
           },
           "unreadCount": {
             "type": "integer",
@@ -2217,55 +2971,55 @@
         },
         "additionalProperties": false
       },
-      "Message": {
-        "required": [
-          "content",
-          "conversationId",
-          "senderId"
-        ],
+      "MatchData": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "conversationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "senderId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "content": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "messageType": {
-            "maxLength": 20,
-            "type": "string",
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchConversationData"
+            },
             "nullable": true
           },
-          "isRead": {
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fromCache": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MatchDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
           },
-          "sentAt": {
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
             "type": "string",
             "format": "date-time"
           },
-          "conversation": {
-            "$ref": "#/components/schemas/Conversation"
-          },
-          "sender": {
-            "$ref": "#/components/schemas/User"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
+          "data": {
+            "$ref": "#/components/schemas/MatchData"
           }
         },
         "additionalProperties": false
@@ -2307,107 +3061,601 @@
         },
         "additionalProperties": false
       },
-      "NotificationDTO": {
+      "MessageDeletionData": {
         "type": "object",
         "properties": {
-          "id": {
+          "messageId": {
             "type": "string",
             "format": "uuid"
           },
-          "title": {
+          "conversationId": {
             "type": "string",
-            "nullable": true
+            "format": "uuid"
           },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "notificationType": {
-            "$ref": "#/components/schemas/NotificationType"
-          },
-          "data": {
-            "type": "string",
-            "nullable": true
-          },
-          "isRead": {
+          "wasWithinTimeLimit": {
             "type": "boolean"
           },
-          "createdAt": {
+          "deletedAt": {
             "type": "string",
             "format": "date-time"
           },
-          "readAt": {
+          "deletionType": {
             "type": "string",
-            "format": "date-time",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "NotificationType": {
-        "enum": [
-          "Match",
-          "Message",
-          "SuperLike",
-          "ProfileView"
-        ],
-        "type": "string"
-      },
-      "PushNotification": {
-        "required": [
-          "message",
-          "title",
-          "userId"
-        ],
+      "MessageDeletionDataOperationResult": {
         "type": "object",
         "properties": {
-          "id": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "userId": {
+          "errorMessage": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "title": {
-            "maxLength": 200,
-            "minLength": 1,
-            "type": "string"
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
           },
-          "message": {
-            "maxLength": 500,
-            "minLength": 1,
-            "type": "string"
-          },
-          "notificationType": {
-            "$ref": "#/components/schemas/NotificationType"
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           },
           "data": {
-            "type": "string",
-            "nullable": true
+            "$ref": "#/components/schemas/MessageDeletionData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageSendData": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/MessageDTO"
           },
-          "isSent": {
+          "receiverId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isFirstMessage": {
             "type": "boolean"
+          },
+          "conversationMessageCount": {
+            "type": "integer",
+            "format": "int32"
           },
           "sentAt": {
             "type": "string",
-            "format": "date-time",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessageSendDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MessageSendData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessagesReadData": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readMessageIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
             "nullable": true
           },
-          "isRead": {
+          "markedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastReadMessageId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "MessagesReadDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MessagesReadData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoDeletionData": {
+        "type": "object",
+        "properties": {
+          "deletedPhotoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "wasPrimary": {
             "type": "boolean"
           },
-          "readAt": {
+          "newPrimaryPhotoId": {
             "type": "string",
-            "format": "date-time",
+            "format": "uuid",
+            "nullable": true
+          },
+          "remainingPhotosCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoDeletionDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoDeletionData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoReorderData": {
+        "type": "object",
+        "properties": {
+          "reorderedPhotos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
+          },
+          "photosCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoReorderDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoReorderData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoUploadData": {
+        "type": "object",
+        "properties": {
+          "photo": {
+            "$ref": "#/components/schemas/UserPhotoDTO"
+          },
+          "totalPhotosCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "setAsPrimary": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoUploadDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoUploadData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhotoUploadError": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PreferencesDTO": {
+        "type": "object",
+        "properties": {
+          "preferredHeritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            },
+            "nullable": true
+          },
+          "preferredReligions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
+            "nullable": true
+          },
+          "languagePreference": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "preferredHeightMin": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredHeightMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "preferredChildren": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChildrenStatusType"
+            },
+            "nullable": true
+          },
+          "preferredFamilyPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FamilyPlanType"
+            },
+            "nullable": true
+          },
+          "preferredDrugs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredSmoking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredDrinking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredMarijuana": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViceFrequencyType"
+            },
+            "nullable": true
+          },
+          "preferredEducationLevels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationLevelType"
+            },
             "nullable": true
           },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           },
-          "user": {
-            "$ref": "#/components/schemas/User"
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PrimaryPhotoData": {
+        "type": "object",
+        "properties": {
+          "newPrimaryPhotoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previousPrimaryPhotoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "newPrimaryPhoto": {
+            "$ref": "#/components/schemas/UserPhotoDTO"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PrimaryPhotoDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PrimaryPhotoData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileUpdateData": {
+        "type": "object",
+        "properties": {
+          "updatedUser": {
+            "$ref": "#/components/schemas/UserDTO"
+          },
+          "updatedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "requiredDiscoveryRefresh": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileUpdateDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProfileUpdateData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshTokenData": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshTokenDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RefreshTokenData"
           }
         },
         "additionalProperties": false
@@ -2425,19 +3673,40 @@
         },
         "additionalProperties": false
       },
-      "RegistrationResult": {
+      "RegistrationData": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDTO"
+          },
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegistrationDataOperationResult": {
         "type": "object",
         "properties": {
           "success": {
             "type": "boolean",
             "readOnly": true
           },
-          "errorMessage": {
+          "errorCode": {
             "type": "string",
             "nullable": true,
             "readOnly": true
           },
-          "errorCode": {
+          "errorMessage": {
             "type": "string",
             "nullable": true,
             "readOnly": true
@@ -2448,24 +3717,104 @@
             "nullable": true,
             "readOnly": true
           },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
           "data": {
-            "$ref": "#/components/schemas/User"
-          },
-          "accessToken": {
+            "$ref": "#/components/schemas/RegistrationData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegistrationRequest": {
+        "required": [
+          "dateOfBirth",
+          "email",
+          "firstName",
+          "gender",
+          "heritage",
+          "hometown",
+          "interestedIn",
+          "languagesSpoken",
+          "latitude",
+          "longitude",
+          "religion",
+          "verificationToken"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true,
-            "readOnly": true
+            "format": "email"
           },
-          "refreshToken": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
+          "verificationToken": {
+            "minLength": 1,
+            "type": "string"
           },
-          "tokenExpiresAt": {
+          "firstName": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "lastName": {
+            "maxLength": 100,
             "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "readOnly": true
+            "nullable": true
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "hometown": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          },
+          "heritage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeritageType"
+            }
+          },
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            }
+          },
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            }
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "format": "tel",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2500,11 +3849,11 @@
       "ReportUserRequest": {
         "required": [
           "reason",
-          "userId"
+          "reportedUserId"
         ],
         "type": "object",
         "properties": {
-          "userId": {
+          "reportedUserId": {
             "type": "string",
             "format": "uuid"
           },
@@ -2571,14 +3920,11 @@
         },
         "additionalProperties": false
       },
-      "SubscriptionStatusDTO": {
+      "SubscriptionDTO": {
         "type": "object",
         "properties": {
           "subscriptionType": {
             "$ref": "#/components/schemas/SubscriptionType"
-          },
-          "isActive": {
-            "type": "boolean"
           },
           "startsAt": {
             "type": "string",
@@ -2587,11 +3933,6 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time",
-            "nullable": true
-          },
-          "daysRemaining": {
-            "type": "integer",
-            "format": "int32",
             "nullable": true
           }
         },
@@ -2604,35 +3945,221 @@
         ],
         "type": "string"
       },
-      "SubscriptionUpgradeRequest": {
+      "SwipeData": {
         "type": "object",
         "properties": {
-          "durationMonths": {
-            "maximum": 12,
-            "minimum": 1,
-            "type": "integer",
-            "format": "int32"
+          "outcome": {
+            "$ref": "#/components/schemas/SwipeOutcome"
           },
-          "paymentToken": {
+          "swipedUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "isMatch": {
+            "type": "boolean"
+          },
+          "swipeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "swipeTimestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SwipeOutcome": {
+        "enum": [
+          "Success",
+          "LimitReached",
+          "UserAlreadyProcessed",
+          "UserBlocked",
+          "UserNotFound",
+          "MatchCreated",
+          "SwipeUndone",
+          "NoRecentPassToUndo"
+        ],
+        "type": "string"
+      },
+      "SwipeRequest": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "swipeType": {
+            "$ref": "#/components/schemas/SwipeType"
+          },
+          "discoveryMode": {
             "type": "string",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "UpdateDiscoverySettingsRequest": {
+      "SwipeResult": {
         "type": "object",
         "properties": {
-          "enableGlobalDiscovery": {
+          "success": {
             "type": "boolean",
-            "nullable": true
+            "readOnly": true
           },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SwipeData"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SwipeOutcome"
+          },
+          "swipedUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SwipeType": {
+        "enum": [
+          "Like",
+          "SuperLike",
+          "Pass",
+          "Unmatched",
+          "Reported"
+        ],
+        "type": "string"
+      },
+      "UnblockUserData": {
+        "type": "object",
+        "properties": {
+          "unblockedUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unblockedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnblockUserDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UnblockUserData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnblockUserRequest": {
+        "required": [
+          "unblockedUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "unblockedUserId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateDiscoveryFiltersRequest": {
+        "type": "object",
+        "properties": {
           "isDiscoverable": {
             "type": "boolean",
             "nullable": true
           },
           "isGloballyDiscoverable": {
             "type": "boolean",
+            "nullable": true
+          },
+          "enableGlobalDiscovery": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "minAge": {
+            "maximum": 100,
+            "minimum": 18,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxAge": {
+            "maximum": 100,
+            "minimum": 18,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "neighbourhood": {
+            "maxLength": 200,
+            "type": "string",
             "nullable": true
           },
           "maxDistanceKm": {
@@ -2641,169 +4168,6 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
-          },
-          "minAge": {
-            "maximum": 100,
-            "minimum": 18,
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "maxAge": {
-            "maximum": 100,
-            "minimum": 18,
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "UpdateDiscoveryVisibilityRequest": {
-        "type": "object",
-        "properties": {
-          "isDiscoverable": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UpdateNotificationSettingsRequest": {
-        "required": [
-          "notificationsEnabled"
-        ],
-        "type": "object",
-        "properties": {
-          "notificationsEnabled": {
-            "type": "boolean"
-          },
-          "pushToken": {
-            "maxLength": 500,
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "UpdateProfileRequest": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "bio": {
-            "type": "string",
-            "nullable": true
-          },
-          "hometown": {
-            "type": "string",
-            "nullable": true
-          },
-          "interestedIn": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "heritage": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HeritageType"
-            },
-            "nullable": true
-          },
-          "religion": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReligionType"
-            },
-            "nullable": true
-          },
-          "languagesSpoken": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LanguageType"
-            },
-            "nullable": true
-          },
-          "educationLevel": {
-            "$ref": "#/components/schemas/EducationLevelType"
-          },
-          "occupation": {
-            "type": "string",
-            "nullable": true
-          },
-          "heightCm": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "maxDistanceKm": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "minAge": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "maxAge": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "enableGlobalDiscovery": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "isGloballyDiscoverable": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "isDiscoverable": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "children": {
-            "$ref": "#/components/schemas/ChildrenStatusType"
-          },
-          "familyPlan": {
-            "$ref": "#/components/schemas/FamilyPlanType"
-          },
-          "drugs": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "smoking": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "marijuana": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "drinking": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
           },
           "preferredHeritage": {
             "type": "array",
@@ -2819,7 +4183,7 @@
             },
             "nullable": true
           },
-          "languagePreference": {
+          "preferredLanguagesSpoken": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/LanguageType"
@@ -2827,13 +4191,24 @@
             "nullable": true
           },
           "preferredHeightMin": {
+            "maximum": 250,
+            "minimum": 120,
             "type": "integer",
             "format": "int32",
             "nullable": true
           },
           "preferredHeightMax": {
+            "maximum": 250,
+            "minimum": 120,
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "preferredEducationLevels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationLevelType"
+            },
             "nullable": true
           },
           "preferredChildren": {
@@ -2864,13 +4239,6 @@
             },
             "nullable": true
           },
-          "preferredMarijuana": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ViceFrequencyType"
-            },
-            "nullable": true
-          },
           "preferredDrinking": {
             "type": "array",
             "items": {
@@ -2878,124 +4246,19 @@
             },
             "nullable": true
           },
-          "preferredEducationLevels": {
+          "preferredMarijuana": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/EducationLevelType"
+              "$ref": "#/components/schemas/ViceFrequencyType"
             },
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "UpdatePushTokenRequest": {
-        "required": [
-          "pushToken"
-        ],
+      "UpdateProfileRequest": {
         "type": "object",
         "properties": {
-          "pushToken": {
-            "maxLength": 500,
-            "minLength": 1,
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UsageLimitsDTO": {
-        "type": "object",
-        "properties": {
-          "subscriptionType": {
-            "$ref": "#/components/schemas/SubscriptionType"
-          },
-          "likesUsedToday": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxLikesPerDay": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remainingLikes": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "bonusLikesFromAds": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "superLikesUsedToday": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxSuperLikesPerDay": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "superLikesUsedThisWeek": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxSuperLikesPerWeek": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remainingSuperLikes": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "matchesCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxMatches": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remainingMatches": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "adsWatchedToday": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxAdsPerDay": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remainingAds": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "additionalProperties": false
-      },
-      "User": {
-        "required": [
-          "email",
-          "supabaseUid"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "supabaseUid": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "email": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "phoneNumber": {
-            "maxLength": 20,
-            "type": "string",
-            "nullable": true
-          },
           "firstName": {
             "maxLength": 100,
             "type": "string",
@@ -3006,29 +4269,26 @@
             "type": "string",
             "nullable": true
           },
-          "dateOfBirth": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "gender": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "interestedIn": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
           "bio": {
+            "maxLength": 500,
             "type": "string",
+            "nullable": true
+          },
+          "hometown": {
+            "maxLength": 200,
+            "type": "string",
+            "nullable": true
+          },
+          "occupation": {
+            "maxLength": 100,
+            "type": "string",
+            "nullable": true
+          },
+          "heightCm": {
+            "maximum": 250,
+            "minimum": 120,
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "heritage": {
@@ -3055,26 +4315,6 @@
           "educationLevel": {
             "$ref": "#/components/schemas/EducationLevelType"
           },
-          "occupation": {
-            "maxLength": 100,
-            "type": "string",
-            "nullable": true
-          },
-          "heightCm": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "hometown": {
-            "maxLength": 200,
-            "type": "string",
-            "nullable": true
-          },
-          "neighbourhood": {
-            "maxLength": 200,
-            "type": "string",
-            "nullable": true
-          },
           "children": {
             "$ref": "#/components/schemas/ChildrenStatusType"
           },
@@ -3087,141 +4327,128 @@
           "smoking": {
             "$ref": "#/components/schemas/ViceFrequencyType"
           },
-          "drinking": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
           "marijuana": {
             "$ref": "#/components/schemas/ViceFrequencyType"
           },
-          "maxDistanceKm": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "minAge": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxAge": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "enableGlobalDiscovery": {
-            "type": "boolean"
-          },
-          "isDiscoverable": {
-            "type": "boolean"
-          },
-          "isGloballyDiscoverable": {
-            "type": "boolean"
-          },
-          "pushToken": {
-            "maxLength": 500,
-            "type": "string",
-            "nullable": true
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
           },
           "notificationsEnabled": {
-            "type": "boolean"
-          },
-          "isVerified": {
-            "type": "boolean"
-          },
-          "isActive": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": true
           },
           "isOnboarding": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": true
           },
-          "lastActive": {
+          "pushToken": {
             "type": "string",
-            "format": "date-time"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "photos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserPhoto"
-            },
-            "nullable": true
-          },
-          "likesGiven": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserLike"
-            },
-            "nullable": true
-          },
-          "likesReceived": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserLike"
-            },
-            "nullable": true
-          },
-          "conversationsAsUser1": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Conversation"
-            },
-            "nullable": true
-          },
-          "conversationsAsUser2": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Conversation"
-            },
-            "nullable": true
-          },
-          "messagesSent": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Message"
-            },
-            "nullable": true
-          },
-          "reportsMade": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserReport"
-            },
-            "nullable": true
-          },
-          "reportsReceived": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserReport"
-            },
-            "nullable": true
-          },
-          "preferences": {
-            "$ref": "#/components/schemas/UserPreference"
-          },
-          "subscription": {
-            "$ref": "#/components/schemas/UserSubscription"
-          },
-          "usageLimit": {
-            "$ref": "#/components/schemas/UserUsageLimit"
-          },
-          "notifications": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PushNotification"
-            },
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "UserLike": {
+      "UsageLimitsDTO": {
+        "type": "object",
+        "properties": {
+          "likesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxLikesPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "superLikesUsedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxSuperLikesPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adsWatchedToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAdsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserConversationsData": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationDTO"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unreadConversationsCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalUnreadMessages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fromCache": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserConversationsDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserConversationsData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserDTO": {
         "required": [
-          "likedUserId",
-          "likerUserId"
+          "email",
+          "firstName",
+          "hometown",
+          "preferences"
         ],
         "type": "object",
         "properties": {
@@ -3229,46 +4456,13 @@
             "type": "string",
             "format": "uuid"
           },
-          "likerUserId": {
+          "email": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true
           },
-          "likedUserId": {
+          "phoneNumber": {
             "type": "string",
-            "format": "uuid"
-          },
-          "isLike": {
-            "type": "boolean"
-          },
-          "likeType": {
-            "$ref": "#/components/schemas/LikeType"
-          },
-          "isMatch": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "likerUser": {
-            "$ref": "#/components/schemas/User"
-          },
-          "likedUser": {
-            "$ref": "#/components/schemas/User"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserLikeDTO": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
+            "nullable": true
           },
           "firstName": {
             "type": "string",
@@ -3278,13 +4472,44 @@
             "type": "string",
             "nullable": true
           },
-          "age": {
-            "type": "integer",
-            "format": "int32"
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time"
           },
-          "primaryPhoto": {
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "heightCm": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "bio": {
             "type": "string",
             "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "hometown": {
+            "type": "string",
+            "nullable": true
+          },
+          "neighbourhood": {
+            "type": "string",
+            "nullable": true
+          },
+          "occupation": {
+            "type": "string",
+            "nullable": true
+          },
+          "educationLevel": {
+            "$ref": "#/components/schemas/EducationLevelType"
           },
           "heritage": {
             "type": "array",
@@ -3293,55 +4518,76 @@
             },
             "nullable": true
           },
-          "likeType": {
-            "$ref": "#/components/schemas/LikeType"
-          },
-          "likedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "distanceKm": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserPhoto": {
-        "required": [
-          "storagePath",
-          "url",
-          "userId"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "storagePath": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "url": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "thumbnailUrl": {
-            "type": "string",
+          "religion": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReligionType"
+            },
             "nullable": true
           },
-          "photoOrder": {
+          "languagesSpoken": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageType"
+            },
+            "nullable": true
+          },
+          "familyPlan": {
+            "$ref": "#/components/schemas/FamilyPlanType"
+          },
+          "children": {
+            "$ref": "#/components/schemas/ChildrenStatusType"
+          },
+          "drugs": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "smoking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "marijuana": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "drinking": {
+            "$ref": "#/components/schemas/ViceFrequencyType"
+          },
+          "interestedIn": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "minAge": {
             "type": "integer",
             "format": "int32"
           },
-          "isPrimary": {
+          "maxAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDistanceKm": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isDiscoverable": {
+            "type": "boolean"
+          },
+          "isGloballyDiscoverable": {
+            "type": "boolean"
+          },
+          "enableGlobalDiscovery": {
+            "type": "boolean"
+          },
+          "pushToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "notificaitonsEnabled": {
+            "type": "boolean"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "isOnboarding": {
+            "type": "boolean"
+          },
+          "isActive": {
             "type": "boolean"
           },
           "createdAt": {
@@ -3352,8 +4598,25 @@
             "type": "string",
             "format": "date-time"
           },
-          "user": {
-            "$ref": "#/components/schemas/User"
+          "lastActive": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/PreferencesDTO"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/SubscriptionDTO"
+          },
+          "usageLimit": {
+            "$ref": "#/components/schemas/UsageLimitsDTO"
           }
         },
         "additionalProperties": false
@@ -3383,292 +4646,88 @@
         },
         "additionalProperties": false
       },
-      "UserPreference": {
-        "required": [
-          "userId"
-        ],
+      "UserPhotoDTOListOperationResult": {
         "type": "object",
         "properties": {
-          "id": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "userId": {
+          "errorMessage": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "preferredHeritage": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HeritageType"
-            },
-            "nullable": true
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
           },
-          "preferredReligions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReligionType"
-            },
-            "nullable": true
-          },
-          "languagePreference": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LanguageType"
-            },
-            "nullable": true
-          },
-          "preferredHeightMin": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "preferredHeightMax": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "preferredChildren": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ChildrenStatusType"
-            },
-            "nullable": true
-          },
-          "preferredFamilyPlans": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FamilyPlanType"
-            },
-            "nullable": true
-          },
-          "preferredDrugs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ViceFrequencyType"
-            },
-            "nullable": true
-          },
-          "preferredSmoking": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ViceFrequencyType"
-            },
-            "nullable": true
-          },
-          "preferredDrinking": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ViceFrequencyType"
-            },
-            "nullable": true
-          },
-          "preferredMarijuana": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ViceFrequencyType"
-            },
-            "nullable": true
-          },
-          "preferredEducationLevels": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EducationLevelType"
-            },
-            "nullable": true
-          },
-          "createdAt": {
+          "timestamp": {
             "type": "string",
             "format": "date-time"
           },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user": {
-            "$ref": "#/components/schemas/User"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserProfileDTO": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "age": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "dateOfBirth": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "gender": {
-            "$ref": "#/components/schemas/GenderType"
-          },
-          "bio": {
-            "type": "string",
-            "nullable": true
-          },
-          "heritage": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HeritageType"
-            },
-            "nullable": true
-          },
-          "religion": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReligionType"
-            },
-            "nullable": true
-          },
-          "languagesSpoken": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LanguageType"
-            },
-            "nullable": true
-          },
-          "educationLevel": {
-            "$ref": "#/components/schemas/EducationLevelType"
-          },
-          "occupation": {
-            "type": "string",
-            "nullable": true
-          },
-          "heightCm": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "distanceKm": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "enableGlobalDiscovery": {
-            "type": "boolean"
-          },
-          "isGloballyDiscoverable": {
-            "type": "boolean"
-          },
-          "isDiscoverable": {
-            "type": "boolean"
-          },
-          "hometown": {
-            "type": "string",
-            "nullable": true
-          },
-          "neighbourhood": {
-            "type": "string",
-            "nullable": true
-          },
-          "children": {
-            "$ref": "#/components/schemas/ChildrenStatusType"
-          },
-          "familyPlan": {
-            "$ref": "#/components/schemas/FamilyPlanType"
-          },
-          "drugs": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "smoking": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "marijuana": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "drinking": {
-            "$ref": "#/components/schemas/ViceFrequencyType"
-          },
-          "photos": {
+          "data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UserPhotoDTO"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserProfileData": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDTO"
           },
-          "isVerified": {
+          "wasCached": {
             "type": "boolean"
           },
-          "isOnboarding": {
-            "type": "boolean"
-          },
-          "lastActive": {
+          "lastUpdated": {
             "type": "string",
             "format": "date-time"
           }
         },
         "additionalProperties": false
       },
-      "UserReport": {
-        "required": [
-          "reportedId",
-          "reporterId"
-        ],
+      "UserProfileDataOperationResult": {
         "type": "object",
         "properties": {
-          "id": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "reporterId": {
+          "errorMessage": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "reportedId": {
-            "type": "string",
-            "format": "uuid"
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
           },
-          "reason": {
-            "$ref": "#/components/schemas/ReportReason"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "maxLength": 20,
-            "type": "string",
-            "nullable": true
-          },
-          "adminNotes": {
-            "type": "string",
-            "nullable": true
-          },
-          "resolvedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
+          "timestamp": {
             "type": "string",
             "format": "date-time"
           },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reporter": {
-            "$ref": "#/components/schemas/User"
-          },
-          "reported": {
-            "$ref": "#/components/schemas/User"
+          "data": {
+            "$ref": "#/components/schemas/UserProfileData"
           }
         },
         "additionalProperties": false
@@ -3715,104 +4774,142 @@
         },
         "additionalProperties": false
       },
-      "UserSubscription": {
-        "required": [
-          "userId"
-        ],
+      "UserReportData": {
         "type": "object",
         "properties": {
-          "id": {
+          "reportId": {
             "type": "string",
             "format": "uuid"
           },
-          "userId": {
+          "reportedUserId": {
             "type": "string",
             "format": "uuid"
           },
-          "subscriptionType": {
-            "$ref": "#/components/schemas/SubscriptionType"
+          "reason": {
+            "$ref": "#/components/schemas/ReportReason"
           },
-          "startsAt": {
+          "description": {
             "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
             "nullable": true
           },
-          "isActive": {
+          "matchRemoved": {
             "type": "boolean"
           },
-          "createdAt": {
+          "conversationDeleted": {
+            "type": "boolean"
+          },
+          "reportedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user": {
-            "$ref": "#/components/schemas/User"
           }
         },
         "additionalProperties": false
       },
-      "UserUsageLimit": {
-        "required": [
-          "userId"
-        ],
+      "UserReportDataOperationResult": {
         "type": "object",
         "properties": {
-          "id": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "userId": {
+          "errorMessage": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "readOnly": true
           },
-          "likesUsedToday": {
-            "type": "integer",
-            "format": "int32"
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
           },
-          "superLikesUsedToday": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "superLikesUsedThisWeek": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "adsWatchedToday": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "bonusLikesFromAds": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "lastResetDate": {
+          "timestamp": {
             "type": "string",
             "format": "date-time"
           },
-          "lastWeeklyReset": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "user": {
-            "$ref": "#/components/schemas/User"
+          "data": {
+            "$ref": "#/components/schemas/UserReportData"
           }
         },
         "additionalProperties": false
+      },
+      "UserReportsListData": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserReportDTO"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pendingCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserReportsListDataOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserReportsListData"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerificationType": {
+        "enum": [
+          "CodeSent",
+          "CodeVerified",
+          "CodeExpired",
+          "CodeInvalid",
+          "RateLimitExceeded",
+          "ValidationError",
+          "Error"
+        ],
+        "type": "string"
       },
       "VerifyOtpRequest": {
         "required": [

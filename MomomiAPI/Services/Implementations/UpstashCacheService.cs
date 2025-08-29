@@ -66,10 +66,8 @@ namespace MomomiAPI.Services.Implementations
             if (!_isRedisAvailable)
                 return;
 
-            // Using _keySemaphores for preventing race conditions on specific keys
-            var keySemaphore = _keySemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-
-            await keySemaphore.WaitAsync();
+            // Use global semaphore instead of per-key semaphore to avoid deadlock
+            await _semaphore.WaitAsync();
             try
             {
                 var serializedValue = JsonSerializer.Serialize(value);
@@ -82,12 +80,70 @@ namespace MomomiAPI.Services.Implementations
             }
             finally
             {
+                _semaphore.Release();
+            }
+        }
+
+        // Internal method for SetAsync that doesn't use semaphore (for use within GetOrSetAsync)
+        private async Task SetAsyncInternal<T>(string key, T value, TimeSpan? expiry = null)
+        {
+            if (!_isRedisAvailable)
+                return;
+
+            try
+            {
+                var serializedValue = JsonSerializer.Serialize(value);
+                await _database.StringSetAsync(key, serializedValue, expiry);
+                _logger.LogDebug("Cache set (internal) for key: {Key}", key);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting cache key (internal) {Key}", key);
+            }
+        }
+
+        // Cache-Aside Pattern with Locking - FIXED VERSION
+        public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiry = null)
+        {
+            if (!_isRedisAvailable)
+            {
+                _logger.LogWarning("Redis not available, executing factory directly for key: {Key}", key);
+                return await factory();
+            }
+
+            // Try to get from cache first (without locking)
+            var cached = await GetAsync<T>(key);
+            if (cached != null) return cached;
+
+            // Use per-key semaphore to prevent cache stampede
+            var keySemaphore = _keySemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+            await keySemaphore.WaitAsync();
+            try
+            {
+                // Double-check pattern
+                cached = await GetAsync<T>(key);
+                if (cached != null) return cached;
+
+                // Execute factory and cache result
+                _logger.LogDebug("Cache miss for key {Key}, executing factory", key);
+                var value = await factory();
+                if (value != null)
+                {
+                    // Use internal method to avoid semaphore deadlock
+                    await SetAsyncInternal(key, value, expiry);
+                }
+                return value;
+            }
+            finally
+            {
                 keySemaphore.Release();
 
-                // Optional: Clean up unused semaphores
+                // Clean up semaphore if no one is waiting
                 if (keySemaphore.CurrentCount == 1)
                 {
                     _keySemaphores.TryRemove(key, out _);
+                    keySemaphore.Dispose();
                 }
             }
         }
@@ -194,50 +250,6 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        // Cache-Aside Pattern with Locking
-        public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiry = null)
-        {
-            if (!_isRedisAvailable)
-            {
-                _logger.LogWarning("Redis not available, executing factory directly for key: {Key}", key);
-                return await factory();
-            }
-
-            // Try to get from cache first
-            var cached = await GetAsync<T>(key);
-            if (cached != null) return cached;
-
-            // Use per-key semaphore to prevent cache stampede
-            var keySemaphore = _keySemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-
-            await keySemaphore.WaitAsync();
-            try
-            {
-                // Double-check pattern
-                cached = await GetAsync<T>(key);
-                if (cached != null) return cached;
-
-                // Execute factory and cache result
-                var value = await factory();
-                if (value != null)
-                {
-                    await SetAsync(key, value, expiry);
-                }
-                return value;
-            }
-            finally
-            {
-                keySemaphore.Release();
-
-                // Clean up semaphore if no one is waiting
-                if (keySemaphore.CurrentCount == 1)
-                {
-                    _keySemaphores.TryRemove(key, out _);
-                    keySemaphore.Dispose();
-                }
-            }
-        }
-
         public async Task RemoveAsync(string key)
         {
             if (!_isRedisAvailable)
@@ -246,6 +258,7 @@ namespace MomomiAPI.Services.Implementations
                 return;
             }
 
+            await _semaphore.WaitAsync();
             try
             {
                 await _database.KeyDeleteAsync(key);
@@ -254,6 +267,10 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error removing cache key {Key}", key);
+            }
+            finally
+            {
+                _semaphore.Release();
             }
         }
 
@@ -265,6 +282,7 @@ namespace MomomiAPI.Services.Implementations
                 return false;
             }
 
+            await _semaphore.WaitAsync();
             try
             {
                 var exists = await _database.KeyExistsAsync(key);
@@ -286,6 +304,10 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogError(ex, "Unexpected error checking cache key exists {Key}", key);
                 return false;
             }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public async Task SetStringAsync(string key, string value, TimeSpan? expiry = null)
@@ -296,6 +318,7 @@ namespace MomomiAPI.Services.Implementations
                 return;
             }
 
+            await _semaphore.WaitAsync();
             try
             {
                 await _database.StringSetAsync(key, value, expiry);
@@ -313,6 +336,10 @@ namespace MomomiAPI.Services.Implementations
             {
                 _logger.LogError(ex, "Unexpected error setting string cache key {Key}", key);
             }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public async Task<string?> GetStringAsync(string key)
@@ -323,6 +350,7 @@ namespace MomomiAPI.Services.Implementations
                 return null;
             }
 
+            await _semaphore.WaitAsync();
             try
             {
                 var value = await _database.StringGetAsync(key);
@@ -344,6 +372,10 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogError(ex, "Unexpected error getting string cache key {Key}", key);
                 return null;
             }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         // Health check method
@@ -364,7 +396,7 @@ namespace MomomiAPI.Services.Implementations
         }
 
         #region Private Helper Methods
-        // Pipleline approach for mixed TTLs
+        // Pipeline approach for mixed TTLs
         private async Task SetManyWithPipeline<T>(Dictionary<string, T> keyValuePairs, Dictionary<string, TimeSpan>? expiries)
         {
             var batch = _database.CreateBatch();
@@ -400,7 +432,7 @@ namespace MomomiAPI.Services.Implementations
             await Task.WhenAll(tasks);
         }
 
-        /// Fallback to individual GET operations if batch fails
+        // Fallback to individual GET operations if batch fails
         private async Task<Dictionary<string, T?>> FallbackToIndividualGets<T>(List<string> keys)
         {
             _logger.LogWarning("Falling back to individual GET operations for {Count} keys", keys.Count);

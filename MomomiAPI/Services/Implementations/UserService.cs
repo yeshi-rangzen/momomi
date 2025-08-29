@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
@@ -19,16 +20,21 @@ namespace MomomiAPI.Services.Implementations
         private readonly ICacheService _cacheService;
         private readonly ILogger<UserService> _logger;
 
+        private readonly IMemoryCache _inMemoryActiveUsers;
+        private readonly TimeSpan _inMemoryCacheExpiry = TimeSpan.FromMinutes(5);
+
         public UserService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
             ILogger<UserService> logger,
-            Supabase.Client supabaseClient)
+            Supabase.Client supabaseClient,
+            IMemoryCache memoryCache)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _logger = logger;
             _supabaseClient = supabaseClient;
+            _inMemoryActiveUsers = memoryCache;
         }
 
         /// <summary>
@@ -331,7 +337,134 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        /// <summary>
+        /// Highly optimized user activity check with multi-layer caching
+        /// Called on every API request for authorization
+        /// </summary>
+        public async Task<bool?> IsActiveUser(Guid userId)
+        {
+            try
+            {
+                // Layer 1: In-memory cache for ultra-fast access (most recent checks)
+                if (_inMemoryActiveUsers.TryGetValue(userId, out var cachedResult) && cachedResult != null)
+                {
+                    // Check if cachedResult is not null AND is the correct type
+                    if (cachedResult is UserActiveStatus userActiveStatus)
+                    {
+                        _logger.LogDebug("In-memory cache hit for user activity check: {UserId}", userId);
+                        return userActiveStatus.IsActive;
+                    }
+                    else
+                    {
+                        // cachedResult is null or wrong type - remove from cache
+                        _logger.LogWarning("Invalid cached result for user {UserId}, removing from cache", userId);
+                        _inMemoryActiveUsers.Remove(userId);
+                    }
+                }
+
+                // Layer 2: Redis cache for fast distributed access
+                var cacheKey = CacheKeys.Users.ActiveStatus(userId);
+                var redisResult = await _cacheService.GetAsync<UserActiveStatus>(cacheKey);
+
+                if (redisResult != null)
+                {
+                    _logger.LogDebug("Redis cache hit for user activity check: {UserId}", userId);
+
+                    var cacheEntryOptionsFromRedis = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = _inMemoryCacheExpiry,
+                        Priority = CacheItemPriority.Normal,
+                        Size = 1 // Each entry counts as size 1
+                    };
+                    // Update in-memory cache for next time
+                    _inMemoryActiveUsers.Set(userId, redisResult, cacheEntryOptionsFromRedis);
+                    return redisResult.IsActive;
+                }
+
+                // Layer 3: Database query (cache miss)
+                _logger.LogDebug("Cache miss for user activity check, querying database: {UserId}", userId);
+
+                var userResult = await _dbContext.Users
+                    .Where(u => u.Id == userId)
+                    .Select(u => new { UserId = u.Id, IsActive = u.IsActive })
+                    .FirstOrDefaultAsync();
+
+                if (userResult == null)
+                {
+                    // User does not exist - cache this result to avoid repeated DB queries
+                    var nonExistentUserStatus = new UserActiveStatus
+                    {
+                        UserId = userId,
+                        IsActive = null, // null indicates user doesn't exist
+                        CheckedAt = DateTime.UtcNow
+                    };
+
+                    // Cache the "user doesn't exist" result with shorter TTL
+                    var redisTask = _cacheService.SetAsync(cacheKey, nonExistentUserStatus, TimeSpan.FromMinutes(2));
+                    var inMemoryTask = Task.Run(() => _inMemoryActiveUsers.Set(userId, nonExistentUserStatus, TimeSpan.FromMinutes(1)));
+
+                    // Fire and forget cache updates
+                    _ = Task.WhenAll(redisTask, inMemoryTask);
+
+                    _logger.LogDebug("User does not exist: {UserId}", userId);
+                    return null;
+                }
+
+                var userStatus = new UserActiveStatus
+                {
+                    UserId = userId,
+                    IsActive = userResult.IsActive,
+                    CheckedAt = DateTime.UtcNow
+                };
+
+                var cacheEntryOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = _inMemoryCacheExpiry,
+                    Priority = CacheItemPriority.Normal,
+                    Size = 1 // Each entry counts as size 1
+                };
+
+                // Cache the result in both layers
+                var redisCacheTask = _cacheService.SetAsync(cacheKey, userStatus, CacheKeys.Duration.UserActiveStatus);
+                var inMemoryCacheTask = Task.Run(() => _inMemoryActiveUsers.Set(userId, userStatus, cacheEntryOptions));
+
+                // Fire and forget cache updates for performance
+                _ = Task.WhenAll(redisCacheTask, inMemoryCacheTask);
+
+                _logger.LogDebug("User activity status cached for: {UserId}, IsActive: {IsActive}", userId, userResult.IsActive);
+                return userResult.IsActive;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking user activity status: {UserId}", userId);
+
+                // Fallback: assume user is active to avoid blocking valid requests
+                // Security note: This is a availability vs security trade-off
+                // Alternative: return false for fail-secure behavior
+                return false;
+            }
+        }
+
         #region Private Helper Methods
+        /// Invalidate user active status cache when user is deactivated/activated
+        public async Task InvalidateUserActiveStatusCache(Guid userId)
+        {
+            try
+            {
+                // Remove from in-memory cache
+                _inMemoryActiveUsers.Remove(userId);
+
+                // Remove from Redis cache
+                var cacheKey = CacheKeys.Users.ActiveStatus(userId);
+                await _cacheService.RemoveAsync(cacheKey);
+
+                _logger.LogDebug("Invalidated active status cache for user: {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate active status cache for user: {UserId}", userId);
+            }
+        }
 
         /// <summary>
         /// Fetches complete user profile from database
@@ -345,7 +478,25 @@ namespace MomomiAPI.Services.Implementations
                 .Include(u => u.UsageLimit)
                 .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
 
+            if (user?.UsageLimit != null)
+            {
+                ResetDailyLimitsIfNeeded(user.UsageLimit);
+            }
+
             return user != null ? UserMapper.UserToDTO(user) : null;
+        }
+
+        private static void ResetDailyLimitsIfNeeded(UserUsageLimit usageLimit)
+        {
+            var twentyFourHoursAgo = DateTime.UtcNow.AddHours(-24);
+
+            if (usageLimit.LastResetDate.Date < twentyFourHoursAgo)
+            {
+                usageLimit.LikesUsedToday = 0;
+                usageLimit.SuperLikesUsedToday = 0;
+                usageLimit.AdsWatchedToday = 0;
+                usageLimit.LastResetDate = DateTime.UtcNow.Date;
+            }
         }
 
         /// <summary>
@@ -582,6 +733,11 @@ namespace MomomiAPI.Services.Implementations
             {
                 user.PushToken = request.PushToken;
                 updatedFields.Add("PushToken");
+            }
+            if (request.IsOnboarding.HasValue)
+            {
+                user.IsOnboarding = request.IsOnboarding.Value;
+                updatedFields.Add("IsOnboarding");
             }
         }
 
@@ -957,6 +1113,17 @@ namespace MomomiAPI.Services.Implementations
             _dbContext.Users.Remove(user);
         }
 
+
+        #endregion
+
+        #region Helper classes
+        /// Cache model for user active status
+        private class UserActiveStatus
+        {
+            public Guid UserId { get; set; }
+            public bool? IsActive { get; set; }
+            public DateTime CheckedAt { get; set; }
+        }
         #endregion
     }
 }

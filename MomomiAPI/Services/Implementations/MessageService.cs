@@ -207,7 +207,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (!unreadMessages.Any())
                 {
-                    return MessagesReadResult.Successful(conversationId, 0);
+                    return MessagesReadResult.Successful(conversationId, []);
                 }
 
                 // Mark all as read
@@ -226,7 +226,7 @@ namespace MomomiAPI.Services.Implementations
                 await InvalidateReadStatusCaches(userId, conversationId);
                 _logger.LogDebug("Marked {Count} messages as read for user {UserId}", unreadMessages.Count, userId);
 
-                return MessagesReadResult.Successful(conversationId, unreadMessages.Count, lastReadMessageId);
+                return MessagesReadResult.Successful(conversationId, unreadMessages.Select(msg => msg.Id).ToList(), lastReadMessageId);
             }
             catch (Exception ex)
             {
@@ -309,7 +309,7 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 // Check if other user is online
-                var isOtherUserOnline = await IsUserOnline(otherUser.Id);
+                var isOtherUserOnline = await IsUserOnlineAsync(otherUser.Id);
 
                 // Get conversation summary data
                 var summaryData = await GetConversationSummaryData(conversationId, userId);
@@ -347,7 +347,7 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                return await IsUserOnline(userId);
+                return await _cacheService.ExistsAsync(CacheKeys.Messaging.UserOnline(userId));
             }
             catch (Exception ex)
             {
@@ -355,6 +355,28 @@ namespace MomomiAPI.Services.Implementations
                 return false; // Assume offline on error
             }
         }
+
+        public async Task SetUserOnlineStatus(Guid userId, bool isOnline)
+        {
+            try
+            {
+                var cacheKey = CacheKeys.Messaging.UserOnline(userId);
+
+                if (isOnline)
+                {
+                    await _cacheService.SetStringAsync(cacheKey, "true", CacheKeys.Duration.UserOnlineStatus);
+                }
+                else
+                {
+                    await _cacheService.RemoveAsync(cacheKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update online status for user {UserId}", userId);
+            }
+        }
+
 
         #region Private Helper Methods
         // Validates message content and type
@@ -462,56 +484,55 @@ namespace MomomiAPI.Services.Implementations
         // Fetches user conversations from database with all metadata
         private async Task<UserConversationsData> FetchUserConversationsFromDatabase(Guid userId)
         {
-            // Single optimized query with all the data
+            // First, get conversations with proper includes
             var conversations = await _dbContext.Conversations
                 .Where(c => (c.User1Id == userId || c.User2Id == userId) && c.IsActive)
-                .Select(c => new
-                {
-                    Conversation = c,
-                    OtherUser = c.User1Id == userId ? c.User2 : c.User1,
-                    OtherUserPhoto = (c.User1Id == userId ? c.User2 : c.User1).Photos
-                        .Where(p => p.IsPrimary)
-                        .Select(p => p.Url)
-                        .FirstOrDefault(),
-                    LastMessage = c.Messages
-                        .OrderByDescending(m => m.SentAt)
-                        .Select(m => new
-                        {
-                            m.Id,
-                            m.ConversationId,
-                            m.SenderId,
-                            m.Content,
-                            m.MessageType,
-                            m.IsRead,
-                            m.SentAt
-                        })
-                        .FirstOrDefault(),
-                    UnreadCount = c.Messages.Count(m => m.SenderId != userId && !m.IsRead)
-                })
-                .Where(x => x.OtherUser.IsActive)
-                .OrderByDescending(x => x.Conversation.UpdatedAt)
+                .Include(c => c.User1)
+                    .ThenInclude(u => u.Photos.Where(p => p.IsPrimary))
+                .Include(c => c.User2)
+                    .ThenInclude(u => u.Photos.Where(p => p.IsPrimary))
+                .Include(c => c.Messages.OrderByDescending(m => m.SentAt).Take(1))
+                .Where(c => c.User1Id == userId ? c.User2.IsActive : c.User1.IsActive)
+                .OrderByDescending(c => c.UpdatedAt)
                 .ToListAsync();
 
-            var conversationDtos = conversations.Select(item => new ConversationDTO
+            // Get unread counts for all conversations in a single query
+            var conversationIds = conversations.Select(c => c.Id).ToList();
+            var unreadCounts = await _dbContext.Messages
+                .Where(m => conversationIds.Contains(m.ConversationId) &&
+                           m.SenderId != userId &&
+                           !m.IsRead)
+                .GroupBy(m => m.ConversationId)
+                .Select(g => new { ConversationId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.ConversationId, x => x.Count);
+
+            // Transform to DTOs in memory
+            var conversationDtos = conversations.Select(conversation =>
             {
-                Id = item.Conversation.Id,
-                OtherUserId = item.OtherUser.Id,
-                OtherUserName = $"{item.OtherUser.FirstName} {item.OtherUser.LastName}".Trim(),
-                OtherUserPhoto = item.OtherUserPhoto,
-                LastMessage = item.LastMessage != null ? new MessageDTO
+                var otherUser = conversation.User1Id == userId ? conversation.User2 : conversation.User1;
+                var lastMessage = conversation.Messages.FirstOrDefault();
+
+                return new ConversationDTO
                 {
-                    Id = item.LastMessage.Id,
-                    ConversationId = item.LastMessage.ConversationId,
-                    SenderId = item.LastMessage.SenderId,
-                    SenderName = item.LastMessage.SenderId == userId ? "You" : item.OtherUser.FirstName ?? "",
-                    Content = item.LastMessage.Content,
-                    MessageType = item.LastMessage.MessageType,
-                    IsRead = item.LastMessage.IsRead,
-                    SentAt = item.LastMessage.SentAt
-                } : null,
-                UnreadCount = item.UnreadCount,
-                UpdatedAt = item.Conversation.UpdatedAt,
-                IsActive = item.Conversation.IsActive
+                    Id = conversation.Id,
+                    OtherUserId = otherUser.Id,
+                    OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
+                    OtherUserPhoto = otherUser.Photos.FirstOrDefault()?.Url,
+                    LastMessage = lastMessage != null ? new MessageDTO
+                    {
+                        Id = lastMessage.Id,
+                        ConversationId = lastMessage.ConversationId,
+                        SenderId = lastMessage.SenderId,
+                        SenderName = lastMessage.SenderId == userId ? "You" : otherUser.FirstName ?? "",
+                        Content = lastMessage.Content,
+                        MessageType = lastMessage.MessageType,
+                        IsRead = lastMessage.IsRead,
+                        SentAt = lastMessage.SentAt
+                    } : null,
+                    UnreadCount = unreadCounts.GetValueOrDefault(conversation.Id, 0),
+                    UpdatedAt = conversation.UpdatedAt,
+                    IsActive = conversation.IsActive
+                };
             }).ToList();
 
             return new UserConversationsData
@@ -574,12 +595,6 @@ namespace MomomiAPI.Services.Implementations
             );
         }
 
-        // Checks if online using cache
-        private async Task<bool> IsUserOnline(Guid userId)
-        {
-            return await _cacheService.ExistsAsync(CacheKeys.Messaging.UserOnline(userId));
-        }
-
         /// Creates MessageDTO from Message entity
         private static MessageDTO CreateMessageDTO(Message message, string senderName, Guid currentUserId)
         {
@@ -588,7 +603,7 @@ namespace MomomiAPI.Services.Implementations
                 Id = message.Id,
                 ConversationId = message.ConversationId,
                 SenderId = message.SenderId,
-                SenderName = message.SenderId == currentUserId ? "You" : senderName,
+                SenderName = message.SenderId == currentUserId ? senderName : "Unidentified Sender",
                 Content = message.Content,
                 MessageType = message.MessageType,
                 IsRead = message.IsRead,

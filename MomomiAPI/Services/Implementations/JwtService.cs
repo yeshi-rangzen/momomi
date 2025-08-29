@@ -34,7 +34,7 @@ namespace MomomiAPI.Services.Implementations
             _dbContext = dbContext;
 
             // Initialize expensive objects once
-            var secretKey = _configuration["JWT:Secret"] ?? throw new ArgumentNullException("JWT:Secret configuration is missing.");
+            var secretKey = _configuration["JWT:SecretKey"] ?? throw new ArgumentNullException("JWT:Secret configuration is missing.");
             _signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             _issuer = _configuration["JWT:Issuer"] ?? throw new ArgumentNullException("JWT:Issuer configuration is missing.");
             _audience = _configuration["JWT:Audience"] ?? throw new ArgumentNullException("JWT:Audience configuration is missing.");

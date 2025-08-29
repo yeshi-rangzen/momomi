@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MomomiAPI.Models.DTOs;
+using MomomiAPI.Common.Results;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
@@ -19,7 +19,7 @@ namespace MomomiAPI.Controllers
         /// Discover users for swiping based on user preferences and subscription type
         /// </summary>
         [HttpGet("users")]
-        public async Task<ActionResult<List<DiscoveryUserDTO>>> DiscoverUsersForSwiping([FromQuery] int count = 30)
+        public async Task<ActionResult<OperationResult<DiscoveryData>>> DiscoverUsersForSwiping([FromQuery] int count = 30)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -27,7 +27,7 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(DiscoverUsersForSwiping), new { count });
 
             var result = await _userDiscoveryService.DiscoverCandidatesAsync(userIdResult.Value, count);
-            return HandleAuthResult(result);
+            return HandleOperationResult(result);
         }
 
     }

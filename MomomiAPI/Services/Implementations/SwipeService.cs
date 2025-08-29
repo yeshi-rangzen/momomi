@@ -47,7 +47,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (HasReachedUsageLimit(currentUser.UsageLimit!, SwipeType.Like, currentUser.Subscription!.SubscriptionType))
                 {
-                    return SwipeResult.LimitReached("Like limit reached. Try again tomorrow");
+                    return SwipeResult.LimitReached("Like limit reached. Try again tomorrow", likedUserId);
                 }
 
                 // Use the execution strategy to handle retries and transactions
@@ -96,7 +96,7 @@ namespace MomomiAPI.Services.Implementations
                         _logger.LogInformation("User {UserId} liked user {LikedUserId}. Match: {IsMatch}",
                             userId, likedUserId, isMatch);
 
-                        return isMatch ? SwipeResult.MatchCreated() : SwipeResult.LikeRecorded();
+                        return isMatch ? SwipeResult.MatchCreated(likedUserId) : SwipeResult.LikeRecorded(likedUserId);
 
                     }
                     catch
@@ -109,7 +109,7 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error liking between user {UserId} and {TargetUserId}", userId, likedUserId);
-                return SwipeResult.Error("An error occurred while processing your like");
+                return SwipeResult.Error("An error occurred while processing your like", likedUserId);
             }
         }
 
@@ -132,7 +132,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (HasReachedUsageLimit(currentUser.UsageLimit!, SwipeType.SuperLike, currentUser.Subscription!.SubscriptionType))
                 {
-                    return SwipeResult.SuperLikeLimitReached("Super Like limit reached. Try again tomorrow");
+                    return SwipeResult.SuperLikeLimitReached("Super Like limit reached. Try again tomorrow", likedUserId);
                 }
 
                 // Use the execution strategy to handle retries and transactions
@@ -179,7 +179,7 @@ namespace MomomiAPI.Services.Implementations
                         _logger.LogInformation("User {UserId} super liked user {LikedUserId}. Match: {IsMatch}",
                             userId, likedUserId, isMatch);
 
-                        return isMatch ? SwipeResult.MatchCreated() : SwipeResult.SuperLikeRecorded();
+                        return isMatch ? SwipeResult.MatchCreated(likedUserId) : SwipeResult.SuperLikeRecorded(likedUserId);
 
                     }
                     catch
@@ -193,7 +193,7 @@ namespace MomomiAPI.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error super liking between user {UserId} and {TargetUserId}", userId, likedUserId);
-                return SwipeResult.Error("An error occurred while processing your super like");
+                return SwipeResult.Error("An error occurred while processing your super like", likedUserId);
             }
         }
 
@@ -227,13 +227,13 @@ namespace MomomiAPI.Services.Implementations
 
                 _logger.LogInformation("User {UserId} passed user {DismissedUserId}", userId, dismissedUserId);
 
-                return SwipeResult.PassRecorded();
+                return SwipeResult.PassRecorded(dismissedUserId);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing pass from user {UserId} to user {DismissedUserId}",
                     userId, dismissedUserId);
-                return SwipeResult.Error("An error occurred while processing your pass");
+                return SwipeResult.Error("An error occurred while processing your pass", dismissedUserId);
             }
         }
 
@@ -274,7 +274,7 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("User {UserId} undid last pass swipe for user {SwipedUserId}",
                     userId, lastPassSwipe.SwipedUserId);
 
-                return SwipeResult.SwipeUndone();
+                return SwipeResult.SwipeUndone(lastPassSwipe.SwipedUserId);
             }
             catch (Exception ex)
             {
@@ -294,7 +294,7 @@ namespace MomomiAPI.Services.Implementations
 
             if (currentUser == null)
             {
-                return SwipeUserData.Invalid(SwipeResult.UserNotFound());
+                return SwipeUserData.Invalid(SwipeResult.UserNotFound(targetUserId));
             }
 
             // Batch query for all validations
@@ -320,17 +320,17 @@ namespace MomomiAPI.Services.Implementations
 
             if (validationData?.TargetUser == null)
             {
-                return SwipeUserData.Invalid(SwipeResult.UserNotFound());
+                return SwipeUserData.Invalid(SwipeResult.UserNotFound(targetUserId));
             }
 
             if (validationData.IsReported)
             {
-                return SwipeUserData.Invalid(SwipeResult.UserBlocked());
+                return SwipeUserData.Invalid(SwipeResult.UserBlocked(targetUserId));
             }
 
             if (validationData.ExistingSwipe)
             {
-                return SwipeUserData.Invalid(SwipeResult.UserAlreadyProcessed());
+                return SwipeUserData.Invalid(SwipeResult.UserAlreadyProcessed(targetUserId));
             }
 
             return SwipeUserData.Valid(currentUser, validationData.TargetUser, validationData.IsAlreadyLikedByTarget, validationData.ExistingSwipeType == SwipeType.SuperLike);
@@ -467,12 +467,12 @@ namespace MomomiAPI.Services.Implementations
 
             if (validationData == null)
             {
-                return PassUserValidation.Invalid(SwipeResult.UserNotFound());
+                return PassUserValidation.Invalid(SwipeResult.UserNotFound(targetUserId));
             }
 
             if (validationData.ExistingSwipe)
             {
-                return PassUserValidation.Invalid(SwipeResult.UserAlreadyProcessed());
+                return PassUserValidation.Invalid(SwipeResult.UserAlreadyProcessed(targetUserId));
             }
 
             return PassUserValidation.Valid();

@@ -20,6 +20,8 @@
             public static readonly TimeSpan TokenBlacklist = TimeSpan.FromHours(24);
             public static readonly TimeSpan UserOnlineStatus = TimeSpan.FromMinutes(5);
             public static readonly TimeSpan BlockedUsers = TimeSpan.FromMinutes(15);
+            public static readonly TimeSpan UserActiveStatus = TimeSpan.FromMinutes(10); // Short TTL for active status
+
         }
         public static class Authentication
         {
@@ -42,6 +44,8 @@
             public static string SubscriptionStatus(Guid userId) => $"user:subscription:{userId}";
             public static string UsageLimits(Guid userId) => $"user:usage:{userId}";
             public static string OnlineStatus(Guid userId) => $"user:online:{userId}";
+            public static string ActiveStatus(Guid userId) => $"user:active:{userId}";
+
         }
 
         // Discovery and matching cache keys

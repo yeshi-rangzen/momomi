@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MomomiAPI.Common.Results;
-using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
 
@@ -14,16 +13,16 @@ namespace MomomiAPI.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IJwtService _jwtService;
-        private readonly IAnalyticsService _analyticsService;
+        //private readonly IAnalyticsService _analyticsService;
 
         public AuthController(
             IAuthService authService,
             IJwtService jwtService,
-            IAnalyticsService analyticsService,
+            //IAnalyticsService analyticsService,
             ILogger<AuthController> logger) : base(logger)
         {
             _authService = authService;
-            _analyticsService = analyticsService;
+            //_analyticsService = analyticsService;
             _jwtService = jwtService;
         }
 
@@ -39,12 +38,12 @@ namespace MomomiAPI.Controllers
             var result = await _authService.SendOTPCode(request.Email);
 
             // Track email verification sent
-            if (result.Success)
-            {
-                _ = Task.Run(() => _analyticsService.TrackEmailVerificationSentAsync(
-                    request.Email,
-                    result.Data.RemainingAttempts ?? 0));
-            }
+            //if (result.Success)
+            //{
+            //    _ = Task.Run(() => _analyticsService.TrackEmailVerificationSentAsync(
+            //        request.Email,
+            //        result.Data.RemainingAttempts ?? 0));
+            //}
 
             return HandleOperationResult(result);
         }
@@ -90,24 +89,24 @@ namespace MomomiAPI.Controllers
             var result = await _authService.RegisterNewUser(request);
 
             // Track successful registration
-            if (((OperationResult)result).Success && result.Data != null)
-            {
-                var analyticsData = new UserRegistrationData
-                {
-                    Email = request.Email,
-                    Age = DateTime.UtcNow.Year - request.DateOfBirth.Year,
-                    Gender = request.Gender,
-                    Heritage = request.Heritage ?? new List<HeritageType>(),
-                    Religion = request.Religion ?? new List<ReligionType>(),
-                    Languages = request.LanguagesSpoken ?? new List<LanguageType>(),
-                    Hometown = request.Hometown,
-                    RegistrationMethod = "email",
-                    RegistrationTimestamp = DateTime.UtcNow
-                };
+            //if (((OperationResult)result).Success && result.Data != null)
+            //{
+            //    var analyticsData = new UserRegistrationData
+            //    {
+            //        Email = request.Email,
+            //        Age = DateTime.UtcNow.Year - request.DateOfBirth.Year,
+            //        Gender = request.Gender,
+            //        Heritage = request.Heritage ?? new List<HeritageType>(),
+            //        Religion = request.Religion ?? new List<ReligionType>(),
+            //        Languages = request.LanguagesSpoken ?? new List<LanguageType>(),
+            //        Hometown = request.Hometown,
+            //        RegistrationMethod = "email",
+            //        RegistrationTimestamp = DateTime.UtcNow
+            //    };
 
-                // Fire and forget analytics tracking
-                _ = Task.Run(() => _analyticsService.TrackUserRegistrationAsync(result.Data.User.Id, analyticsData));
-            }
+            //    // Fire and forget analytics tracking
+            //    _ = Task.Run(() => _analyticsService.TrackUserRegistrationAsync(result.Data.User.Id, analyticsData));
+            //}
 
             return HandleOperationResult(result);
         }
@@ -125,19 +124,19 @@ namespace MomomiAPI.Controllers
             var result = await _authService.LoginWithEmailCode(request.Email, request.Otp);
 
             // Track successful login
-            if (((OperationResult)result).Success && result.Data != null)
-            {
-                var loginData = new LoginDataAnalytics
-                {
-                    Email = request.Email,
-                    LoginMethod = "email_otp",
-                    DaysSinceLastLogin = CalculateDaysSinceLastLogin(result.Data.User.LastActive),
-                    LoginTimestamp = DateTime.UtcNow
-                };
+            //if (((OperationResult)result).Success && result.Data != null)
+            //{
+            //    var loginData = new LoginDataAnalytics
+            //    {
+            //        Email = request.Email,
+            //        LoginMethod = "email_otp",
+            //        DaysSinceLastLogin = CalculateDaysSinceLastLogin(result.Data.User.LastActive),
+            //        LoginTimestamp = DateTime.UtcNow
+            //    };
 
-                // Fire and forget analytics tracking
-                _ = Task.Run(() => _analyticsService.TrackUserLoginAsync(result.Data.User.Id, loginData));
-            }
+            //    // Fire and forget analytics tracking
+            //    _ = Task.Run(() => _analyticsService.TrackUserLoginAsync(result.Data.User.Id, loginData));
+            //}
 
             return HandleOperationResult(result);
         }

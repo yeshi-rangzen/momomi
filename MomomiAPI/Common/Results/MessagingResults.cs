@@ -137,7 +137,7 @@ namespace MomomiAPI.Common.Results
     public class MessagesReadData
     {
         public Guid ConversationId { get; set; }
-        public int MessagesMarkedCount { get; set; }
+        public List<Guid> ReadMessageIds { get; set; } = [];
         public DateTime MarkedAt { get; set; }
         public Guid? LastReadMessageId { get; set; }
     }
@@ -150,13 +150,13 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static MessagesReadResult Successful(Guid conversationId, int messagesMarkedCount,
+        public static MessagesReadResult Successful(Guid conversationId, List<Guid> readMessageIds,
             Guid? lastReadMessageId = null, Dictionary<string, object>? metadata = null)
         {
             var data = new MessagesReadData
             {
                 ConversationId = conversationId,
-                MessagesMarkedCount = messagesMarkedCount,
+                ReadMessageIds = readMessageIds,
                 MarkedAt = DateTime.UtcNow,
                 LastReadMessageId = lastReadMessageId
             };

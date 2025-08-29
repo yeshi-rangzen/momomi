@@ -7,7 +7,6 @@ using MomomiAPI.Data;
 using MomomiAPI.Extensions;
 using MomomiAPI.HealthChecks;
 using MomomiAPI.Hubs;
-using MomomiAPI.Services.Implementations;
 using MomomiAPI.Services.Interfaces;
 using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
@@ -230,15 +229,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     if (Guid.TryParse(userIdClaim, out var userId))
                     {
                         // Validate user exists and is active
-                        var userResult = await userService.GetUserAsync(userId);
-                        if (userResult.Data == null)
+                        var isActiveUser = await userService.IsActiveUser(userId);
+                        if (isActiveUser == null)
                         {
                             logger.LogWarning("Token valid but user not found: {UserId}", userId);
                             context.Fail("User not found");
                             return;
                         }
 
-                        if (!userResult.Data.IsActive)
+                        if (isActiveUser == false)
                         {
                             logger.LogWarning("Token valid but user is inactive: {UserId}", userId);
                             context.Fail("User account is inactive");
@@ -309,6 +308,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // Authorization
 builder.Services.AddAuthorization();
+
+// IMemoryCache registration
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1000; // Limit memory cache size
+    options.CompactionPercentage = 0.25; // Compact when 75% full
+});
 
 // Add Momomi Services
 builder.Services.AddMomomiServices();
@@ -390,19 +396,19 @@ builder.Services.AddScoped<SupabaseStorageHealthCheck>();
 builder.Services.AddAnalyticsServices(builder.Configuration);
 
 // Register Retention Tracking Background Service
-builder.Services.AddHostedService<RetentionTrackingService>();
+//builder.Services.AddHostedService<RetentionTrackingService>();
 
 // Health checks using custom classes
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<MomomiDbContext>("database", HealthStatus.Unhealthy, new[] { "db", "database" })
     .AddCheck<RedisHealthCheck>("redis", tags: new[] { "cache", "redis" })
     .AddCheck<SupabaseHealthCheck>("supabase", tags: new[] { "auth", "supabase" })
-    .AddCheck<SupabaseStorageHealthCheck>("supabase-storage", tags: new[] { "storage", "supabase" })
-    .AddCheck<PostHogHealthCheck>("posthog", tags: new[] { "analytics", "posthog" });
+    .AddCheck<SupabaseStorageHealthCheck>("supabase-storage", tags: new[] { "storage", "supabase" });
+//.AddCheck<PostHogHealthCheck>("posthog", tags: new[] { "analytics", "posthog" });
 
 
 var app = builder.Build();
-app.UseAnalyticsMiddleware();
+//app.UseAnalyticsMiddleware();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

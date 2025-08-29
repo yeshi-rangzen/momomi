@@ -39,5 +39,7 @@ namespace MomomiAPI.Services.Interfaces
         /// Checks if a user is currently online
         /// </summary>
         Task<bool> IsUserOnlineAsync(Guid userId);
+
+        Task SetUserOnlineStatus(Guid userId, bool isOnline);
     }
 }

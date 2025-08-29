@@ -42,6 +42,7 @@ namespace MomomiAPI.Models.Requests
 
         // Notifications
         public bool? NotificationsEnabled { get; set; }
+        public bool? IsOnboarding { get; set; }
         public string? PushToken { get; set; }
     }
 }

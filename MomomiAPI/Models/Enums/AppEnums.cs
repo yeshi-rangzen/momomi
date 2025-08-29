@@ -17,7 +17,7 @@ namespace MomomiAPI.Models.Enums
         Himachali,
         //Kinners,
         Ladakhi,
-        //Lepcha,
+        Lepcha,
         //Manipuri,
         //Mizo,
         //Monpa,

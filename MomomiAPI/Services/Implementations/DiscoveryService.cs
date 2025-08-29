@@ -103,7 +103,8 @@ namespace MomomiAPI.Services.Implementations
                 FromCache = false,
                 CachedAt = DateTime.UtcNow,
                 UserLatitude = currentUser.Latitude,
-                UserLongitude = currentUser.Longitude
+                UserLongitude = currentUser.Longitude,
+                HasMore = maxResults == discoveredUserDtos.Count
             };
         }
 
@@ -116,7 +117,7 @@ namespace MomomiAPI.Services.Implementations
 
             var candidateBatch = await query
                 .OrderBy(u => u.LastActive) // Add some ordering for consistency
-                .Take(100)
+                .Take(200)
                 .ToListAsync();
 
             // Apply distance filtering in memory (unavoidable for complex distance calculations)
@@ -125,26 +126,47 @@ namespace MomomiAPI.Services.Implementations
                     currentUser.Latitude, currentUser.Longitude,
                     u.Latitude, u.Longitude,
                     currentUser.MaxDistanceKm))
-                .Take(maxResults)
                 .ToList();
 
-            _logger.LogInformation("Local discovery for user {UserId}: Found {Count}/{BatchSize} users within {Distance}km",
-            currentUser.Id, localCandidates.Count, candidateBatch.Count, currentUser.MaxDistanceKm);
+            // Apply preference filters
+            var filteredCandidates = ApplyPreferenceFilters(localCandidates, currentUser);
 
-            return localCandidates;
+            // Apply premium filters if user is a subscriber
+            if (IsActiveSubscriber(currentUser))
+            {
+                filteredCandidates = ApplyPremiumFilters(filteredCandidates, currentUser);
+            }
+
+            var finalResults = filteredCandidates.Take(maxResults).ToList();
+
+            _logger.LogInformation("Local discovery for user {UserId}: Found {Count}/{BatchSize} users within {Distance}km after all filtering",
+                currentUser.Id, finalResults.Count, candidateBatch.Count, currentUser.MaxDistanceKm);
+
+            return finalResults;
         }
 
         private async Task<List<User>> DiscoverGlobalCandidatesAsync(User currentUser, int maxResults)
         {
             var candidates = await BuildBaseCandidateQuery(currentUser)
                 .OrderByDescending(u => u.LastActive) // Prioritize recently active users
-                .Take(maxResults)
+                .Take(maxResults * 3) // Get 3x more to account for preference filtering
                 .ToListAsync();
 
-            _logger.LogInformation("Global discovery for user {UserId}: Found {Count} users",
-                currentUser.Id, candidates.Count);
+            // Apply preference filters in memory
+            var filteredCandidates = ApplyPreferenceFilters(candidates, currentUser);
 
-            return candidates;
+            // Apply premium filters if user is a subscriber
+            if (IsActiveSubscriber(currentUser))
+            {
+                filteredCandidates = ApplyPremiumFilters(filteredCandidates, currentUser);
+            }
+
+            var finalResults = filteredCandidates.Take(maxResults).ToList();
+
+            _logger.LogInformation("Global discovery for user {UserId}: Found {Count} users after filtering from {CandidateCount} candidates",
+                currentUser.Id, finalResults.Count, candidates.Count);
+
+            return finalResults;
         }
 
         private IQueryable<User> BuildBaseCandidateQuery(User currentUser)
@@ -162,6 +184,8 @@ namespace MomomiAPI.Services.Implementations
                 .Include(u => u.Photos)
                 .Where(u => u.IsActive
                     && u.IsDiscoverable
+                    && u.Id != currentUser.Id
+                    && u.InterestedIn == currentUser.Gender
                     && !swipedUserIdsQuery.Contains(u.Id)
                     && !reportExclusionQuery.Contains(u.Id)
                     && u.IsGloballyDiscoverable == currentUser.EnableGlobalDiscovery // Global constraint
@@ -169,12 +193,6 @@ namespace MomomiAPI.Services.Implementations
 
             // Apply core filters (available to all users)
             query = ApplyCoreMatchingFilters(query, currentUser);
-
-            // Apply premium filters if user is a subscriber
-            if (IsActiveSubscriber(currentUser))
-            {
-                query = ApplyPremiumMatchingFilters(query, currentUser);
-            }
 
             return query;
         }
@@ -203,6 +221,13 @@ namespace MomomiAPI.Services.Implementations
                     return false;
                 }
             }
+
+            // Check if cache is empty but hasMore
+            if (cache.Users.Count == 0 && cache.HasMore)
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -218,43 +243,41 @@ namespace MomomiAPI.Services.Implementations
 
             query = query.Where(u => u.DateOfBirth >= minBirthDate && u.DateOfBirth <= maxBirthDate);
 
-            // Heritage compatibility filter
-            if (HasPreferredHeritage(currentUser))
-            {
-                query = query.Where(u => u.Heritage != null &&
-                    u.Heritage.Any(h => currentUser.Preferences!.PreferredHeritage!.Contains(h)));
-            }
-
-            // Religion compatibility filter
-            if (HasPreferredReligions(currentUser))
-            {
-                query = query.Where(u => u.Religion != null &&
-                    u.Religion.Any(r => currentUser.Preferences!.PreferredReligions!.Contains(r)));
-            }
-
-            // Language compatibility filter
-            if (HasPreferredLanguages(currentUser))
-            {
-                query = query.Where(u => u.LanguagesSpoken != null &&
-                    u.LanguagesSpoken.Any(l => currentUser.Preferences!.LanguagePreference!.Contains(l)));
-            }
-
             return query;
         }
 
-        private static bool HasPreferredHeritage(User currentUser)
+        private static List<User> ApplyPreferenceFilters(List<User> users, User currentUser)
         {
-            return currentUser.Preferences?.PreferredHeritage?.Count > 0;
-        }
+            var preferredHeritage = currentUser.Preferences?.PreferredHeritage?.ToList();
+            var preferredReligions = currentUser.Preferences?.PreferredReligions?.ToList();
+            var preferredLanguages = currentUser.Preferences?.LanguagePreference?.ToList();
 
-        private static bool HasPreferredReligions(User currentUser)
-        {
-            return currentUser.Preferences?.PreferredReligions?.Count > 0;
-        }
+            return users.Where(u =>
+            {
+                // Heritage compatibility filter
+                if (preferredHeritage is { Count: > 0 })
+                {
+                    if (u.Heritage.Count > 0 && !u.Heritage.Any(h => preferredHeritage.Contains(h)))
+                        return false;
+                }
 
-        private static bool HasPreferredLanguages(User currentUser)
-        {
-            return currentUser.Preferences?.LanguagePreference?.Count > 0;
+                // Religion compatibility filter
+                if (preferredReligions is { Count: > 0 })
+                {
+                    if (u.Religion.Count > 0 && !u.Religion.Any(r => preferredReligions.Contains(r)))
+                        return false;
+                }
+
+                // Language compatibility filter
+                if (preferredLanguages is { Count: > 0 })
+                {
+                    if (u.LanguagesSpoken.Count > 0 && !u.LanguagesSpoken.Any(l => preferredLanguages.Contains(l)))
+                        return false;
+                }
+
+                return true;
+
+            }).ToList();
         }
 
         private static bool IsActiveSubscriber(User currentUser)
@@ -264,63 +287,65 @@ namespace MomomiAPI.Services.Implementations
                     currentUser.Subscription.ExpiresAt > DateTime.UtcNow);
         }
 
-        private static IQueryable<User> ApplyPremiumMatchingFilters(IQueryable<User> query, User currentUser)
+        private static List<User> ApplyPremiumFilters(List<User> users, User currentUser)
         {
             var preferences = currentUser.Preferences;
-            if (preferences == null) return query;
+            if (preferences == null) return users;
 
-            // Height range filters
-            if (preferences.PreferredHeightMin.HasValue)
+            return users.Where(u =>
             {
-                query = query.Where(u => u.HeightCm >= preferences.PreferredHeightMin.Value);
-            }
-            if (preferences.PreferredHeightMax.HasValue)
-            {
-                query = query.Where(u => u.HeightCm <= preferences.PreferredHeightMax.Value);
-            }
+                // Height range filters
+                if (preferences.PreferredHeightMin.HasValue && u.HeightCm < preferences.PreferredHeightMin.Value)
+                    return false;
+                if (preferences.PreferredHeightMax.HasValue && u.HeightCm > preferences.PreferredHeightMax.Value)
+                    return false;
 
-            // Education filter
-            if (preferences.PreferredEducationLevels?.Count > 0)
-            {
-                query = query.Where(u => u.EducationLevel.HasValue && preferences.PreferredEducationLevels.Contains(u.EducationLevel.Value));
-            }
+                // Education filter
+                if (preferences.PreferredEducationLevels?.Count > 0)
+                {
+                    if (!u.EducationLevel.HasValue || !preferences.PreferredEducationLevels.Contains(u.EducationLevel.Value))
+                        return false;
+                }
 
-            // Children filters
-            if (preferences.PreferredChildren?.Count > 0)
-            {
-                query = query.Where(u => u.Children.HasValue && preferences.PreferredChildren.Contains(u.Children.Value));
-            }
-            if (preferences.PreferredFamilyPlans?.Count > 0)
-            {
-                query = query.Where(u => u.FamilyPlan.HasValue && preferences.PreferredFamilyPlans.Contains(u.FamilyPlan.Value));
-            }
+                // Children filters
+                if (preferences.PreferredChildren?.Count > 0)
+                {
+                    if (!u.Children.HasValue || !preferences.PreferredChildren.Contains(u.Children.Value))
+                        return false;
+                }
+                if (preferences.PreferredFamilyPlans?.Count > 0)
+                {
+                    if (!u.FamilyPlan.HasValue || !preferences.PreferredFamilyPlans.Contains(u.FamilyPlan.Value))
+                        return false;
+                }
 
-            // Vices filters
-            if (preferences.PreferredDrugs?.Count > 0)
-            {
-                query = query.Where(u => u.Drugs.HasValue &&
-                    preferences.PreferredDrugs.Contains(u.Drugs.Value));
-            }
+                // Vices filters
+                if (preferences.PreferredDrugs?.Count > 0)
+                {
+                    if (!u.Drugs.HasValue || !preferences.PreferredDrugs.Contains(u.Drugs.Value))
+                        return false;
+                }
 
-            if (preferences.PreferredSmoking?.Count > 0)
-            {
-                query = query.Where(u => u.Smoking.HasValue &&
-                    preferences.PreferredSmoking.Contains(u.Smoking.Value));
-            }
+                if (preferences.PreferredSmoking?.Count > 0)
+                {
+                    if (!u.Smoking.HasValue || !preferences.PreferredSmoking.Contains(u.Smoking.Value))
+                        return false;
+                }
 
-            if (preferences.PreferredMarijuana?.Count > 0)
-            {
-                query = query.Where(u => u.Marijuana.HasValue &&
-                    preferences.PreferredMarijuana.Contains(u.Marijuana.Value));
-            }
+                if (preferences.PreferredMarijuana?.Count > 0)
+                {
+                    if (!u.Marijuana.HasValue || !preferences.PreferredMarijuana.Contains(u.Marijuana.Value))
+                        return false;
+                }
 
-            if (preferences.PreferredDrinking?.Count > 0)
-            {
-                query = query.Where(u => u.Drinking.HasValue &&
-                    preferences.PreferredDrinking.Contains(u.Drinking.Value));
-            }
+                if (preferences.PreferredDrinking?.Count > 0)
+                {
+                    if (!u.Drinking.HasValue || !preferences.PreferredDrinking.Contains(u.Drinking.Value))
+                        return false;
+                }
 
-            return query;
+                return true;
+            }).ToList();
         }
         #endregion
     }
@@ -335,5 +360,6 @@ namespace MomomiAPI.Services.Implementations
         public DateTime CachedAt { get; set; }
         public decimal? UserLatitude { get; set; }
         public decimal? UserLongitude { get; set; }
+        public bool HasMore { get; set; } = false;
     }
 }

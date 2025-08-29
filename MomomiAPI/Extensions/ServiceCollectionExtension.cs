@@ -1,6 +1,5 @@
 ﻿using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
-using MomomiAPI.HealthChecks;
 using MomomiAPI.Services.Implementations;
 using MomomiAPI.Services.Interfaces;
 
@@ -26,27 +25,27 @@ namespace MomomiAPI.Extensions
             services.AddScoped<IUserService, UserService>();
 
             // Photo services
-            services.AddScoped<IPhotoManagementService, SupabasePhotoService>();
-            services.AddScoped<IPhotoGalleryService, PhotoGalleryService>();
+            services.AddScoped<IPhotoService, PhotoService>();
+            //services.AddScoped<IPhotoGalleryService, PhotoGalleryService>();
 
             // Messaging services
-            //services.AddScoped<IMatchManagementService, MatchManagementService>();
+            services.AddScoped<IMatchService, MatchService>();
             services.AddScoped<IMessageService, MessageService>();
 
             // Subscription and usage services
-            services.AddScoped<ISubscriptionService, SubscriptionService>();
+            //services.AddScoped<ISubscriptionService, SubscriptionService>();
 
             // Safety services
             services.AddScoped<IReportingService, ReportingService>();
 
             // Notification services
-            services.AddScoped<IPushNotificationService, PushNotificationService>();
+            //services.AddScoped<IPushNotificationService, PushNotificationService>();
 
             // Cache service (existing)
             services.AddScoped<ICacheService, UpstashCacheService>();
 
             // HTTP Client for push notifications
-            services.AddHttpClient<IPushNotificationService, PushNotificationService>();
+            //services.AddHttpClient<IPushNotificationService, PushNotificationService>();
 
             return services;
         }
@@ -71,15 +70,15 @@ namespace MomomiAPI.Extensions
 
         public static IServiceCollection AddAnalyticsServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // Register PostHog Analytics Service
-            services.AddHttpClient<IAnalyticsService, PostHogAnalyticsService>(client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(10);
-                client.DefaultRequestHeaders.Add("User-Agent", "Momomi-API/1.0");
-            });
+            //// Register PostHog Analytics Service
+            //services.AddHttpClient<IAnalyticsService, PostHogAnalyticsService>(client =>
+            //{
+            //    client.Timeout = TimeSpan.FromSeconds(10);
+            //    client.DefaultRequestHeaders.Add("User-Agent", "Momomi-API/1.0");
+            //});
 
-            // Register PostHog Health Check
-            services.AddScoped<PostHogHealthCheck>();
+            //// Register PostHog Health Check
+            //services.AddScoped<PostHogHealthCheck>();
 
             return services;
         }

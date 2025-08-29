@@ -14,9 +14,6 @@ namespace MomomiAPI.Hubs
         private readonly ICacheService _cacheService;
         private readonly ILogger<ChatHub> _logger;
 
-        // Cache TTL for online status
-        private static readonly TimeSpan OnlineStatusTTL = TimeSpan.FromMinutes(5);
-
         public ChatHub(IMessageService messageService, ICacheService cacheService, ILogger<ChatHub> logger)
         {
             _messageService = messageService;
@@ -29,7 +26,7 @@ namespace MomomiAPI.Hubs
         /// <summary>
         /// User joins a specific conversation room
         /// </summary>
-        public async Task JoinConversationRoom(string conversationId)
+        public async Task<List<string>> JoinConversationRoom(string conversationId)
         {
             try
             {
@@ -37,7 +34,7 @@ namespace MomomiAPI.Hubs
                 if (userId == null)
                 {
                     await Clients.Caller.SendAsync("Error", "User not authenticated");
-                    return;
+                    return []; // Return empty list on error
                 }
 
                 // Verify user has access to this conversation
@@ -45,24 +42,40 @@ namespace MomomiAPI.Hubs
                 if (!conversationResult.Success)
                 {
                     await Clients.Caller.SendAsync("Error", "Access denied to conversation");
-                    return;
+                    return []; // Return empty list on error
                 }
 
                 await Groups.AddToGroupAsync(Context.ConnectionId, GetConversationGroupName(conversationId));
 
+                // Track user joining the conversation
+                await TrackUserInConversation(conversationId, userId.Value, Context.ConnectionId, true);
+                await TrackUserConversations(userId.Value, conversationId, true);
+
                 // Update user's online status
-                await SetUserOnlineStatus(userId.Value, true);
+                await _messageService.SetUserOnlineStatus(userId.Value, true);
+
+                // Get all users currently in the conversation (including the one just joined)
+                var connectedUsers = await GetConnectedUsersInConversation(conversationId);
+
+                // Get other users (excluding the current user who just joined)
+                var otherUsers = connectedUsers
+                    .Where(u => u.UserId != userId.ToString())
+                    .Select(u => u.UserId) // Just return user IDs as strings
+                    .ToList();
 
                 // Notify other users in conversation that this user is online
                 await Clients.OthersInGroup(GetConversationGroupName(conversationId))
                     .SendAsync("UserJoinedConversation", userId.Value);
 
                 _logger.LogInformation("User {UserId} joined conversation {ConversationId}", userId, conversationId);
+
+                return otherUsers;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error joining conversation {ConversationId}", conversationId);
                 await Clients.Caller.SendAsync("Error", "Failed to join conversation");
+                return []; // Return empty list on error
             }
         }
 
@@ -75,6 +88,13 @@ namespace MomomiAPI.Hubs
             {
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
+
+                // Log users before leaving
+                await LogUsersInConversation(conversationId, "LeaveConversationRoom", userId.Value);
+
+                // Track user leaving the conversation
+                await TrackUserInConversation(conversationId, userId.Value, Context.ConnectionId, false);
+                await TrackUserConversations(userId.Value, conversationId, false);
 
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, GetConversationGroupName(conversationId));
 
@@ -108,6 +128,9 @@ namespace MomomiAPI.Hubs
                     return;
                 }
 
+                // Log all users in conversation before sending message
+                await LogUsersInConversation(conversationId, "SendRealtimeMessage", userId.Value);
+
                 var request = new SendMessageRequest
                 {
                     ConversationId = Guid.Parse(conversationId),
@@ -125,20 +148,36 @@ namespace MomomiAPI.Hubs
 
                 var messageData = result.Data!;
 
+                // Log who will receive the message
+                var connectedUsers = await GetConnectedUsersInConversation(conversationId);
+                _logger.LogInformation("Sending message {MessageId} to {RecipientCount} connected users in conversation {ConversationId}: [{Recipients}]",
+                    messageData.Message.Id,
+                    connectedUsers.Count,
+                    conversationId,
+                    string.Join(", ", connectedUsers.Select(u => u.UserId)));
+
                 // Send to all users in the conversation room
                 await Clients.Group(GetConversationGroupName(conversationId))
-                    .SendAsync("MessageReceived", new
-                    {
-                        message = messageData.Message,
-                        isFirstMessage = messageData.IsFirstMessage,
-                        messageCount = messageData.ConversationMessageCount
-                    });
-
-                // Send push notification to offline users
-                await SendOfflineNotification(conversationId, messageData.ReceiverId, messageData.Message);
-
+                    .SendAsync("MessageReceived", messageData.Message);
                 _logger.LogDebug("Real-time message {MessageId} sent in conversation {ConversationId}",
-                    messageData.Message.Id, conversationId);
+                messageData.Message.Id, conversationId);
+
+
+                var isReceiverInConversation = connectedUsers.Any(u => u.UserId == messageData.ReceiverId.ToString());
+                var isReceiverOnline = await _messageService.IsUserOnlineAsync(messageData.ReceiverId);
+
+                if (!isReceiverInConversation && isReceiverOnline)
+                {
+
+                    // Send push notification to online users but not in conversation
+                    await SendOfflineNotification(conversationId, messageData.ReceiverId, messageData.Message);
+
+                    _logger.LogDebug("Real-time message sent in to User because they are online");
+
+                }
+
+                _logger.LogDebug("Real-time message Should be sent via Push Notifications");
+
             }
             catch (Exception ex)
             {
@@ -157,6 +196,9 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
 
+                // Log all users in conversation for read receipt
+                await LogUsersInConversation(conversationId, "MarkConversationAsRead", userId.Value);
+
                 var result = await _messageService.MarkMessagesAsReadAsync(userId.Value, Guid.Parse(conversationId));
                 if (!result.Success)
                 {
@@ -166,19 +208,26 @@ namespace MomomiAPI.Hubs
 
                 var readData = result.Data!;
 
+                // Log who will receive the read receipt
+                var connectedUsers = await GetConnectedUsersInConversation(conversationId);
+                _logger.LogInformation("Sending read receipt to {RecipientCount} other users in conversation {ConversationId}: [{Recipients}]",
+                    connectedUsers.Count(u => u.UserId != userId.ToString()),
+                    conversationId,
+                    string.Join(", ", connectedUsers.Where(u => u.UserId != userId.ToString()).Select(u => u.UserId)));
+
                 // Notify other users in conversation that messages were read
                 await Clients.OthersInGroup(GetConversationGroupName(conversationId))
                     .SendAsync("MessagesMarkedAsRead", new
                     {
                         conversationId,
                         userId = userId.Value,
-                        messagesMarkedCount = readData.MessagesMarkedCount,
+                        readMessageIds = readData.ReadMessageIds,
                         lastReadMessageId = readData.LastReadMessageId,
                         markedAt = readData.MarkedAt
                     });
 
                 _logger.LogDebug("User {UserId} marked {Count} messages as read in conversation {ConversationId}",
-                    userId, readData.MessagesMarkedCount, conversationId);
+                    userId, readData.ReadMessageIds.Count, conversationId);
             }
             catch (Exception ex)
             {
@@ -199,6 +248,9 @@ namespace MomomiAPI.Hubs
             {
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
+
+                // Log users who will receive typing indicator
+                await LogUsersInConversation(conversationId, "StartTyping", userId.Value);
 
                 await Clients.OthersInGroup(GetConversationGroupName(conversationId))
                     .SendAsync("UserStartedTyping", new
@@ -225,6 +277,9 @@ namespace MomomiAPI.Hubs
             {
                 var userId = GetCurrentUserId();
                 if (userId == null) return;
+
+                // Log users who will receive stop typing indicator
+                await LogUsersInConversation(conversationId, "StopTyping", userId.Value);
 
                 await Clients.OthersInGroup(GetConversationGroupName(conversationId))
                     .SendAsync("UserStoppedTyping", new
@@ -253,7 +308,7 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId != null)
                 {
-                    await SetUserOnlineStatus(userId.Value, true);
+                    await _messageService.SetUserOnlineStatus(userId.Value, true);
 
                     // Join user to their personal notification group
                     await Groups.AddToGroupAsync(Context.ConnectionId, GetUserGroupName(userId.Value));
@@ -276,7 +331,10 @@ namespace MomomiAPI.Hubs
                 var userId = GetCurrentUserId();
                 if (userId != null)
                 {
-                    await SetUserOnlineStatus(userId.Value, false);
+                    await _messageService.SetUserOnlineStatus(userId.Value, true);
+
+                    // Remove user from all conversation tracking when they disconnect
+                    await CleanupUserFromAllConversations(userId.Value, Context.ConnectionId);
 
                     _logger.LogInformation("User {UserId} disconnected from chat hub with connection {ConnectionId}",
                         userId, Context.ConnectionId);
@@ -305,26 +363,148 @@ namespace MomomiAPI.Hubs
         }
 
         /// <summary>
-        /// Sets user online/offline status in cache
+        /// Logs all users currently connected to a conversation
         /// </summary>
-        private async Task SetUserOnlineStatus(Guid userId, bool isOnline)
+        private async Task LogUsersInConversation(string conversationId, string eventType, Guid? currentUserId = null)
         {
             try
             {
-                var cacheKey = $"user_online_{userId}";
+                var connectedUsers = await GetConnectedUsersInConversation(conversationId);
 
-                if (isOnline)
+                var currentUserInfo = currentUserId.HasValue ? $" (Current user: {currentUserId})" : "";
+
+                _logger.LogInformation("[{EventType}] Conversation {ConversationId} has {ConnectedCount} connected users: [{UserList}]{CurrentUserInfo}",
+                    eventType,
+                    conversationId,
+                    connectedUsers.Count,
+                    string.Join(", ", connectedUsers.Select(u => $"{u.UserId}({u.ConnectionId})")),
+                    currentUserInfo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to log users in conversation {ConversationId} for event {EventType}",
+                    conversationId, eventType);
+            }
+        }
+
+        /// <summary>
+        /// Gets all connected users in a specific conversation using cache tracking
+        /// </summary>
+        private async Task<List<ConnectedUserInfo>> GetConnectedUsersInConversation(string conversationId)
+        {
+            var connectedUsers = new List<ConnectedUserInfo>();
+
+            try
+            {
+                var cacheKey = $"conversation_users_{conversationId}";
+                var cachedUsers = await _cacheService.GetAsync<List<ConnectedUserInfo>>(cacheKey);
+
+                if (cachedUsers != null)
                 {
-                    await _cacheService.SetStringAsync(cacheKey, "true", OnlineStatusTTL);
-                }
-                else
-                {
-                    await _cacheService.RemoveAsync(cacheKey);
+                    connectedUsers = cachedUsers;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to update online status for user {UserId}", userId);
+                _logger.LogWarning(ex, "Failed to get connected users for conversation {ConversationId}", conversationId);
+            }
+
+            return connectedUsers;
+        }
+
+        /// <summary>
+        /// Tracks user connection to a conversation in cache
+        /// </summary>
+        private async Task TrackUserInConversation(string conversationId, Guid userId, string connectionId, bool isJoining)
+        {
+            try
+            {
+                var cacheKey = $"conversation_users_{conversationId}";
+                var cachedUsers = await _cacheService.GetAsync<List<ConnectedUserInfo>>(cacheKey) ?? new List<ConnectedUserInfo>();
+
+                if (isJoining)
+                {
+                    // Remove any existing entries for this user (in case of reconnection)
+                    cachedUsers.RemoveAll(u => u.UserId == userId.ToString());
+
+                    // Add the user
+                    cachedUsers.Add(new ConnectedUserInfo
+                    {
+                        UserId = userId.ToString(),
+                        ConnectionId = connectionId,
+                        JoinedAt = DateTime.UtcNow
+                    });
+                }
+                else
+                {
+                    // Remove the user
+                    cachedUsers.RemoveAll(u => u.UserId == userId.ToString() || u.ConnectionId == connectionId);
+                }
+
+                // Update cache with 10-minute expiry
+                await _cacheService.SetAsync(cacheKey, cachedUsers, TimeSpan.FromMinutes(10));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to track user {UserId} in conversation {ConversationId}", userId, conversationId);
+            }
+        }
+
+        /// <summary>
+        /// Cleans up user from all conversation tracking when they disconnect
+        /// </summary>
+        private async Task CleanupUserFromAllConversations(Guid userId, string connectionId)
+        {
+            try
+            {
+                // Get all conversation cache keys for this user
+                var userConversationsKey = $"user_conversations_{userId}";
+                var userConversationIds = await _cacheService.GetAsync<List<string>>(userConversationsKey);
+
+                if (userConversationIds != null)
+                {
+                    foreach (var conversationId in userConversationIds)
+                    {
+                        await TrackUserInConversation(conversationId, userId, connectionId, false);
+                    }
+                }
+
+                // Clear the user's conversation list
+                await _cacheService.RemoveAsync(userConversationsKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to cleanup user {UserId} from conversations on disconnect", userId);
+            }
+        }
+
+        /// <summary>
+        /// Tracks which conversations a user is in
+        /// </summary>
+        private async Task TrackUserConversations(Guid userId, string conversationId, bool isJoining)
+        {
+            try
+            {
+                var cacheKey = $"user_conversations_{userId}";
+                var userConversations = await _cacheService.GetAsync<List<string>>(cacheKey) ?? new List<string>();
+
+                if (isJoining)
+                {
+                    if (!userConversations.Contains(conversationId))
+                    {
+                        userConversations.Add(conversationId);
+                    }
+                }
+                else
+                {
+                    userConversations.Remove(conversationId);
+                }
+
+                await _cacheService.SetAsync(cacheKey, userConversations, TimeSpan.FromMinutes(10));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to track conversations for user {UserId}", userId);
             }
         }
 
@@ -335,27 +515,9 @@ namespace MomomiAPI.Hubs
         {
             try
             {
-                // Check if receiver is online
-                var isReceiverOnline = await _messageService.IsUserOnlineAsync(receiverId);
-
-                if (!isReceiverOnline)
-                {
-                    // Send to user's personal notification group (they might have the app open but not in this conversation)
-                    await Clients.Group(GetUserGroupName(receiverId))
-                        .SendAsync("NewMessageNotification", new
-                        {
-                            conversationId,
-                            message = new
-                            {
-                                id = message.Id,
-                                senderName = message.SenderName,
-                                content = message.Content.Length > 50 ?
-                                    message.Content.Substring(0, 47) + "..." :
-                                    message.Content,
-                                sentAt = message.SentAt
-                            }
-                        });
-                }
+                // Send to user's personal notification group (they might have the app open but not in this conversation)
+                await Clients.Group(GetUserGroupName(receiverId))
+                    .SendAsync("NewMessageNotification", message);
             }
             catch (Exception ex)
             {
@@ -417,6 +579,20 @@ namespace MomomiAPI.Hubs
             {
                 _logger.LogError(ex, "Error handling ping");
             }
+        }
+
+        #endregion
+
+        #region Data Models
+
+        /// <summary>
+        /// Information about a connected user
+        /// </summary>
+        private class ConnectedUserInfo
+        {
+            public string UserId { get; set; } = string.Empty;
+            public string ConnectionId { get; set; } = string.Empty;
+            public DateTime JoinedAt { get; set; }
         }
 
         #endregion

@@ -25,15 +25,17 @@ namespace MomomiAPI.Controllers
 
             LogControllerAction(nameof(UploadPhoto), new { isPrimary, fileName = file?.FileName });
 
-            var result = await _photoService.AddUserPhoto(userIdResult.Value, file, isPrimary);
+            var result = await _photoService.AddUserPhoto(userIdResult.Value, file!, isPrimary);
             return HandleOperationResult(result);
         }
 
         [HttpPost("upload/batch")]
         public async Task<ActionResult<OperationResult<BatchPhotoUploadData>>> UploadPhotos(
-            List<IFormFile> files,
             [FromQuery] int? primaryPhotoIndex = null)
         {
+            // Get files from the request form
+            var files = Request.Form.Files.Where(f => f.Name == "files").ToList();
+
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
@@ -41,10 +43,12 @@ namespace MomomiAPI.Controllers
             {
                 fileCount = files?.Count,
                 primaryPhotoIndex,
-                fileNames = files?.Select(f => f.FileName).ToArray()
+                fileNames = files?.Select(f => f.FileName).ToArray(),
+                formKeys = Request.Form.Keys.ToArray(), // Debug: see what keys are present
+                totalFormFiles = Request.Form.Files.Count // Debug: total files in form
             });
 
-            var result = await _photoService.AddUserPhotos(userIdResult.Value, files, primaryPhotoIndex);
+            var result = await _photoService.AddUserPhotos(userIdResult.Value, files!, primaryPhotoIndex);
             return HandleOperationResult(result);
         }
 

@@ -3,8 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\services\\implementations\\supabaseauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|solutionrelative:momomiapi\\services\\implementations\\supabaseauthservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\hubs\\chathub.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|solutionrelative:momomiapi\\hubs\\chathub.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\common\\results\\messagingresults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|solutionrelative:momomiapi\\common\\results\\messagingresults.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\services\\implementations\\messageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|solutionrelative:momomiapi\\services\\implementations\\messageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\services\\interfaces\\imessageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|solutionrelative:momomiapi\\services\\interfaces\\imessageservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{4388F689-BD56-4E17-AE3C-0D6C2F02A1FB}|MomomiAPI\\MomomiAPI.csproj|c:\\users\\yeshi\\source\\repos\\momomiapi\\momomiapi\\services\\implementations\\jwtservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -21,46 +33,85 @@
       "VerticalTabListWidth": 256,
       "DocumentGroups": [
         {
-          "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "DockedWidth": 290,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "MessagingResults.cs",
+              "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Common\\Results\\MessagingResults.cs",
+              "RelativeDocumentMoniker": "MomomiAPI\\Common\\Results\\MessagingResults.cs",
+              "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Common\\Results\\MessagingResults.cs",
+              "RelativeToolTip": "MomomiAPI\\Common\\Results\\MessagingResults.cs",
+              "ViewState": "AgIAAH8AAAAAAAAAAAAtwIsAAAApAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-28T07:40:16.334Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "IMessageService.cs",
+              "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Interfaces\\IMessageService.cs",
+              "RelativeDocumentMoniker": "MomomiAPI\\Services\\Interfaces\\IMessageService.cs",
+              "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Interfaces\\IMessageService.cs",
+              "RelativeToolTip": "MomomiAPI\\Services\\Interfaces\\IMessageService.cs",
+              "ViewState": "AgIAAAoAAAAAAAAAAIA4wBkAAAAhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-27T23:48:02.989Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "JwtService.cs",
               "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\JwtService.cs",
               "RelativeDocumentMoniker": "MomomiAPI\\Services\\Implementations\\JwtService.cs",
               "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\JwtService.cs",
               "RelativeToolTip": "MomomiAPI\\Services\\Implementations\\JwtService.cs",
-              "ViewState": "AgIAAAMBAAAAAAAAAAAewAwBAAAuAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAE8BAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-01T14:50:12.718Z",
+              "WhenOpened": "2025-08-27T00:26:18.317Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "SupabaseAuthService.cs",
-              "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\SupabaseAuthService.cs",
-              "RelativeDocumentMoniker": "MomomiAPI\\Services\\Implementations\\SupabaseAuthService.cs",
-              "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\SupabaseAuthService.cs",
-              "RelativeToolTip": "MomomiAPI\\Services\\Implementations\\SupabaseAuthService.cs",
-              "ViewState": "AgIAAMQBAAAAAAAAAAAewNMBAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-01T14:45:47.952Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 5,
               "Title": "AuthController.cs",
               "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Controllers\\AuthController.cs",
               "RelativeDocumentMoniker": "MomomiAPI\\Controllers\\AuthController.cs",
               "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Controllers\\AuthController.cs",
               "RelativeToolTip": "MomomiAPI\\Controllers\\AuthController.cs",
-              "ViewState": "AgIAAJYAAAAAAAAAAAA9wPoAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAIwAAAAAAAAAAAAswJ8AAABEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-07-01T14:45:06.024Z",
+              "WhenOpened": "2025-08-25T21:29:59.878Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MessageService.cs",
+              "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\MessageService.cs",
+              "RelativeDocumentMoniker": "MomomiAPI\\Services\\Implementations\\MessageService.cs",
+              "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Services\\Implementations\\MessageService.cs",
+              "RelativeToolTip": "MomomiAPI\\Services\\Implementations\\MessageService.cs",
+              "ViewState": "AgIAAM4AAAAAAAAAAAAcwOQAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-25T21:33:36.563Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ChatHub.cs",
+              "DocumentMoniker": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Hubs\\ChatHub.cs",
+              "RelativeDocumentMoniker": "MomomiAPI\\Hubs\\ChatHub.cs",
+              "ToolTip": "C:\\Users\\yeshi\\source\\repos\\MomomiAPI\\MomomiAPI\\Hubs\\ChatHub.cs",
+              "RelativeToolTip": "MomomiAPI\\Hubs\\ChatHub.cs",
+              "ViewState": "AgIAAMcAAAAAAAAAAAAcwOEAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-25T01:27:05.911Z",
               "EditorCaption": ""
             }
           ]

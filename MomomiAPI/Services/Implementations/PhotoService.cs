@@ -247,46 +247,51 @@ namespace MomomiAPI.Services.Implementations
                     return BatchPhotoUploadResult.AllFailed(failedPhotos);
                 }
 
-                // Batch database operations
-                using var transaction = await _dbContext.Database.BeginTransactionAsync();
-                try
+                var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
+
+                return await executionStrategy.ExecuteAsync(async () =>
                 {
-                    // If any photo is marked as primary, unset existing primary photos
-                    if (photosToAdd.Any(p => p.IsPrimary))
+                    // Batch database operations
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
                     {
-                        await UnsetOtherPrimaryPhotos(userId);
+                        // If any photo is marked as primary, unset existing primary photos
+                        if (photosToAdd.Any(p => p.IsPrimary))
+                        {
+                            await UnsetOtherPrimaryPhotos(userId);
+                        }
+
+                        // Add all photos in one operation
+                        _dbContext.UserPhotos.AddRange(photosToAdd);
+                        await _dbContext.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // Invalidate caches after successful commit
+                        await InvalidateUserPhotosCaches(userId);
+
+                        var result = new BatchPhotoUploadData
+                        {
+                            SuccessfulPhotos = successfulPhotos,
+                            FailedPhotos = failedPhotos,
+                            TotalPhotosCount = userData.PhotoCount + successfulPhotos.Count
+                        };
+
+                        _logger.LogInformation("Batch upload completed for user {UserId}: {Successful} successful, {Failed} failed",
+                            userId, successfulPhotos.Count, failedPhotos.Count);
+
+                        return BatchPhotoUploadResult.UploadSuccess(result);
                     }
-
-                    // Add all photos in one operation
-                    _dbContext.UserPhotos.AddRange(photosToAdd);
-                    await _dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Invalidate caches after successful commit
-                    await InvalidateUserPhotosCaches(userId);
-
-                    var result = new BatchPhotoUploadData
+                    catch (Exception ex)
                     {
-                        SuccessfulPhotos = successfulPhotos,
-                        FailedPhotos = failedPhotos,
-                        TotalPhotosCount = userData.PhotoCount + successfulPhotos.Count
-                    };
+                        await transaction.RollbackAsync();
+                        _logger.LogError(ex, "Database transaction failed during batch upload for user {UserId}", userId);
 
-                    _logger.LogInformation("Batch upload completed for user {UserId}: {Successful} successful, {Failed} failed",
-                        userId, successfulPhotos.Count, failedPhotos.Count);
+                        // Clean up uploaded files on transaction failure
+                        await CleanupUploadedFiles(photosToAdd.Select(p => p.StoragePath).ToList());
 
-                    return BatchPhotoUploadResult.UploadSuccess(result);
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    _logger.LogError(ex, "Database transaction failed during batch upload for user {UserId}", userId);
-
-                    // Clean up uploaded files on transaction failure
-                    await CleanupUploadedFiles(photosToAdd.Select(p => p.StoragePath).ToList());
-
-                    return BatchPhotoUploadResult.Error("Failed to save photos to database");
-                }
+                        return BatchPhotoUploadResult.Error("Failed to save photos to database");
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -408,7 +413,7 @@ namespace MomomiAPI.Services.Implementations
                     .ToList();
 
                 _logger.LogInformation("Successfully reordered photos for user {UserId}", userId);
-                return PhotoReorderResult.Success(reorderedPhotoDtos);
+                return PhotoReorderResult.ReorderSuccess(reorderedPhotoDtos);
             }
             catch (Exception ex)
             {

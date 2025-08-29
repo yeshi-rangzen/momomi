@@ -35,5 +35,7 @@ namespace MomomiAPI.Services.Interfaces
         /// Permanently deletes user account and all associated data
         /// </summary>
         Task<AccountDeletionResult> DeleteUserAccountAsync(Guid userId);
+
+        Task<bool?> IsActiveUser(Guid userId);
     }
 }

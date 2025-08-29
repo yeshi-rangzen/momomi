@@ -34,8 +34,8 @@ namespace MomomiAPI.Common.Caching
             // Clear all discovery cache variations
             for (int count = 5; count <= 30; count += 5)
             {
-                tasks.Add(_cacheService.RemoveAsync(CacheKeys.Discovery.GlobalResults(userId, count)));
-                tasks.Add(_cacheService.RemoveAsync(CacheKeys.Discovery.LocalResults(userId, count)));
+                tasks.Add(_cacheService.RemoveAsync(CacheKeys.Discovery.GlobalResults(userId)));
+                tasks.Add(_cacheService.RemoveAsync(CacheKeys.Discovery.LocalResults(userId)));
             }
 
             await Task.WhenAll(tasks);
@@ -68,7 +68,7 @@ namespace MomomiAPI.Common.Caching
         {
             await Task.WhenAll(
                 InvalidateUserMatches(user1Id),
-                InvalidateUserMatches(user2Id),
+                InvalidateUserMatches(user2Id)
             );
         }
 
