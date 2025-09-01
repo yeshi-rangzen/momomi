@@ -18,14 +18,14 @@ namespace MomomiAPI.Controllers
 
         /// Upload a new photo for the current user
         [HttpPost("upload")]
-        public async Task<ActionResult<OperationResult<PhotoUploadData>>> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false)
+        public async Task<ActionResult<OperationResult<PhotoUploadData>>> UploadPhoto(IFormFile file, [FromQuery] bool isPrimary = false, [FromQuery] int photoOrder = -1)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
 
             LogControllerAction(nameof(UploadPhoto), new { isPrimary, fileName = file?.FileName });
 
-            var result = await _photoService.AddUserPhoto(userIdResult.Value, file!, isPrimary);
+            var result = await _photoService.AddUserPhoto(userIdResult.Value, file!, isPrimary, photoOrder);
             return HandleOperationResult(result);
         }
 

@@ -735,6 +735,15 @@
               "type": "boolean",
               "default": false
             }
+          },
+          {
+            "name": "photoOrder",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": -1
+            }
           }
         ],
         "requestBody": {
@@ -3251,9 +3260,12 @@
             "format": "uuid",
             "nullable": true
           },
-          "remainingPhotosCount": {
-            "type": "integer",
-            "format": "int32"
+          "remainingPhotos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserPhotoDTO"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -4267,6 +4279,14 @@
           "lastName": {
             "maxLength": 100,
             "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "bio": {

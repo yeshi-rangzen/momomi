@@ -113,7 +113,7 @@ namespace MomomiAPI.Common.Results
         public Guid DeletedPhotoId { get; set; }
         public bool WasPrimary { get; set; }
         public Guid? NewPrimaryPhotoId { get; set; }
-        public int RemainingPhotosCount { get; set; }
+        public List<UserPhotoDTO> RemainingPhotos { get; set; } = [];
     }
     public class PhotoDeletionResult : OperationResult<PhotoDeletionData>
     {
@@ -124,14 +124,14 @@ namespace MomomiAPI.Common.Results
         }
 
         public static PhotoDeletionResult DeleteSuccess(Guid deletedPhotoId, bool wasPrimary,
-            Guid? newPrimaryPhotoId, int remainingCount, Dictionary<string, object>? metadata = null)
+            Guid? newPrimaryPhotoId, List<UserPhotoDTO> remainingPhotos, Dictionary<string, object>? metadata = null)
         {
             var data = new PhotoDeletionData
             {
                 DeletedPhotoId = deletedPhotoId,
                 WasPrimary = wasPrimary,
                 NewPrimaryPhotoId = newPrimaryPhotoId,
-                RemainingPhotosCount = remainingCount
+                RemainingPhotos = remainingPhotos
             };
 
             return new PhotoDeletionResult(true, data, null, null, metadata);

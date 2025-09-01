@@ -628,6 +628,18 @@ namespace MomomiAPI.Services.Implementations
                 updatedFields.Add("LastName");
             }
 
+            if (request.Gender.HasValue)
+            {
+                user.Gender = request.Gender.Value;
+                updatedFields.Add("Gender");
+            }
+
+            if (request.DateOfBirth.HasValue)
+            {
+                user.DateOfBirth = request.DateOfBirth.Value;
+                updatedFields.Add("Gender");
+            }
+
             if (!string.IsNullOrEmpty(request.Bio))
             {
                 user.Bio = request.Bio;

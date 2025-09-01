@@ -46,7 +46,7 @@ namespace MomomiAPI.Services.Implementations
             _configuration = configuration;
         }
 
-        public async Task<PhotoUploadResult> AddUserPhoto(Guid userId, IFormFile file, bool setAsPrimary = false)
+        public async Task<PhotoUploadResult> AddUserPhoto(Guid userId, IFormFile file, bool setAsPrimary = false, int photoOrder = -1)
         {
             try
             {
@@ -97,7 +97,7 @@ namespace MomomiAPI.Services.Implementations
                     StoragePath = uploadResult.Data!.FilePath,
                     Url = uploadResult.Data.PublicUrl,
                     ThumbnailUrl = GenerateThumbnailUrl(uploadResult.Data.PublicUrl),
-                    PhotoOrder = userData.PhotoCount,
+                    PhotoOrder = photoOrder == -1 ? userData.PhotoCount : photoOrder,
                     IsPrimary = setAsPrimary,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -318,49 +318,75 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 var wasPrimary = photo.IsPrimary;
-                Guid? newPrimaryPhotoId = null;
+                var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
-                using var transaction = await _dbContext.Database.BeginTransactionAsync();
-                try
+                return await executionStrategy.ExecuteAsync(async () =>
                 {
-                    // If this was the primary photo, set another as primary
-                    if (wasPrimary)
+                    using var transaction = await _dbContext.Database.BeginTransactionAsync();
+                    try
                     {
-                        newPrimaryPhotoId = await SetNewPrimaryPhoto(userId, photoId);
+                        // If this was the primary photo, set another as primary
+                        //if (wasPrimary)
+                        //{
+                        //    newPrimaryPhotoId = await SetNewPrimaryPhoto(userId, photoId);
+                        //}
+
+                        // Remove from database
+                        _dbContext.UserPhotos.Remove(photo);
+
+                        var remainingPhotos = await _dbContext.UserPhotos
+                        .Where(p => p.UserId == userId && p.Id != photo.Id)
+                        .OrderBy(p => p.PhotoOrder)
+                        .ToListAsync();
+
+                        // Reassign PhotoOrders in ascending order (0,1,2,3...)
+                        for (int i = 0; i < remainingPhotos.Count; i++)
+                        {
+                            remainingPhotos[i].PhotoOrder = i;
+                            remainingPhotos[i].IsPrimary = (i == 0); // first photo is always primary
+                        }
+
+
+                        await _dbContext.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // Get remaining photo count
+                        var newPrimaryPhotoId = remainingPhotos.FirstOrDefault()?.Id;
+
+                        // Delete from storage (don't fail the operation if this fails)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await DeleteFromSupabaseStorage(photo.StoragePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to delete photo from storage: {StoragePath}", photo.StoragePath);
+                            }
+                        });
+
+                        // Invalidate caches
+                        await InvalidateUserPhotosCaches(userId);
+                        var remainingPhotoDtos = remainingPhotos.Select((photo) => new UserPhotoDTO
+                        {
+                            Id = photo.Id,
+                            Url = photo.Url,
+                            ThumbnailUrl = photo.ThumbnailUrl,
+                            IsPrimary = photo.IsPrimary,
+                            PhotoOrder = photo.PhotoOrder,
+                        }).ToList();
+
+                        _logger.LogInformation("Successfully removed photo {PhotoId} for user {UserId}", photoId, userId);
+
+                        return PhotoDeletionResult.DeleteSuccess(photoId, wasPrimary, newPrimaryPhotoId, remainingPhotoDtos);
                     }
-
-                    // Remove from database
-                    _dbContext.UserPhotos.Remove(photo);
-                    await _dbContext.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Get remaining photo count
-                    var remainingCount = await _dbContext.UserPhotos.CountAsync(p => p.UserId == userId);
-
-                    // Delete from storage (don't fail the operation if this fails)
-                    _ = Task.Run(async () =>
+                    catch (Exception ex)
                     {
-                        try
-                        {
-                            await DeleteFromSupabaseStorage(photo.StoragePath);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to delete photo from storage: {StoragePath}", photo.StoragePath);
-                        }
-                    });
-
-                    // Invalidate caches
-                    await InvalidateUserPhotosCaches(userId);
-
-                    _logger.LogInformation("Successfully removed photo {PhotoId} for user {UserId}", photoId, userId);
-                    return PhotoDeletionResult.DeleteSuccess(photoId, wasPrimary, newPrimaryPhotoId, remainingCount);
-                }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {

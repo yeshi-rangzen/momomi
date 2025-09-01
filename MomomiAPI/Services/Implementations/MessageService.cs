@@ -511,13 +511,14 @@ namespace MomomiAPI.Services.Implementations
             {
                 var otherUser = conversation.User1Id == userId ? conversation.User2 : conversation.User1;
                 var lastMessage = conversation.Messages.FirstOrDefault();
+                var otherUserPhoto = otherUser.Photos.FirstOrDefault();
 
                 return new ConversationDTO
                 {
                     Id = conversation.Id,
                     OtherUserId = otherUser.Id,
                     OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
-                    OtherUserPhoto = otherUser.Photos.FirstOrDefault()?.Url,
+                    OtherUserPhoto = otherUserPhoto?.ThumbnailUrl != "" ? otherUserPhoto?.ThumbnailUrl : otherUserPhoto?.Url,
                     LastMessage = lastMessage != null ? new MessageDTO
                     {
                         Id = lastMessage.Id,

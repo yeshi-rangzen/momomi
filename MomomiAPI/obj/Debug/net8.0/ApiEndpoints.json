@@ -548,6 +548,11 @@
         "Name": "isPrimary",
         "Type": "System.Boolean",
         "IsRequired": false
+      },
+      {
+        "Name": "photoOrder",
+        "Type": "System.Int32",
+        "IsRequired": false
       }
     ],
     "ReturnTypes": [

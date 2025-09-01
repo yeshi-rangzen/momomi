@@ -13,6 +13,10 @@ namespace MomomiAPI.Models.Requests
         [MaxLength(100)]
         public string? LastName { get; set; }
 
+        public GenderType? Gender { get; set; }
+
+        public DateTime? DateOfBirth { get; set; }
+
         [MaxLength(500)]
         public string? Bio { get; set; }
 
