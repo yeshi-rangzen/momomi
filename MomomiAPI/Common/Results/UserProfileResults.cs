@@ -7,7 +7,6 @@ namespace MomomiAPI.Common.Results
     public class UserProfileData
     {
         public UserDTO User { get; set; } = null!;
-        public bool WasCached { get; set; }
         public DateTime LastUpdated { get; set; }
     }
 
@@ -19,13 +18,12 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static UserProfileResult Successful(UserDTO user, bool wasCached = false,
+        public static UserProfileResult Successful(UserDTO user,
             Dictionary<string, object>? metadata = null)
         {
             var data = new UserProfileData
             {
                 User = user,
-                WasCached = wasCached,
                 LastUpdated = DateTime.UtcNow
             };
 
@@ -42,9 +40,7 @@ namespace MomomiAPI.Common.Results
     /// Profile update data
     public class ProfileUpdateData
     {
-        public UserDTO UpdatedUser { get; set; } = null!;
         public List<string> UpdatedFields { get; set; } = new();
-        public bool RequiredDiscoveryRefresh { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
 
@@ -56,14 +52,11 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static ProfileUpdateResult Successful(UserDTO updatedUser, List<string> updatedFields,
-            bool requiresDiscoveryRefresh, Dictionary<string, object>? metadata = null)
+        public static ProfileUpdateResult Successful(List<string> updatedFields, Dictionary<string, object>? metadata = null)
         {
             var data = new ProfileUpdateData
             {
-                UpdatedUser = updatedUser,
                 UpdatedFields = updatedFields,
-                RequiredDiscoveryRefresh = requiresDiscoveryRefresh,
                 UpdatedAt = DateTime.UtcNow
             };
 
@@ -83,10 +76,7 @@ namespace MomomiAPI.Common.Results
     /// Discovery filters update data
     public class DiscoveryFiltersUpdateData
     {
-        public DiscoverySettingsDTO UpdatedSettings { get; set; } = null!;
         public List<string> UpdatedFilters { get; set; } = new();
-        public bool LocationChanged { get; set; }
-        public bool FiltersChanged { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
 
@@ -98,16 +88,13 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static DiscoveryFiltersUpdateResult Successful(DiscoverySettingsDTO updatedSettings,
-            List<string> updatedFilters, bool locationChanged, bool filtersChanged,
+        public static DiscoveryFiltersUpdateResult Successful(
+            List<string> updatedFilters,
             Dictionary<string, object>? metadata = null)
         {
             var data = new DiscoveryFiltersUpdateData
             {
-                UpdatedSettings = updatedSettings,
                 UpdatedFilters = updatedFilters,
-                LocationChanged = locationChanged,
-                FiltersChanged = filtersChanged,
                 UpdatedAt = DateTime.UtcNow
             };
 

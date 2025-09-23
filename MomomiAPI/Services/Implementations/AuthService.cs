@@ -9,7 +9,6 @@ using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 using Supabase.Gotrue;
 using System.Text.Json.Serialization;
-using static MomomiAPI.Common.Constants.AppConstants;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
 using static Supabase.Gotrue.Constants;
 using User = MomomiAPI.Models.Entities.User;
@@ -24,19 +23,22 @@ namespace MomomiAPI.Services.Implementations
         private readonly ICacheService _cacheService;
         private readonly IJwtService _jwtService;
         private readonly ILogger<AuthService> _logger;
+        private readonly IUserService _userService;
 
         public AuthService(
            Supabase.Client supabaseClient,
            MomomiDbContext dbContext,
            ICacheService cacheService,
            IJwtService jwtService,
-           ILogger<AuthService> logger)
+           ILogger<AuthService> logger,
+           IUserService userService)
         {
             _supabaseClient = supabaseClient;
             _dbContext = dbContext;
             _cacheService = cacheService;
             _jwtService = jwtService;
             _logger = logger;
+            _userService = userService;
         }
 
         public async Task<RegistrationResult> RegisterNewUser(RegistrationRequest request)
@@ -55,6 +57,7 @@ namespace MomomiAPI.Services.Implementations
 
                 var existingUserExists = await _dbContext.Users
                     .AnyAsync(u => u.Email == request.Email);
+
                 if (existingUserExists)
                 {
                     return RegistrationResult.EmailAlreadyRegistered();
@@ -63,6 +66,7 @@ namespace MomomiAPI.Services.Implementations
                 // Verify verification token
                 var varificationKey = CacheKeys.Authentication.EmailVerificationToken(request.Email, request.VerificationToken);
                 var verificationData = await _cacheService.GetAsync<RegisterVerificationData>(varificationKey);
+
                 if (verificationData == null || verificationData.Email != request.Email)
                 {
                     return RegistrationResult.InvalidVerificationToken();
@@ -77,10 +81,10 @@ namespace MomomiAPI.Services.Implementations
                 var accessToken = _jwtService.GenerateAccessToken(user);
                 var refreshToken = _jwtService.GenerateRefreshToken();
 
-                // Remove verification token from cache
-                await _cacheService.RemoveAsync(varificationKey);
+                _ = _cacheService.RemoveAsync(varificationKey);
+
                 // Store refresh token to Cache
-                await _jwtService.CacheRefreshTokenAsync(user.Id, refreshToken);
+                _ = _jwtService.CacheRefreshTokenAsync(user.Id, refreshToken);
 
                 _logger.LogInformation("User registered successfully: {Email}", request.Email);
 
@@ -109,36 +113,29 @@ namespace MomomiAPI.Services.Implementations
                 if (verifyResponse?.User == null)
                 {
                     // Update attempt count on failed verification
-                    await UpdateOtpAttemptCount(email, otpValidationResult.AttemptData!);
+                    _ = UpdateOtpAttemptCount(email, otpValidationResult.AttemptData!);
                     return LoginResult.InvalidCredentials();
                 }
-                var supabaseUid = Guid.Parse(verifyResponse.User.Id!);
-                var user = await _dbContext.Users
-                    .Include(u => u.Photos)
-                    .Include(u => u.Preferences)
-                    .Include(u => u.Subscription)
-                    .Include(u => u.UsageLimit)
-                    .FirstOrDefaultAsync(u => u.SupabaseUid == supabaseUid && u.IsActive);
 
-                if (user == null)
+                var supabaseUid = Guid.Parse(verifyResponse.User.Id!);
+                var userResult = await _userService.GetUserProfileWithSupabaseIdAsync(supabaseUid);
+                var userDto = userResult.Data?.User;
+
+                if (!userResult.Success || userDto == null)
                 {
                     return LoginResult.UserNotFound();
                 }
 
                 // Token generation
-                var accessToken = _jwtService.GenerateAccessToken(user);
+                var accessToken = _jwtService.GenerateAccessToken(userDto);
                 var refreshToken = _jwtService.GenerateRefreshToken();
                 var tokenExpiresAt = DateTime.UtcNow.AddHours(1);
 
                 // Store refresh token
-                await _jwtService.CacheRefreshTokenAsync(user.Id, refreshToken);
-
-                // Update last active time
-                await UpdateUserLastActive(user.Id);
+                _ = _jwtService.CacheRefreshTokenAsync(userDto.Id, refreshToken);
 
                 _logger.LogInformation("User logged in successfully: {Email}", email);
 
-                var userDto = UserMapper.UserToDTO(user);
                 return LoginResult.Successful(userDto, accessToken, refreshToken, tokenExpiresAt);
             }
             catch (Exception ex)
@@ -167,7 +164,7 @@ namespace MomomiAPI.Services.Implementations
                 var isEmailRegistered = emailExistsTask.Result;
 
                 // Early return if rate limited
-                if (rateLimitCount >= Limits.MaxOtpRequestsPerHour)
+                if (rateLimitCount >= AppConstants.Limits.MaxOtpRequestsPerHour)
                 {
                     return EmailVerificationResult.RateLimitExceeded(0, email);
                 }
@@ -182,18 +179,26 @@ namespace MomomiAPI.Services.Implementations
                 var otpAttemptKey = CacheKeys.Authentication.OtpAttempt(email);
                 var otpAttemptData = new OtpAttemptData(email, 0, DateTime.UtcNow, now.AddMinutes(10));
 
-                // Parallel cache tasks
-                var updateRateLimitTask = _cacheService.SetAsync(rateLimitKey, rateLimitCount + 1, CacheKeys.Duration.OtpRateLimit);
-                var otpAttemptTask =
-                    _cacheService.SetAsync(otpAttemptKey, otpAttemptData, CacheKeys.Duration.OtpAttempt);
-                await Task.WhenAll(updateRateLimitTask, otpAttemptTask);
+                var caches = new Dictionary<string, object?>
+                {
+                    { rateLimitKey, rateLimitCount + 1 },
+                    { otpAttemptKey, otpAttemptData},
+                };
+
+                var cacheExpirations = new Dictionary<string, TimeSpan>
+                {
+                    { rateLimitKey, CacheKeys.Duration.OtpRateLimit },
+                    { otpAttemptKey, CacheKeys.Duration.OtpAttempt },
+                };
+
+                _ = _cacheService.SetManyAsync(caches, cacheExpirations);
 
                 _logger.LogInformation("OTP code sent successfully to {Email}", email);
 
                 return EmailVerificationResult.CodeSentSuccessfully(
                    null!, // verificationToken is not used here
                    otpAttemptData.ExpiresAt,
-                   Limits.MaxOtpAttempts - otpAttemptData.AttemptCount,
+                   AppConstants.Limits.MaxOtpAttempts - otpAttemptData.AttemptCount,
                    isEmailRegistered, // Frontend will decide for login flow based on this flag
                    email // Pass email for frontend to use in verification
                 );
@@ -222,8 +227,9 @@ namespace MomomiAPI.Services.Implementations
 
                 if (verifyResponse?.User == null)
                 {
-                    await UpdateOtpAttemptCount(otpAttemptKey, validationResult.AttemptData!);
-                    var remainingAttempts = Limits.MaxOtpAttempts - validationResult.AttemptData!.AttemptCount - 1;
+                    _ = UpdateOtpAttemptCount(otpAttemptKey, validationResult.AttemptData!);
+
+                    var remainingAttempts = AppConstants.Limits.MaxOtpAttempts - validationResult.AttemptData!.AttemptCount - 1;
                     return EmailVerificationResult.InvalidOtpCode(remainingAttempts, email);
                 }
 
@@ -231,10 +237,8 @@ namespace MomomiAPI.Services.Implementations
                 var verificationKey = CacheKeys.Authentication.EmailVerificationToken(email, verificationToken);
                 var verificationData = new RegisterVerificationData(email, verifyResponse.User.Id!, DateTime.UtcNow);
 
-                var cacheVerificationCodeTask = _cacheService.SetAsync(verificationKey, verificationData, CacheKeys.Duration.EmailVerificationCode);
-                var removeAttemptDataTask = _cacheService.RemoveAsync(otpAttemptKey);
-
-                await Task.WhenAll(cacheVerificationCodeTask, removeAttemptDataTask);
+                _ = _cacheService.SetAsync(verificationKey, verificationData, CacheKeys.Duration.EmailVerificationCode);
+                _ = _cacheService.RemoveAsync(otpAttemptKey);
 
                 _logger.LogInformation("Email verification successful for {Email}", email);
 
@@ -352,9 +356,9 @@ namespace MomomiAPI.Services.Implementations
                 // Related entities
                 Preferences = new UserPreference
                 {
-                    LanguagePreference = request.LanguagesSpoken,
                     PreferredHeritage = request.Heritage,
-                    PreferredReligions = request.Religion
+                    LanguagePreference = [],
+                    PreferredReligions = []
                 },
                 Subscription = new UserSubscription
                 {

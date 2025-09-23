@@ -111,9 +111,6 @@ namespace MomomiAPI.Common.Results
     public class PhotoDeletionData
     {
         public Guid DeletedPhotoId { get; set; }
-        public bool WasPrimary { get; set; }
-        public Guid? NewPrimaryPhotoId { get; set; }
-        public List<UserPhotoDTO> RemainingPhotos { get; set; } = [];
     }
     public class PhotoDeletionResult : OperationResult<PhotoDeletionData>
     {
@@ -123,15 +120,11 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static PhotoDeletionResult DeleteSuccess(Guid deletedPhotoId, bool wasPrimary,
-            Guid? newPrimaryPhotoId, List<UserPhotoDTO> remainingPhotos, Dictionary<string, object>? metadata = null)
+        public static PhotoDeletionResult DeleteSuccess(Guid deletedPhotoId, Dictionary<string, object>? metadata = null)
         {
             var data = new PhotoDeletionData
             {
                 DeletedPhotoId = deletedPhotoId,
-                WasPrimary = wasPrimary,
-                NewPrimaryPhotoId = newPrimaryPhotoId,
-                RemainingPhotos = remainingPhotos
             };
 
             return new PhotoDeletionResult(true, data, null, null, metadata);
@@ -153,31 +146,24 @@ namespace MomomiAPI.Common.Results
         public int PhotosCount { get; set; }
     }
 
-    public class PhotoReorderResult : OperationResult<PhotoReorderData>
+    public class PhotoReorderResult : OperationResult
     {
-        private PhotoReorderResult(bool success, PhotoReorderData? data, string? errorCode = null,
+        private PhotoReorderResult(bool success, string? errorCode = null,
             string? errorMessage = null, Dictionary<string, object>? metadata = null)
-            : base(success, data, errorCode, errorMessage, metadata)
+            : base(success, errorCode, errorMessage, metadata)
         {
         }
 
-        public static PhotoReorderResult ReorderSuccess(List<UserPhotoDTO> reorderedPhotos,
-            Dictionary<string, object>? metadata = null)
+        public static PhotoReorderResult ReorderSuccess(Dictionary<string, object>? metadata = null)
         {
-            var data = new PhotoReorderData
-            {
-                ReorderedPhotos = reorderedPhotos,
-                PhotosCount = reorderedPhotos.Count
-            };
-
-            return new PhotoReorderResult(true, data, null, null, metadata);
+            return new PhotoReorderResult(true, null, null, metadata);
         }
 
         public static PhotoReorderResult ValidationError(string message)
-            => new(false, null, ErrorCodes.VALIDATION_ERROR, message);
+            => new(false, ErrorCodes.VALIDATION_ERROR, message);
 
         public static PhotoReorderResult Error(string message)
-            => new(false, null, ErrorCodes.INTERNAL_SERVER_ERROR, message);
+            => new(false, ErrorCodes.INTERNAL_SERVER_ERROR, message);
     }
     #endregion
 

@@ -51,7 +51,7 @@ namespace MomomiAPI.Models.DTOs
 
         // Notifications & Device
         public string? PushToken { get; set; }
-        public bool NotificaitonsEnabled { get; set; } = true;
+        public bool NotificationsEnabled { get; set; } = true;
 
         // Account status & Verification
         public bool IsVerified { get; set; } = false;

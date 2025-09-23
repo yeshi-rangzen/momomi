@@ -15,17 +15,23 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
         private readonly ILogger<SwipeService> _logger;
+        private readonly IPushNotificationService _pushNotificationService;
+        private readonly IUserService _userService;
 
         private static readonly SwipeType[] PositiveSwipeTypes = { SwipeType.Like, SwipeType.SuperLike };
 
         public SwipeService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            ILogger<SwipeService> logger)
+            ILogger<SwipeService> logger,
+            IUserService userService,
+            IPushNotificationService pushNotificationService)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _logger = logger;
+            _pushNotificationService = pushNotificationService;
+            _userService = userService;
         }
 
         public async Task<SwipeResult> LikeUser(Guid userId, Guid likedUserId)
@@ -75,23 +81,23 @@ namespace MomomiAPI.Services.Implementations
                             var convSwipeType = userData.IsSuperLikedByTarget ? SwipeType.SuperLike : SwipeType.Like;
                             var conversationRecord = CreateConversationRecord(userId, likedUserId, convSwipeType);
                             _dbContext.Conversations.Add(conversationRecord);
+
+                            // Send push notifications if user is not online
+                            var userOnlineStatus = await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(likedUserId));
+
+                            // Updated the line to handle the nullability of `likedUser` and its properties.
+                            if (!userOnlineStatus && targetUser != null && targetUser.NotificationsEnabled && !string.IsNullOrEmpty(targetUser.PushToken))
+                            {
+                                // Fire-and-forget push notification
+                                _ = _pushNotificationService.SendNewMatchNotificationAsync(targetUser.PushToken, currentUser.FirstName ?? "Someone");
+                            }
                         }
 
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
                         // Don't wait for cache invalidation - fire and forget
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await InvalidateRelevantCaches(userId, likedUserId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Cache invalidation failed for users {UserId}, {TargetUserId}", userId, likedUserId);
-                            }
-                        });
+                        _ = InvalidateRelevantCaches(userId, likedUserId, isMatch);
 
                         _logger.LogInformation("User {UserId} liked user {LikedUserId}. Match: {IsMatch}",
                             userId, likedUserId, isMatch);
@@ -158,23 +164,26 @@ namespace MomomiAPI.Services.Implementations
                         {
                             var conversationRecord = CreateConversationRecord(userId, likedUserId, SwipeType.SuperLike);
                             _dbContext.Conversations.Add(conversationRecord);
+
+                            // Send push notifications if user is not online
+                            var userOnlineStatus = await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(likedUserId));
+
+                            // Updated the line to handle the nullability of `likedUser` and its properties.
+                            if (!userOnlineStatus && targetUser != null && targetUser.NotificationsEnabled && !string.IsNullOrEmpty(targetUser.PushToken))
+                            {
+
+                                // Fire-and-forget push notification
+                                _ = _pushNotificationService.SendNewMatchNotificationAsync(targetUser.PushToken, currentUser.FirstName ?? "Someone");
+
+                            }
                         }
 
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
                         // Don't wait for cache invalidation - fire and forget
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await InvalidateRelevantCaches(userId, likedUserId);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Cache invalidation failed for users {UserId}, {TargetUserId}", userId, likedUserId);
-                            }
-                        });
+                        _ = InvalidateRelevantCaches(userId, likedUserId);
+
 
                         _logger.LogInformation("User {UserId} super liked user {LikedUserId}. Match: {IsMatch}",
                             userId, likedUserId, isMatch);
@@ -211,20 +220,6 @@ namespace MomomiAPI.Services.Implementations
                 var swipeRecord = CreateSwipeRecord(userId, dismissedUserId, SwipeType.Pass);
                 _dbContext.UserSwipes.Add(swipeRecord);
                 await _dbContext.SaveChangesAsync();
-
-                // Fire-and-forget cache invalidation for discovery
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await RemoveUserFromDiscoveryCache(userId, dismissedUserId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Discovery cache invalidation failed for user {UserId} during undo", userId);
-                    }
-                });
-
                 _logger.LogInformation("User {UserId} passed user {DismissedUserId}", userId, dismissedUserId);
 
                 return SwipeResult.PassRecorded(dismissedUserId);
@@ -258,19 +253,6 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserSwipes.Remove(lastPassSwipe);
                 await _dbContext.SaveChangesAsync();
 
-                // Fire-and-forget cache invalidation for discovery
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await InvalidateDiscoveryCaches(userId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Discovery cache invalidation failed for user {UserId} during undo", userId);
-                    }
-                });
-
                 _logger.LogInformation("User {UserId} undid last pass swipe for user {SwipedUserId}",
                     userId, lastPassSwipe.SwipedUserId);
 
@@ -291,11 +273,12 @@ namespace MomomiAPI.Services.Implementations
                 .Include(u => u.UsageLimit)
                 .Include(u => u.Subscription)
                 .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
-
-            if (currentUser == null)
+            var userResult = await _userService.GetUserProfileAsync(userId);
+            if (!userResult.Success || userResult.Data == null)
             {
-                return SwipeUserData.Invalid(SwipeResult.UserNotFound(targetUserId));
+                return SwipeUserData.Invalid(SwipeResult.Error("Current user profile not found or inactive"));
             }
+            var userDto = userResult.Data.User;
 
             // Batch query for all validations
             var validationData = await _dbContext.Users
@@ -304,7 +287,7 @@ namespace MomomiAPI.Services.Implementations
                 {
                     TargetUser = u,
                     IsReported = _dbContext.UserReports
-                        .Any(ur => ur.ReportedId == userId && ur.ReporterId == targetUserId),
+                        .Any(ur => ur.ReportedEmail == userDto.Email && ur.ReporterEmail == u.Email),
                     ExistingSwipe = _dbContext.UserSwipes
                         .Any(us => us.SwiperUserId == userId && us.SwipedUserId == targetUserId),
                     IsAlreadyLikedByTarget = _dbContext.UserSwipes
@@ -334,55 +317,6 @@ namespace MomomiAPI.Services.Implementations
             }
 
             return SwipeUserData.Valid(currentUser, validationData.TargetUser, validationData.IsAlreadyLikedByTarget, validationData.ExistingSwipeType == SwipeType.SuperLike);
-        }
-
-        // Removes a specific user from all discovery cache entries for the given user
-        // Used when user swipes on someone to prevent them from appearing again
-        // More efficient than invalidting entire discovery cache
-        public async Task RemoveUserFromDiscoveryCache(Guid userId, Guid removedUserId)
-        {
-            var keys = new List<string>();
-            keys.Add(CacheKeys.Discovery.GlobalResults(userId));
-            keys.Add(CacheKeys.Discovery.LocalResults(userId));
-
-            // Get all discovery caches in one batch operation
-            var cachedResults = await _cacheService.GetManyAsync<CachedDiscoveryData>(keys);
-
-            var updatedCaches = new Dictionary<string, CachedDiscoveryData>();
-            var keysToRemove = new List<string>();
-
-            foreach (var (cacheKey, cachedData) in cachedResults)
-            {
-                if (cachedData?.Users != null)
-                {
-                    // Remove the swiped user from the cached results
-                    var originalCount = cachedData.Users.Count;
-                    cachedData.Users.RemoveAll(u => u.Id == removedUserId);
-
-                    if (cachedData.Users.Count != originalCount)
-                    {
-                        // Only update if we actually removed someone
-                        cachedData.ActualCount = cachedData.Users.Count;
-                        updatedCaches[cacheKey] = cachedData;
-
-                        _logger.LogDebug("Removed user {RemovedUserId} from discovery cache {CacheKey} for user {UserId}",
-                            removedUserId, cacheKey, userId);
-                    }
-                }
-            }
-
-            // Batch update all modified caches
-            if (updatedCaches.Any())
-            {
-                var expiries = updatedCaches.Keys.ToDictionary(
-                    key => key,
-                    _ => CacheKeys.Duration.DiscoveryResults
-                );
-
-                await _cacheService.SetManyAsync(updatedCaches, expiries);
-                _logger.LogDebug("Updated {Count} discovery caches after removing user {RemovedUserId} for user {UserId}",
-                    updatedCaches.Count, removedUserId, userId);
-            }
         }
 
         // Usage limit logic 
@@ -422,33 +356,20 @@ namespace MomomiAPI.Services.Implementations
         // Cache Invalidation for related data
         private async Task InvalidateRelevantCaches(Guid userId, Guid targetUserId, bool isMatch = false)
         {
-            // For the target user: only invalidate matches if it was a positive swipe
-            var keysToRemove = new List<string>
-            {
-                CacheKeys.Matching.UserMatches(userId)
-            };
-
+            // Only invalidate if it was a match
             if (isMatch)
             {
-                keysToRemove.Add(CacheKeys.Matching.UserMatches(targetUserId));
+                var keysToRemove = new List<string>
+                {
+                    CacheKeys.Matching.UserMatches(userId),
+                    CacheKeys.Matching.UserMatches(targetUserId),
+                    CacheKeys.Messaging.UserConversations(userId),
+                    CacheKeys.Messaging.UserConversations(targetUserId),
+                };
+
+                await _cacheService.RemoveManyAsync(keysToRemove);
             }
 
-            var removeMatchesTask = _cacheService.RemoveManyAsync(keysToRemove);
-
-            await Task.WhenAll(removeMatchesTask, RemoveUserFromDiscoveryCache(userId, targetUserId));
-
-            _logger.LogDebug("Invalidated caches after swiping for {UserId}", userId);
-        }
-
-        private async Task InvalidateDiscoveryCaches(Guid userId)
-        {
-            var keysToRemove = new[]
-            {
-               CacheKeys.Discovery.GlobalResults(userId),
-               CacheKeys.Discovery.LocalResults(userId),
-            };
-
-            await _cacheService.RemoveManyAsync(keysToRemove);
             _logger.LogDebug("Invalidated caches after swiping for {UserId}", userId);
         }
 

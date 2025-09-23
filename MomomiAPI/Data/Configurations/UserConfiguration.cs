@@ -137,18 +137,6 @@ namespace MomomiAPI.Data.Configurations
                 .HasForeignKey(m => m.SenderId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure relationships - Reports Made
-            builder.HasMany(u => u.ReportsMade)
-                .WithOne(r => r.Reporter)
-                .HasForeignKey(r => r.ReporterId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Configure relationships - Reports Received
-            builder.HasMany(u => u.ReportsReceived)
-                .WithOne(r => r.Reported)
-                .HasForeignKey(r => r.ReportedId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             // Configure relationships - Preferences (One-to-One)
             builder.HasOne(u => u.Preferences)
                 .WithOne(p => p.User)

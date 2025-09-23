@@ -11,7 +11,8 @@ namespace MomomiAPI.Common.Results
         UserNotFound,
         MatchCreated,
         SwipeUndone,
-        NoRecentPassToUndo
+        NoRecentPassToUndo,
+        InternalError
     }
     public class SwipeData
     {
@@ -24,9 +25,6 @@ namespace MomomiAPI.Common.Results
     }
     public class SwipeResult : OperationResult<SwipeData>
     {
-        public SwipeOutcome Outcome { get; private set; }
-        public Guid? SwipedUserId { get; private set; }
-
         private SwipeResult(bool success, SwipeData? data, string? errorCode = null,
             string? errorMessage = null, Dictionary<string, object>? metadata = null)
             : base(success, data, errorCode, errorMessage, metadata)
@@ -182,7 +180,7 @@ namespace MomomiAPI.Common.Results
         {
             var swipeData = new SwipeData
             {
-                Outcome = SwipeOutcome.UserNotFound, // Or consider adding SwipeOutcome.InternalError
+                Outcome = SwipeOutcome.InternalError, // Or consider adding SwipeOutcome.InternalError
                 SwipedUserId = swipedUserId,
                 IsMatch = false,
                 SwipeType = null,

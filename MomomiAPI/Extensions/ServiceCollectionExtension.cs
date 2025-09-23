@@ -26,26 +26,23 @@ namespace MomomiAPI.Extensions
 
             // Photo services
             services.AddScoped<IPhotoService, PhotoService>();
-            //services.AddScoped<IPhotoGalleryService, PhotoGalleryService>();
 
             // Messaging services
             services.AddScoped<IMatchService, MatchService>();
             services.AddScoped<IMessageService, MessageService>();
 
-            // Subscription and usage services
-            //services.AddScoped<ISubscriptionService, SubscriptionService>();
-
             // Safety services
             services.AddScoped<IReportingService, ReportingService>();
 
             // Notification services
-            //services.AddScoped<IPushNotificationService, PushNotificationService>();
+            services.AddHttpClient<IPushNotificationService, ExpoPushNotificationService>();
 
             // Cache service (existing)
             services.AddScoped<ICacheService, UpstashCacheService>();
 
-            // HTTP Client for push notifications
-            //services.AddHttpClient<IPushNotificationService, PushNotificationService>();
+            // Subscription and usage services
+            //services.AddScoped<ISubscriptionService, SubscriptionService>();
+
 
             return services;
         }
@@ -63,7 +60,6 @@ namespace MomomiAPI.Extensions
             services.Configure<SupabaseSettings>(configuration.GetSection("Supabase"));
             services.Configure<JwtSettings>(configuration.GetSection("JWT"));
             services.Configure<AppLimits>(configuration.GetSection("AppSettings"));
-            services.Configure<PushNotificationSettings>(configuration.GetSection("PushNotifications"));
 
             return services;
         }
@@ -88,14 +84,12 @@ namespace MomomiAPI.Extensions
             public SupabaseSettings Supabase { get; set; } = new();
             public JwtSettings Jwt { get; set; } = new();
             public AppLimits AppSettings { get; set; } = new();
-            public PushNotificationSettings PushNotifications { get; set; } = new();
 
             public void Validate()
             {
                 Supabase.Validate();
                 Jwt.Validate();
                 AppSettings.Validate();
-                PushNotifications.Validate();
             }
         }
 
@@ -165,21 +159,5 @@ namespace MomomiAPI.Extensions
             }
         }
 
-        public class PushNotificationSettings
-        {
-            public string ExpoAccessToken { get; set; } = string.Empty;
-            public string FcmServerKey { get; set; } = string.Empty;
-            public bool EnablePushNotifications { get; set; } = false; // TODO: Implement Push notifications
-
-            public void Validate()
-            {
-                // Push notification settings are optional
-                // Only validate if EnablePushNotifications is true
-                if (EnablePushNotifications && string.IsNullOrEmpty(ExpoAccessToken) && string.IsNullOrEmpty(FcmServerKey))
-                {
-                    throw new InvalidOperationException("At least one push notification service must be configured when push notifications are enabled");
-                }
-            }
-        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MomomiAPI.Common.Results;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 
 namespace MomomiAPI.Controllers
@@ -49,6 +50,21 @@ namespace MomomiAPI.Controllers
 
             var result = await _matchService.RemoveMatchConversation(currentUserIdResult.Value, userId, Models.Enums.SwipeType.Unmatched);
             return HandleOperationResult(result);
+        }
+
+        ///<summary>
+        /// Get matched user
+        /// </summary>
+        [HttpGet("{matchedUserId}")]
+        public async Task<ActionResult<OperationResult<DiscoveryUserDTO>>> GetMatchedUser(Guid matchedUserId)
+        {
+            var currentUserIdResult = GetCurrentUserIdOrUnauthorized();
+            if (currentUserIdResult.Result != null) return currentUserIdResult.Result;
+
+            LogControllerAction(nameof(RemoveMatch), new { matchedUserId });
+
+            var result = await _matchService.GetMatchedUser(currentUserIdResult.Value, matchedUserId);
+            return result;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
@@ -13,16 +14,16 @@ namespace MomomiAPI.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IJwtService _jwtService;
-        //private readonly IAnalyticsService _analyticsService;
+        private readonly ICacheInvalidation _cacheInvalidationService;
 
         public AuthController(
             IAuthService authService,
             IJwtService jwtService,
-            //IAnalyticsService analyticsService,
+            ICacheInvalidation cacheInvalidationService,
             ILogger<AuthController> logger) : base(logger)
         {
             _authService = authService;
-            //_analyticsService = analyticsService;
+            _cacheInvalidationService = cacheInvalidationService;
             _jwtService = jwtService;
         }
 
@@ -36,14 +37,6 @@ namespace MomomiAPI.Controllers
                 return BadRequest(ModelState);
 
             var result = await _authService.SendOTPCode(request.Email);
-
-            // Track email verification sent
-            //if (result.Success)
-            //{
-            //    _ = Task.Run(() => _analyticsService.TrackEmailVerificationSentAsync(
-            //        request.Email,
-            //        result.Data.RemainingAttempts ?? 0));
-            //}
 
             return HandleOperationResult(result);
         }
@@ -189,6 +182,8 @@ namespace MomomiAPI.Controllers
 
             await _jwtService.RevokeRefreshTokenAsync((Guid)userId);
 
+            await _cacheInvalidationService.InvalidateOnLogoutOrDelete((Guid)userId);
+
             // Blacklist current access token for immediate effect
             //var token = ExtractTokenFromRequest();
             //if (token != null)
@@ -203,19 +198,5 @@ namespace MomomiAPI.Controllers
             return Ok(new { message = "Logged out successfully" });
         }
 
-        /// Extract token from Authorization header
-        private string? ExtractTokenFromRequest()
-        {
-            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-                return null;
-
-            return authHeader.Substring("Bearer ".Length).Trim();
-        }
-
-        private static int CalculateDaysSinceLastLogin(DateTime lastActive)
-        {
-            return (int)(DateTime.UtcNow - lastActive).TotalDays;
-        }
     }
 }

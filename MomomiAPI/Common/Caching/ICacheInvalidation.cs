@@ -2,6 +2,7 @@
 {
     public interface ICacheInvalidation
     {
+        Task InvalidateOnLogoutOrDelete(Guid userId);
         Task InvalidateUserProfile(Guid userId);
         Task InvalidateUserDiscovery(Guid userId);
         Task InvalidateUserMatches(Guid userId);

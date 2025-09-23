@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
-using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
 
@@ -13,10 +13,12 @@ namespace MomomiAPI.Controllers
     public class UserController : BaseApiController
     {
         private readonly IUserService _userService;
+        private readonly ICacheInvalidation _cacheInvalidationService;
 
-        public UserController(IUserService userService, ILogger<UserController> logger) : base(logger)
+        public UserController(IUserService userService, ILogger<UserController> logger, ICacheInvalidation cacheInvalidationService) : base(logger)
         {
             _userService = userService;
+            _cacheInvalidationService = cacheInvalidationService;
         }
 
         /// <summary>
@@ -56,21 +58,6 @@ namespace MomomiAPI.Controllers
                 return BadRequest(ModelState);
 
             var result = await _userService.UpdateUserProfileAsync(userIdResult.Value, request);
-            return HandleOperationResult(result);
-        }
-
-        /// <summary>
-        /// Get current user's discovery filters and preferences
-        /// </summary>
-        [HttpGet("discovery-filters")]
-        public async Task<ActionResult<OperationResult<DiscoverySettingsDTO>>> GetDiscoveryFilters()
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
-
-            LogControllerAction(nameof(GetDiscoveryFilters));
-
-            var result = await _userService.GetDiscoveryFiltersAsync(userIdResult.Value);
             return HandleOperationResult(result);
         }
 
@@ -131,68 +118,11 @@ namespace MomomiAPI.Controllers
             LogControllerAction(nameof(DeleteAccount));
 
             var result = await _userService.DeleteUserAccountAsync(userIdResult.Value);
+
+            await _cacheInvalidationService.InvalidateOnLogoutOrDelete(userIdResult.Value);
             return HandleOperationResult(result);
         }
 
-        /// <summary>
-        /// Update user's discoverable status quickly
-        /// Convenience endpoint for toggling visibility
-        /// </summary>
-        [HttpPut("discoverable")]
-        public async Task<ActionResult<OperationResult<DiscoveryFiltersUpdateData>>> UpdateDiscoverableStatus([FromBody] bool isDiscoverable)
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
-
-            LogControllerAction(nameof(UpdateDiscoverableStatus), new { isDiscoverable });
-
-            var request = new UpdateDiscoveryFiltersRequest
-            {
-                IsDiscoverable = isDiscoverable
-            };
-
-            var result = await _userService.UpdateDiscoveryFiltersAsync(userIdResult.Value, request);
-            return HandleOperationResult(result);
-        }
-
-        /// <summary>
-        /// Update user's location quickly
-        /// Convenience endpoint for location updates
-        /// </summary>
-        [HttpPut("location")]
-        public async Task<ActionResult<OperationResult<DiscoveryFiltersUpdateData>>> UpdateLocation([FromBody] LocationUpdateRequest locationRequest)
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
-
-            LogControllerAction(nameof(UpdateLocation), new
-            {
-                hasCoordinates = locationRequest.Latitude.HasValue && locationRequest.Longitude.HasValue,
-                hasNeighbourhood = !string.IsNullOrEmpty(locationRequest.Neighbourhood)
-            });
-
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var request = new UpdateDiscoveryFiltersRequest
-            {
-                Latitude = locationRequest.Latitude,
-                Longitude = locationRequest.Longitude,
-                Neighbourhood = locationRequest.Neighbourhood
-            };
-
-            var result = await _userService.UpdateDiscoveryFiltersAsync(userIdResult.Value, request);
-            return HandleOperationResult(result);
-        }
     }
 
-    /// <summary>
-    /// Request model for location updates
-    /// </summary>
-    public class LocationUpdateRequest
-    {
-        public double? Latitude { get; set; }
-        public double? Longitude { get; set; }
-        public string? Neighbourhood { get; set; }
-    }
 }

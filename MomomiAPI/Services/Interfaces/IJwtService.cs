@@ -1,4 +1,5 @@
 ﻿using MomomiAPI.Common.Results;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using System.Security.Claims;
 
@@ -7,6 +8,7 @@ namespace MomomiAPI.Services.Interfaces
     public interface IJwtService
     {
         string GenerateAccessToken(User user);
+        string GenerateAccessToken(UserDTO userDto);
         string GenerateRefreshToken();
         ClaimsPrincipal? ValidateToken(string token, bool validateLifetime = true);
         Task<bool> IsTokenBlacklistedAsync(string jti);

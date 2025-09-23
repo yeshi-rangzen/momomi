@@ -58,7 +58,7 @@ namespace MomomiAPI.Helpers
 
                 // Notifications & Device
                 PushToken = user.PushToken,
-                NotificaitonsEnabled = user.NotificationsEnabled,
+                NotificationsEnabled = user.NotificationsEnabled,
 
                 // Account status & Verification
                 IsVerified = user.IsVerified,
@@ -97,7 +97,7 @@ namespace MomomiAPI.Helpers
                     PreferredSmoking = user.Preferences.PreferredSmoking ?? [],
                     CreatedAt = user.Preferences.CreatedAt,
                     UpdatedAt = user.Preferences.UpdatedAt
-                } : null,
+                } : new PreferencesDTO(),
 
                 Subscription = user.Subscription != null ? new SubscriptionDTO
                 {

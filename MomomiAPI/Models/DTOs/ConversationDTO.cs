@@ -1,10 +1,13 @@
-﻿namespace MomomiAPI.Models.DTOs
+﻿using MomomiAPI.Models.Enums;
+
+namespace MomomiAPI.Models.DTOs
 {
     public class ConversationDTO
     {
         public Guid Id { get; set; }
         public Guid OtherUserId { get; set; }
         public string OtherUserName { get; set; } = string.Empty;
+        public GenderType OtherUserGender { get; set; }
         public string? OtherUserPhoto { get; set; }
         public MessageDTO? LastMessage { get; set; }
         public int UnreadCount { get; set; }

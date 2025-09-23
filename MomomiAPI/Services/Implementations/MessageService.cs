@@ -15,15 +15,19 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
         private readonly ILogger<MessageService> _logger;
+        private readonly IPushNotificationService _pushNotificationService;
 
         public MessageService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            ILogger<MessageService> logger)
+            ILogger<MessageService> logger
+            ,
+            IPushNotificationService pushNotificationService)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _logger = logger;
+            _pushNotificationService = pushNotificationService;
         }
 
         // Sends a message in a conversation with optimized operations
@@ -42,6 +46,7 @@ namespace MomomiAPI.Services.Implementations
 
                 // Get conversation data and validate access in a single query
                 var conversationData = await GetConversationDataForSending(senderId, request.ConversationId);
+
                 if (!conversationData.IsValid)
                 {
                     return conversationData.ErrorResult!;
@@ -63,7 +68,7 @@ namespace MomomiAPI.Services.Implementations
                             Content = request.Content,
                             MessageType = request.MessageType,
                             IsRead = false,
-                            SentAt = DateTime.UtcNow
+                            SentAt = DateTime.UtcNow,
                         };
 
                         _dbContext.Messages.Add(message);
@@ -80,8 +85,26 @@ namespace MomomiAPI.Services.Implementations
                         // Create DTO for response
                         var messageDto = CreateMessageDTO(message, conversationData.SenderName!, senderId);
 
+                        // Updated the line to handle the nullability of `conversationData.ReceiverId` properly.
+                        var userOnlineStatus = conversationData.ReceiverId.HasValue
+                            ? await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(conversationData.ReceiverId.Value))
+                            : false;
+
+                        // Get liked user's device token
+                        var otherUser = await _dbContext.Users
+                            .Where(u => u.Id == conversationData.ReceiverId)
+                            .Select(u => new { u.Id, u.PushToken, u.NotificationsEnabled })
+                            .FirstOrDefaultAsync();
+
+                        // Updated the line to handle the nullability of `otherUser` and its properties.
+                        if (!userOnlineStatus && otherUser != null && otherUser.NotificationsEnabled && !string.IsNullOrEmpty(otherUser.PushToken))
+                        {
+                            // Fire-and-forget push notification
+                            _ = _pushNotificationService.SendNewMessageNotificationAsync(otherUser.PushToken, messageDto.SenderName ?? "Someone", messageDto.Content);
+                        }
+
                         // Invalidate relevant caches (fire and forget for performance)
-                        _ = Task.Run(async () => await InvalidateMessagingCaches(request.ConversationId, senderId, conversationData.ReceiverId!.Value));
+                        _ = InvalidateMessagingCaches(request.ConversationId, senderId, conversationData.ReceiverId!.Value);
 
                         _logger.LogInformation("Message {MessageId} sent successfully from user {SenderId}", message.Id, senderId);
 
@@ -223,7 +246,8 @@ namespace MomomiAPI.Services.Implementations
                 var lastReadMessageId = unreadMessages.OrderByDescending(m => m.SentAt).FirstOrDefault()?.Id ?? Guid.Empty;
 
                 // Invalidate relevant caches
-                await InvalidateReadStatusCaches(userId, conversationId);
+                _ = InvalidateReadStatusCaches(userId, conversationId);
+
                 _logger.LogDebug("Marked {Count} messages as read for user {UserId}", unreadMessages.Count, userId);
 
                 return MessagesReadResult.Successful(conversationId, unreadMessages.Select(msg => msg.Id).ToList(), lastReadMessageId);
@@ -266,7 +290,7 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 // Invalidate conversation caches
-                await InvalidateConversationCaches(message.ConversationId);
+                _ = InvalidateConversationCaches(message.ConversationId);
 
                 _logger.LogInformation("Message {MessageId} deleted by user {UserId}", messageId, userId);
 
@@ -321,6 +345,7 @@ namespace MomomiAPI.Services.Implementations
                     OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
                     OtherUserPhoto = otherUser.Photos.FirstOrDefault(p => p.IsPrimary)?.Url ??
                                    otherUser.Photos.OrderBy(p => p.PhotoOrder).FirstOrDefault()?.Url,
+                    OtherUserGender = otherUser.Gender,
                     LastMessage = summaryData.LastMessage,
                     UnreadCount = summaryData.UnreadCount,
                     UpdatedAt = conversation.UpdatedAt,
@@ -347,7 +372,7 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                return await _cacheService.ExistsAsync(CacheKeys.Messaging.UserOnline(userId));
+                return await _cacheService.ExistsAsync(CacheKeys.Users.OnlineStatus(userId));
             }
             catch (Exception ex)
             {
@@ -360,7 +385,7 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
-                var cacheKey = CacheKeys.Messaging.UserOnline(userId);
+                var cacheKey = CacheKeys.Users.OnlineStatus(userId);
 
                 if (isOnline)
                 {
@@ -519,6 +544,7 @@ namespace MomomiAPI.Services.Implementations
                     OtherUserId = otherUser.Id,
                     OtherUserName = $"{otherUser.FirstName} {otherUser.LastName}".Trim(),
                     OtherUserPhoto = otherUserPhoto?.ThumbnailUrl != "" ? otherUserPhoto?.ThumbnailUrl : otherUserPhoto?.Url,
+                    OtherUserGender = otherUser.Gender,
                     LastMessage = lastMessage != null ? new MessageDTO
                     {
                         Id = lastMessage.Id,

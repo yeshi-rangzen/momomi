@@ -6,11 +6,8 @@ namespace MomomiAPI.Common.Results
     /// Discovery-specific data
     public class DiscoveryData
     {
-        public List<DiscoveryUserDTO> Users { get; set; } = new List<DiscoveryUserDTO>();
-        public string DiscoveryMode { get; set; } = string.Empty;
-        public int RequestedCount { get; set; }
-        public int ActualCount { get; set; }
-        public bool FromCache { get; set; }
+        public List<DiscoveryUserDTO> Users { get; set; } = [];
+        public bool HasMore { get; set; }
     }
 
     public class DiscoveryResult : OperationResult<DiscoveryData>
@@ -21,30 +18,24 @@ namespace MomomiAPI.Common.Results
         {
         }
 
-        public static DiscoveryResult Success(List<DiscoveryUserDTO> users, string discoveryMode,
-             int requestedCount, bool fromCache, Dictionary<string, object>? metadata = null)
+        public static DiscoveryResult Successful(List<DiscoveryUserDTO> users,
+             bool hasMore, Dictionary<string, object>? metadata = null)
         {
             var discoveryData = new DiscoveryData
             {
                 Users = users,
-                DiscoveryMode = discoveryMode,
-                RequestedCount = requestedCount,
-                ActualCount = users?.Count ?? 0,
-                FromCache = fromCache
+                HasMore = hasMore
             };
 
             return new DiscoveryResult(true, discoveryData, null, null, metadata);
         }
 
-        public static DiscoveryResult NoUsersFound(string discoveryMode, int requestedCount)
+        public static DiscoveryResult NoUsersFound()
         {
             var discoveryData = new DiscoveryData
             {
-                Users = new List<DiscoveryUserDTO>(),
-                DiscoveryMode = discoveryMode,
-                RequestedCount = requestedCount,
-                ActualCount = 0,
-                FromCache = false
+                Users = [],
+                HasMore = false
             };
 
             return new DiscoveryResult(true, discoveryData, null, null);

@@ -11,13 +11,16 @@ namespace MomomiAPI.Models.Entities
         [Column("id")]
         public Guid Id { get; set; } = Guid.NewGuid();
 
-        [Column("reporter_id")]
+        [Column("reporter_email")]
         [Required]
-        public Guid ReporterId { get; set; }
+        public required string ReporterEmail { get; set; }
 
-        [Column("reported_id")]
+        [Column("reported_email")]
         [Required]
-        public Guid ReportedId { get; set; }
+        public required string ReportedEmail { get; set; }
+
+        [Column("reported_gender")]
+        public GenderType? ReportedGender { get; set; }
 
         [Column("reason")]
         public ReportReason Reason { get; set; } = ReportReason.Other;
@@ -42,11 +45,5 @@ namespace MomomiAPI.Models.Entities
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties
-        [ForeignKey("ReporterId")]
-        public virtual User Reporter { get; set; } = null!;
-
-        [ForeignKey("ReportedId")]
-        public virtual User Reported { get; set; } = null!;
     }
 }

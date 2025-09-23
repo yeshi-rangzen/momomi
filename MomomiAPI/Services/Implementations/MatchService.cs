@@ -2,6 +2,8 @@
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Helpers;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
 using static MomomiAPI.Common.Constants.AppConstants;
@@ -60,6 +62,28 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
+        public async Task<OperationResult<DiscoveryUserDTO>> GetMatchedUser(Guid currentUserId, Guid matchedUserId)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving matched user {matchedUserId}", matchedUserId);
+
+                var matchedUser = await _dbContext.Users.Include(u => u.Photos).FirstOrDefaultAsync(u => u.Id == matchedUserId);
+                if (matchedUser != null)
+                {
+                    var matchedUserDto = UserMapper.UserToDiscoveryDTO(matchedUser);
+                    return OperationResult<DiscoveryUserDTO>.SuccessResult(matchedUserDto);
+                }
+                else
+                {
+                    return OperationResult<DiscoveryUserDTO>.FailureResult("NOT_FOUND", "Matched User is not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                return OperationResult<DiscoveryUserDTO>.FailureResult("INTERNAL_ERROR", ex.Message);
+            }
+        }
 
         public async Task<OperationResult> RemoveMatchConversation(Guid currentUserId, Guid targetUserId, SwipeType removedSwipeType = SwipeType.Unmatched)
         {
@@ -75,17 +99,21 @@ namespace MomomiAPI.Services.Implementations
                     try
                     {
                         // Update the SwipeType in the UserSwipes table
-                        var swipeRecord = await _dbContext.UserSwipes
-                            .FirstOrDefaultAsync(us => (
+                        var swipeRecords = await _dbContext.UserSwipes
+                            .Where(us =>
                                 (us.SwiperUserId == currentUserId && us.SwipedUserId == targetUserId) ||
                                 (us.SwiperUserId == targetUserId && us.SwipedUserId == currentUserId))
-                            );
+                            .ToListAsync();
 
-                        if (swipeRecord != null)
+                        if (swipeRecords.Count != 0)
                         {
-                            swipeRecord.SwipeType = removedSwipeType;
-                            swipeRecord.UpdatedAt = DateTime.UtcNow;
-                            _dbContext.UserSwipes.Update(swipeRecord);
+                            foreach (var record in swipeRecords)
+                            {
+                                record.SwipeType = removedSwipeType;
+                                record.UpdatedAt = DateTime.UtcNow;
+                            }
+
+                            _dbContext.UserSwipes.UpdateRange(swipeRecords);
                         }
 
                         // Remove the converation and its messages

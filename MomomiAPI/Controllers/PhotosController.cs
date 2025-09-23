@@ -65,18 +65,6 @@ namespace MomomiAPI.Controllers
             return HandleOperationResult(result);
         }
 
-        /// Set a photo as primary
-        [HttpPut("primary/{photoId}")]
-        public async Task<ActionResult<OperationResult<PrimaryPhotoData>>> SetPrimaryPhoto(Guid photoId)
-        {
-            var userIdResult = GetCurrentUserIdOrUnauthorized();
-            if (userIdResult.Result != null) return userIdResult.Result;
-
-            LogControllerAction(nameof(SetPrimaryPhoto), new { photoId });
-
-            var result = await _photoService.SetPrimaryPhoto(userIdResult.Value, photoId);
-            return HandleOperationResult(result);
-        }
 
         /// Reorder photos
         [HttpPut("reorder")]
@@ -87,7 +75,7 @@ namespace MomomiAPI.Controllers
 
             LogControllerAction(nameof(ReorderPhotos), new { photoCount = photoIds?.Count });
 
-            var result = await _photoService.ReorderPhotos(userIdResult.Value, photoIds);
+            var result = await _photoService.ReorderPhotos(userIdResult.Value, photoIds!);
             return HandleOperationResult(result);
         }
 

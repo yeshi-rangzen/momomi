@@ -8,7 +8,6 @@ namespace MomomiAPI.Services.Interfaces
         Task<PhotoUploadResult> AddUserPhoto(Guid userId, IFormFile file, bool setAsPrimary = false, int photoOrder = -1);
         Task<BatchPhotoUploadResult> AddUserPhotos(Guid userId, List<IFormFile> files, int? primaryPhotoIndex = null);
         Task<PhotoDeletionResult> RemovePhoto(Guid userId, Guid photoId);
-        Task<PrimaryPhotoResult> SetPrimaryPhoto(Guid userId, Guid photoId);
         Task<PhotoReorderResult> ReorderPhotos(Guid userId, List<Guid> orderedPhotoIds);
         Task<OperationResult<List<UserPhotoDTO>>> GetUserPhotos(Guid userId);
 

@@ -10,10 +10,10 @@ namespace MomomiAPI.Data.Configurations
         {
             builder.HasKey(ur => ur.Id);
 
-            builder.HasIndex(ur => ur.ReporterId)
+            builder.HasIndex(ur => ur.ReporterEmail)
                 .HasDatabaseName("idx_user_reports_reporter");
 
-            builder.HasIndex(ur => ur.ReportedId)
+            builder.HasIndex(ur => ur.ReportedEmail)
                 .HasDatabaseName("idx_user_reports_reported");
 
             builder.HasIndex(ur => ur.Status)
@@ -26,17 +26,6 @@ namespace MomomiAPI.Data.Configurations
             // Configure enum conversion
             builder.Property(ur => ur.Reason)
                 .HasConversion<string>();
-
-            // Configure explicit relationships to avoid ambiguity
-            builder.HasOne(ur => ur.Reporter)
-                .WithMany(u => u.ReportsMade)
-                .HasForeignKey(ur => ur.ReporterId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.HasOne(ur => ur.Reported)
-                .WithMany(u => u.ReportsReceived)
-                .HasForeignKey(ur => ur.ReportedId)
-                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

@@ -213,6 +213,32 @@
   },
   {
     "ContainingType": "MomomiAPI.Controllers.MatchesController",
+    "Method": "GetMatchedUser",
+    "RelativePath": "api/Matches/{matchedUserId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "matchedUserId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Models.DTOs.DiscoveryUserDTO, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "MomomiAPI.Controllers.MatchesController",
     "Method": "RemoveMatch",
     "RelativePath": "api/Matches/{userId}",
     "HttpMethod": "DELETE",
@@ -621,115 +647,6 @@
   },
   {
     "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "CheckBlockedStatus",
-    "RelativePath": "api/Reporting/blocked-status/{userId}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "userId",
-        "Type": "System.Guid",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Boolean",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "GetBlockedUsers",
-    "RelativePath": "api/Reporting/blocked-users",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "Page",
-        "Type": "System.Int32",
-        "IsRequired": false
-      },
-      {
-        "Name": "PageSize",
-        "Type": "System.Int32",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.BlockedUsersListData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "QuickBlock",
-    "RelativePath": "api/Reporting/quick-block/{userId}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "userId",
-        "Type": "System.Guid",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.BlockUserData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "QuickUnblock",
-    "RelativePath": "api/Reporting/quick-unblock/{userId}",
-    "HttpMethod": "PUT",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "userId",
-        "Type": "System.Guid",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.UnblockUserData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
     "Method": "ReportUser",
     "RelativePath": "api/Reporting/report",
     "HttpMethod": "POST",
@@ -745,63 +662,6 @@
     "ReturnTypes": [
       {
         "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.UserReportData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "GetUserReports",
-    "RelativePath": "api/Reporting/reports",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "Page",
-        "Type": "System.Int32",
-        "IsRequired": false
-      },
-      {
-        "Name": "PageSize",
-        "Type": "System.Int32",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.UserReportsListData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "MomomiAPI.Controllers.ReportingController",
-    "Method": "UnblockUser",
-    "RelativePath": "api/Reporting/unblock",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "request",
-        "Type": "MomomiAPI.Models.Requests.UnblockUserRequest",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "MomomiAPI.Common.Results.OperationResult\u00601[[MomomiAPI.Common.Results.UnblockUserData, MomomiAPI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "MediaTypes": [
           "text/plain",
           "application/json",

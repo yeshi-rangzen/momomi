@@ -20,6 +20,7 @@ namespace MomomiAPI.Services.Implementations
     {
         private readonly Supabase.Client _adminClient;
         private readonly MomomiDbContext _dbContext;
+        private readonly IUserService _userService;
         private readonly ICacheService _cacheService;
         private readonly ILogger<PhotoService> _logger;
         private readonly IConfiguration _configuration;
@@ -35,12 +36,14 @@ namespace MomomiAPI.Services.Implementations
         public PhotoService(
             [FromKeyedServices("AdminClient")] Supabase.Client adminClient,
             MomomiDbContext dbContext,
+            IUserService userService,
             ICacheService cacheService,
             ILogger<PhotoService> logger,
             IConfiguration configuration)
         {
             _adminClient = adminClient ?? throw new ArgumentNullException(nameof(adminClient));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _userService = userService ?? throw new ArgumentNullException(nameof(userService));
             _cacheService = cacheService;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configuration = configuration;
@@ -60,14 +63,15 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 // Get user and current photo count in single query
-                var userData = await GetUserWithPhotoCount(userId);
-                if (userData == null)
+                var userResult = await _userService.GetUserProfileAsync(userId);
+                if (userResult == null || userResult.Data == null)
                 {
                     return PhotoUploadResult.UserNotFound();
                 }
+                var userDto = userResult.Data.User;
 
                 // Check photo limit
-                if (userData.PhotoCount >= AppConstants.Limits.MaxPhotosPerUser)
+                if (userDto.Photos.Count >= AppConstants.Limits.MaxPhotosPerUser)
                 {
                     return PhotoUploadResult.PhotoLimitReached(AppConstants.Limits.MaxPhotosPerUser);
                 }
@@ -80,12 +84,12 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 // If this is the first photo, set as primary
-                if (userData.PhotoCount == 0 && !setAsPrimary)
+                if (userDto.Photos.Count == 0 && !setAsPrimary)
                 {
                     setAsPrimary = true;
                 }
 
-                if (setAsPrimary && userData.PhotoCount > 0)
+                if (setAsPrimary && userDto.Photos.Count > 0)
                 {
                     await UnsetOtherPrimaryPhotos(userId);
                 }
@@ -97,7 +101,7 @@ namespace MomomiAPI.Services.Implementations
                     StoragePath = uploadResult.Data!.FilePath,
                     Url = uploadResult.Data.PublicUrl,
                     ThumbnailUrl = GenerateThumbnailUrl(uploadResult.Data.PublicUrl),
-                    PhotoOrder = photoOrder == -1 ? userData.PhotoCount : photoOrder,
+                    PhotoOrder = photoOrder == -1 ? userDto.Photos.Count : photoOrder,
                     IsPrimary = setAsPrimary,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -105,13 +109,15 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserPhotos.Add(userPhoto);
                 await _dbContext.SaveChangesAsync();
 
+                userDto.Photos.Add(MapToPhotoDTO(userPhoto));
+
                 // Invalidate relevent caches
-                await InvalidateUserPhotosCaches(userId);
+                _ = InvalidateUserPhotosCaches(userDto);
 
                 var photoDto = MapToPhotoDTO(userPhoto);
 
                 _logger.LogInformation("Successfully added photo {PhotoId} for user {UserId}", userPhoto.Id, userId);
-                return PhotoUploadResult.UploadSuccess(photoDto, userData.PhotoCount + 1, setAsPrimary);
+                return PhotoUploadResult.UploadSuccess(photoDto, userDto.Photos.Count + 1, setAsPrimary);
             }
             catch (Exception ex)
             {
@@ -131,14 +137,14 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("Batch uploading {Count} photos for user {UserId}", files?.Count ?? 0, userId);
 
                 // Pre-validate all files
-                var validationErrors = ValidateBatchFiles(files);
+                var validationErrors = ValidateBatchFiles(files!);
                 if (validationErrors.Any())
                 {
                     return BatchPhotoUploadResult.AllFailed(validationErrors);
                 }
 
                 // Validate primary photo index
-                if (primaryPhotoIndex.HasValue && (primaryPhotoIndex < 0 || primaryPhotoIndex >= files.Count))
+                if (primaryPhotoIndex.HasValue && (primaryPhotoIndex < 0 || primaryPhotoIndex >= files!.Count))
                 {
                     return BatchPhotoUploadResult.AllFailed(new List<PhotoUploadError>
                     {
@@ -155,7 +161,7 @@ namespace MomomiAPI.Services.Implementations
 
                 // Check if batch upload would exceed limit
                 var availableSlots = AppConstants.Limits.MaxPhotosPerUser - userData.PhotoCount;
-                if (files.Count > availableSlots)
+                if (files!.Count > availableSlots)
                 {
                     return BatchPhotoUploadResult.AllFailed(new List<PhotoUploadError>
                     {
@@ -267,7 +273,7 @@ namespace MomomiAPI.Services.Implementations
                         await transaction.CommitAsync();
 
                         // Invalidate caches after successful commit
-                        await InvalidateUserPhotosCaches(userId);
+                        _ = _cacheService.RemoveAsync(CacheKeys.Users.Profile(userId));
 
                         var result = new BatchPhotoUploadData
                         {
@@ -317,7 +323,6 @@ namespace MomomiAPI.Services.Implementations
                     return PhotoDeletionResult.PhotoNotFound();
                 }
 
-                var wasPrimary = photo.IsPrimary;
                 var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
                 return await executionStrategy.ExecuteAsync(async () =>
@@ -325,12 +330,6 @@ namespace MomomiAPI.Services.Implementations
                     using var transaction = await _dbContext.Database.BeginTransactionAsync();
                     try
                     {
-                        // If this was the primary photo, set another as primary
-                        //if (wasPrimary)
-                        //{
-                        //    newPrimaryPhotoId = await SetNewPrimaryPhoto(userId, photoId);
-                        //}
-
                         // Remove from database
                         _dbContext.UserPhotos.Remove(photo);
 
@@ -350,39 +349,19 @@ namespace MomomiAPI.Services.Implementations
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
-                        // Get remaining photo count
-                        var newPrimaryPhotoId = remainingPhotos.FirstOrDefault()?.Id;
-
                         // Delete from storage (don't fail the operation if this fails)
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await DeleteFromSupabaseStorage(photo.StoragePath);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to delete photo from storage: {StoragePath}", photo.StoragePath);
-                            }
-                        });
+                        _ = DeleteFromSupabaseStorage(photo.StoragePath);
 
-                        // Invalidate caches
-                        await InvalidateUserPhotosCaches(userId);
-                        var remainingPhotoDtos = remainingPhotos.Select((photo) => new UserPhotoDTO
-                        {
-                            Id = photo.Id,
-                            Url = photo.Url,
-                            ThumbnailUrl = photo.ThumbnailUrl,
-                            IsPrimary = photo.IsPrimary,
-                            PhotoOrder = photo.PhotoOrder,
-                        }).ToList();
+                        // Invalidate profile cache
+                        _ = _cacheService.RemoveAsync(CacheKeys.Users.Profile(userId));
 
                         _logger.LogInformation("Successfully removed photo {PhotoId} for user {UserId}", photoId, userId);
 
-                        return PhotoDeletionResult.DeleteSuccess(photoId, wasPrimary, newPrimaryPhotoId, remainingPhotoDtos);
+                        return PhotoDeletionResult.DeleteSuccess(photoId);
                     }
                     catch (Exception ex)
                     {
+                        Console.Error.WriteLine(ex);
                         await transaction.RollbackAsync();
                         throw;
                     }
@@ -425,72 +404,22 @@ namespace MomomiAPI.Services.Implementations
                     if (photo != null)
                     {
                         photo.PhotoOrder = i;
+                        photo.IsPrimary = (i == 0); // First photo is always primary
                     }
                 }
 
                 await _dbContext.SaveChangesAsync();
 
                 // Invalidate caches
-                await InvalidateUserPhotosCaches(userId);
-
-                var reorderedPhotoDtos = photos
-                    .OrderBy(p => p.PhotoOrder)
-                    .Select(MapToPhotoDTO)
-                    .ToList();
+                //_ = _cacheService.RemoveAsync(CacheKeys.Users.Photos(userId));
 
                 _logger.LogInformation("Successfully reordered photos for user {UserId}", userId);
-                return PhotoReorderResult.ReorderSuccess(reorderedPhotoDtos);
+                return PhotoReorderResult.ReorderSuccess();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error reordering photos for user {UserId}", userId);
                 return PhotoReorderResult.Error("Failed to reorder photos. Please try again.");
-            }
-        }
-
-        /// <summary>
-        /// Sets a photo as primary with optimized database operations
-        /// </summary>
-        public async Task<PrimaryPhotoResult> SetPrimaryPhoto(Guid userId, Guid photoId)
-        {
-            try
-            {
-                _logger.LogInformation("Setting primary photo {PhotoId} for user {UserId}", photoId, userId);
-
-                // Get all user photos in single query
-                var photos = await _dbContext.UserPhotos
-                    .Where(p => p.UserId == userId)
-                    .ToListAsync();
-
-                var targetPhoto = photos.FirstOrDefault(p => p.Id == photoId);
-                if (targetPhoto == null)
-                {
-                    return PrimaryPhotoResult.PhotoNotFound();
-                }
-
-                var previousPrimaryPhoto = photos.FirstOrDefault(p => p.IsPrimary);
-                var previousPrimaryPhotoId = previousPrimaryPhoto?.Id;
-
-                // Update primary flags in memory first
-                foreach (var photo in photos)
-                {
-                    photo.IsPrimary = photo.Id == photoId;
-                }
-
-                await _dbContext.SaveChangesAsync();
-
-                // Invalidate caches
-                await InvalidateUserPhotosCaches(userId);
-
-                var targetPhotoDto = MapToPhotoDTO(targetPhoto);
-
-                _logger.LogInformation("Successfully set primary photo {PhotoId} for user {UserId}", photoId, userId);
-                return PrimaryPhotoResult.UpdateSuccess(photoId, previousPrimaryPhotoId, targetPhotoDto);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error setting primary photo {PhotoId} for user {UserId}", photoId, userId);
-                return PrimaryPhotoResult.Error("Failed to set primary photo. Please try again.");
             }
         }
 
@@ -882,20 +811,12 @@ namespace MomomiAPI.Services.Implementations
         }
 
         /// Invalidates all user photo-related caches using batch operations
-        private async Task InvalidateUserPhotosCaches(Guid userId)
+        private async Task InvalidateUserPhotosCaches(UserDTO userDto)
         {
-            //var keysToInvalidate = new[]
-            //{
-            //    CacheKeys.Users.Photos(userId),
-            //    CacheKeys.Users.Profile(userId)  // Profile includes photos
-            //};
+            // Set updated profile in cache
+            await _cacheService.SetAsync(CacheKeys.Users.Profile(userDto.Id), userDto, CacheKeys.Duration.UserProfile);
 
-            //await _cacheService.RemoveManyAsync(keysToInvalidate);
-
-            var userCacheKey = CacheKeys.Users.Profile(userId);
-            await _cacheService.RemoveAsync(userCacheKey);
-
-            _logger.LogDebug("Invalidated photo caches for user {UserId}", userId);
+            _logger.LogDebug("Invalidated photo caches for user {UserId}", userDto.Id);
         }
 
         /// Cleans up uploaded files in case of transaction failure

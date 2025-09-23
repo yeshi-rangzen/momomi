@@ -80,6 +80,7 @@ builder.Services.AddDbContext<MomomiDbContext>(options =>
     }
 });
 
+
 // Redis configuration - Updated for Upstash
 builder.Services.AddSingleton<IConnectionMultiplexer>(provider =>
 {
@@ -319,6 +320,7 @@ builder.Services.AddMemoryCache(options =>
 // Add Momomi Services
 builder.Services.AddMomomiServices();
 builder.Services.AddMomomiConfiguration(builder.Configuration);
+builder.Services.AddResponseCompression();
 
 // SignalR
 builder.Services.AddSignalR(options =>
@@ -431,6 +433,8 @@ else
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseResponseCompression();
+
 
 app.MapControllers().RequireRateLimiting("GeneralPolicy");
 // Auth endpoints with stricter rate limiting

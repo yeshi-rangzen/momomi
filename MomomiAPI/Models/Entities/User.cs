@@ -216,10 +216,6 @@ namespace MomomiAPI.Models.Entities
         public virtual ICollection<Conversation> ConversationsAsUser2 { get; set; } = [];
         public virtual ICollection<Message> MessagesSent { get; set; } = [];
 
-        // Safety and moderation
-        public virtual ICollection<UserReport> ReportsMade { get; set; } = [];
-        public virtual ICollection<UserReport> ReportsReceived { get; set; } = [];
-
         // User preferences and settings
         public virtual UserPreference? Preferences { get; set; }
 

@@ -71,10 +71,10 @@
         public static class Messaging
         {
             public static string ConversationCount(Guid conversationId) => $"messages:conversation_count:{conversationId}";
-            public static string UserOnline(Guid userId) => $"messages:user_online:{userId}";
             public static string UserConversations(Guid userId) => $"messages:conversations:{userId}";
             public static string ConversationMessages(Guid conversationId, int page) => $"messages:conversation:{conversationId}:page:{page}";
             public static string ConversationDetails(Guid conversationId) => $"messages:details:{conversationId}";
+            public static string UsersInConversation(Guid conversationId) => $"messages:users_in_conversation:{conversationId}";
         }
 
         // Notification cache keys

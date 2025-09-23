@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Models.DTOs;
 using MomomiAPI.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -88,6 +89,40 @@ namespace MomomiAPI.Services.Implementations
                 throw;
             }
         }
+
+        public string GenerateAccessToken(UserDTO user)
+        {
+            try
+            {
+                var jwtId = Guid.NewGuid().ToString();
+                var issuedAt = DateTime.UtcNow;
+                var expires = issuedAt.AddMinutes(_accessTokenExpiryMinutes);
+
+                var claims = CreateUserClaims(user, jwtId, issuedAt);
+
+                var tokenDisciptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(claims),
+                    Expires = expires,
+                    Issuer = _issuer,
+                    Audience = _audience,
+                    SigningCredentials = _signingCredentials
+                };
+
+                var token = _tokenHandler.CreateToken(tokenDisciptor);
+                var tokenString = _tokenHandler.WriteToken(token);
+                _logger.LogDebug("Generated access token for user {UserId} with JTI {Jti}", user.Id, jwtId);
+
+                return tokenString;
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating access token for user {UserId}", user.Id);
+                throw;
+            }
+        }
+
 
         public string GenerateRefreshToken()
         {
@@ -246,13 +281,19 @@ namespace MomomiAPI.Services.Implementations
                 var tokenToUserKey = CacheKeys.Authentication.TokenToUser(refreshToken);
                 var ttl = CacheKeys.Duration.RefreshToken;
 
-                // Store both mappings
-                var cacheOperations = Task.WhenAll(
-                    _cacheService.SetAsync(refreshTokenKey, refreshToken, ttl),
-                    _cacheService.SetAsync(tokenToUserKey, userId, ttl)
-                );
+                var caches = new Dictionary<string, object>
+                {
+                    { refreshTokenKey, refreshToken },
+                    { tokenToUserKey , userId.ToString() }
+                };
 
-                await cacheOperations;
+                var cacheExpiries = new Dictionary<string, TimeSpan>
+                {
+                    { refreshTokenKey, ttl },
+                    { tokenToUserKey , ttl }
+                };
+
+                await _cacheService.SetManyAsync(caches, cacheExpiries);
 
                 _logger.LogDebug("Cached refresh token for user {UserId}", userId);
             }
@@ -421,6 +462,29 @@ namespace MomomiAPI.Services.Implementations
                 new("is_onboarding", user.IsOnboarding.ToString().ToLower())
             };
         }
+
+        private static List<Claim> CreateUserClaims(UserDTO user, string jwtId, DateTime issuedAt)
+        {
+            return new List<Claim>
+            {
+                // Standard claims
+                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.Email, user.Email),
+                new(JwtRegisteredClaimNames.Jti, jwtId),
+                new(JwtRegisteredClaimNames.Iat,
+                    ((DateTimeOffset)issuedAt).ToUnixTimeSeconds().ToString(),
+                    ClaimValueTypes.Integer64),
+                
+                // Custom claims
+                new("user_id", user.Id.ToString()),
+                new("first_name", user.FirstName ?? string.Empty),
+                new("last_name", user.LastName ?? string.Empty),
+                new("is_verified", user.IsVerified.ToString().ToLower()),
+                new("is_onboarding", user.IsOnboarding.ToString().ToLower())
+            };
+        }
+
         private TokenValidationParameters CreateNonLifetimeValidationParameters()
         {
             return new TokenValidationParameters

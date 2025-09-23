@@ -74,7 +74,7 @@ namespace MomomiAPI.Common.Results
             return new OperationResult<T>(true, data, metadata: metadata);
         }
 
-        public static new OperationResult<T> FailureResult(string errorCode, string errorMessage, Dictionary<string, object>? metadata = null)
+        public static OperationResult<T> FailureResult(string errorCode, string errorMessage, Dictionary<string, object>? metadata = null)
         {
             return new OperationResult<T>(false, default(T), errorCode, errorMessage, metadata);
 

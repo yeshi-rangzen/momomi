@@ -15,72 +15,57 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
         private readonly ILogger<DiscoveryService> _logger;
+        private readonly UserService _userService;
 
         public DiscoveryService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
-            ILogger<DiscoveryService> logger)
+            ILogger<DiscoveryService> logger,
+            UserService userService)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _logger = logger;
+            _userService = userService;
         }
 
         public async Task<DiscoveryResult> DiscoverCandidatesAsync(Guid userId, int maxResults = 30)
         {
-            var currentUser = await _dbContext.Users
-                .Include(u => u.Preferences)
-                .Include(u => u.Subscription)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            var userProfileResult = await _userService.GetUserProfileAsync(userId);
 
-            if (currentUser == null)
+            if (userProfileResult == null || userProfileResult.Data == null)
             {
                 return DiscoveryResult.UserNotFound();
             }
 
-            var discoveryMode = currentUser.EnableGlobalDiscovery ? "global" : "local";
-            var cacheKey = CacheKeys.Discovery.Results(userId, discoveryMode);
+            var userDto = userProfileResult.Data.User;
+            var discoveryMode = userDto.EnableGlobalDiscovery ? "global" : "local";
+            List<User> discoveredUsers;
 
-            var cachedResult = await _cacheService.GetOrSetAsync(
-            cacheKey,
-            async () => await PerformDiscoveryAndCreateCacheData(currentUser, maxResults, discoveryMode),
-            CacheKeys.Duration.DiscoveryResults
-            );
-
-            // Check if cached result is still valid (location/time validation)
-            if (cachedResult != null && !IsCacheValid(cachedResult, currentUser))
+            if (discoveryMode == "global")
             {
-                _logger.LogDebug("Cached data invalid for user {UserId}, invalidating cache", userId);
-
-                // Remove invalid cache and get fresh data
-                await _cacheService.RemoveAsync(cacheKey);
-
-                // Get fresh data )this will hit database since cache is now empty)
-                cachedResult = await _cacheService.GetOrSetAsync(
-                    cacheKey,
-                    async () => await PerformDiscoveryAndCreateCacheData(currentUser, maxResults, discoveryMode),
-                    CacheKeys.Duration.DiscoveryResults);
+                discoveredUsers = await DiscoverGlobalCandidatesAsync(userDto, maxResults);
+            }
+            else
+            {
+                discoveredUsers = await DiscoverLocalCandidatesAsync(userDto, maxResults);
             }
 
-            if (cachedResult == null)
+            if (discoveredUsers.Count == 0)
             {
-                _logger.LogWarning("Failed to get discovery data for user {UserId}", userId);
-                return DiscoveryResult.NoUsersFound(discoveryMode, maxResults);
+                return DiscoveryResult.NoUsersFound();
             }
 
-            var fromCache = cachedResult.CachedAt < DateTime.UtcNow.AddMinutes(-1); // Consider "from cache" if older than 1 minute
+            var discoveredUserDtos = discoveredUsers.Select(user => UserMapper.UserToDiscoveryDTO(user)).ToList();
+            var hasMore = maxResults == discoveredUserDtos.Count;
 
-            _logger.LogDebug("Serving discovery results for user {UserId}, fromCache: {FromCache}", userId, fromCache);
-
-            return DiscoveryResult.Success(
-                    cachedResult.Users,
-                    discoveryMode,
-                    maxResults,
-                    fromCache: fromCache
+            return DiscoveryResult.Successful(
+                    discoveredUserDtos,
+                    hasMore
                 );
         }
 
-        private async Task<CachedDiscoveryData> PerformDiscoveryAndCreateCacheData(User currentUser, int maxResults, string discoveryMode)
+        private async Task<CachedDiscoveryData> PerformDiscoveryAndCreateCacheData(UserDTO currentUser, int maxResults, string discoveryMode)
         {
             List<User> discoveredUsers;
             if (discoveryMode == "global")
@@ -108,7 +93,7 @@ namespace MomomiAPI.Services.Implementations
             };
         }
 
-        private async Task<List<User>> DiscoverLocalCandidatesAsync(User currentUser, int maxResults)
+        private async Task<List<User>> DiscoverLocalCandidatesAsync(UserDTO currentUser, int maxResults)
         {
             // For local discovery, we need to handle distance filtering differently
             // due to the complexity of SQL-based distance calculations
@@ -145,7 +130,7 @@ namespace MomomiAPI.Services.Implementations
             return finalResults;
         }
 
-        private async Task<List<User>> DiscoverGlobalCandidatesAsync(User currentUser, int maxResults)
+        private async Task<List<User>> DiscoverGlobalCandidatesAsync(UserDTO currentUser, int maxResults)
         {
             var candidates = await BuildBaseCandidateQuery(currentUser)
                 .OrderByDescending(u => u.LastActive) // Prioritize recently active users
@@ -169,15 +154,15 @@ namespace MomomiAPI.Services.Implementations
             return finalResults;
         }
 
-        private IQueryable<User> BuildBaseCandidateQuery(User currentUser)
+        private IQueryable<User> BuildBaseCandidateQuery(UserDTO currentUser)
         {
             var swipedUserIdsQuery = _dbContext.UserSwipes
                .Where(ul => ul.SwiperUserId == currentUser.Id)
                .Select(ul => ul.SwipedUserId);
 
             var reportExclusionQuery = _dbContext.UserReports
-                .Where(ur => ur.ReporterId == currentUser.Id || ur.ReportedId == currentUser.Id)
-                .Select(ur => ur.ReporterId == currentUser.Id ? ur.ReportedId : ur.ReporterId);
+                .Where(ur => ur.ReporterEmail == currentUser.Email || ur.ReportedEmail == currentUser.Email)
+                .Select(ur => ur.ReporterEmail == currentUser.Email ? ur.ReportedEmail : ur.ReporterEmail);
 
             var query = _dbContext.Users
                 .Include(u => u.Preferences)
@@ -187,7 +172,7 @@ namespace MomomiAPI.Services.Implementations
                     && u.Id != currentUser.Id
                     && u.InterestedIn == currentUser.Gender
                     && !swipedUserIdsQuery.Contains(u.Id)
-                    && !reportExclusionQuery.Contains(u.Id)
+                    && !reportExclusionQuery.Contains(u.Email)
                     && u.IsGloballyDiscoverable == currentUser.EnableGlobalDiscovery // Global constraint
                     );
 
@@ -200,7 +185,7 @@ namespace MomomiAPI.Services.Implementations
         #region Private Helper Methods
         // Validates if cached discovery data is still valid
         // Checks location changes for local discovery
-        private bool IsCacheValid(CachedDiscoveryData cache, User currentUser)
+        private bool IsCacheValid(CachedDiscoveryData cache, UserDTO currentUser)
         {
             // Check if cache is too old (additional safety check)
             if (cache.CachedAt < DateTime.UtcNow.Subtract(CacheKeys.Duration.DiscoveryResults))
@@ -231,7 +216,7 @@ namespace MomomiAPI.Services.Implementations
             return true;
         }
 
-        private static IQueryable<User> ApplyCoreMatchingFilters(IQueryable<User> query, User currentUser)
+        private static IQueryable<User> ApplyCoreMatchingFilters(IQueryable<User> query, UserDTO currentUser)
         {
             // Gender preference filter
             query = query.Where(u => u.Gender == currentUser.InterestedIn);
@@ -246,11 +231,10 @@ namespace MomomiAPI.Services.Implementations
             return query;
         }
 
-        private static List<User> ApplyPreferenceFilters(List<User> users, User currentUser)
+        private static List<User> ApplyPreferenceFilters(List<User> users, UserDTO currentUser)
         {
             var preferredHeritage = currentUser.Preferences?.PreferredHeritage?.ToList();
             var preferredReligions = currentUser.Preferences?.PreferredReligions?.ToList();
-            var preferredLanguages = currentUser.Preferences?.LanguagePreference?.ToList();
 
             return users.Where(u =>
             {
@@ -268,13 +252,6 @@ namespace MomomiAPI.Services.Implementations
                         return false;
                 }
 
-                // Language compatibility filter
-                if (preferredLanguages is { Count: > 0 })
-                {
-                    if (u.LanguagesSpoken.Count > 0 && !u.LanguagesSpoken.Any(l => preferredLanguages.Contains(l)))
-                        return false;
-                }
-
                 return true;
 
             }).ToList();
@@ -287,7 +264,14 @@ namespace MomomiAPI.Services.Implementations
                     currentUser.Subscription.ExpiresAt > DateTime.UtcNow);
         }
 
-        private static List<User> ApplyPremiumFilters(List<User> users, User currentUser)
+        private static bool IsActiveSubscriber(UserDTO currentUser)
+        {
+            return currentUser.Subscription?.SubscriptionType == SubscriptionType.Premium &&
+                   (!currentUser.Subscription.ExpiresAt.HasValue ||
+                    currentUser.Subscription.ExpiresAt > DateTime.UtcNow);
+        }
+
+        private static List<User> ApplyPremiumFilters(List<User> users, UserDTO currentUser)
         {
             var preferences = currentUser.Preferences;
             if (preferences == null) return users;
@@ -341,6 +325,12 @@ namespace MomomiAPI.Services.Implementations
                 if (preferences.PreferredDrinking?.Count > 0)
                 {
                     if (!u.Drinking.HasValue || !preferences.PreferredDrinking.Contains(u.Drinking.Value))
+                        return false;
+                }
+
+                if (preferences.LanguagePreference?.Count > 0)
+                {
+                    if (u.LanguagesSpoken.Count > 0 && !u.LanguagesSpoken.Any(l => preferences.LanguagePreference.Contains(l)))
                         return false;
                 }
 

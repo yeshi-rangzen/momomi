@@ -398,6 +398,46 @@
         }
       }
     },
+    "/api/Matches/{matchedUserId}": {
+      "get": {
+        "tags": [
+          "Matches"
+        ],
+        "parameters": [
+          {
+            "name": "matchedUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryUserDTOOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryUserDTOOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryUserDTOOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Messages/conversations": {
       "get": {
         "tags": [
@@ -1094,276 +1134,6 @@
         }
       }
     },
-    "/api/Reporting/unblock": {
-      "post": {
-        "tags": [
-          "Reporting"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnblockUserRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnblockUserRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/UnblockUserRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Reporting/reports": {
-      "get": {
-        "tags": [
-          "Reporting"
-        ],
-        "parameters": [
-          {
-            "name": "Page",
-            "in": "query",
-            "schema": {
-              "maximum": 2147483647,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "PageSize",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserReportsListDataOperationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Reporting/blocked-users": {
-      "get": {
-        "tags": [
-          "Reporting"
-        ],
-        "parameters": [
-          {
-            "name": "Page",
-            "in": "query",
-            "schema": {
-              "maximum": 2147483647,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "PageSize",
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockedUsersListDataOperationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Reporting/blocked-status/{userId}": {
-      "get": {
-        "tags": [
-          "Reporting"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "boolean"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "boolean"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "boolean"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Reporting/quick-block/{userId}": {
-      "put": {
-        "tags": [
-          "Reporting"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BlockUserDataOperationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/Reporting/quick-unblock/{userId}": {
-      "put": {
-        "tags": [
-          "Reporting"
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnblockUserDataOperationResult"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/Swipe": {
       "post": {
         "tags": [
@@ -1983,6 +1753,7 @@
       },
       "BlockUserRequest": {
         "required": [
+          "blockedUserGender",
           "blockedUserId"
         ],
         "type": "object",
@@ -1990,96 +1761,14 @@
           "blockedUserId": {
             "type": "string",
             "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
-      "BlockedUserDTO": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
           },
-          "firstName": {
+          "blockedUserGender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
+          "blockerUserId": {
             "type": "string",
+            "format": "uuid",
             "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "primaryPhotoUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "thumbnailUrl": {
-            "type": "string",
-            "nullable": true
-          },
-          "blockedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "isActive": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "BlockedUsersListData": {
-        "type": "object",
-        "properties": {
-          "blockedUsers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BlockedUserDTO"
-            },
-            "nullable": true
-          },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "lastUpdated": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
-      "BlockedUsersListDataOperationResult": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "readOnly": true
-          },
-          "errorCode": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "errorMessage": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": { },
-            "nullable": true,
-            "readOnly": true
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "data": {
-            "$ref": "#/components/schemas/BlockedUsersListData"
           }
         },
         "additionalProperties": false
@@ -2106,6 +1795,9 @@
           "otherUserName": {
             "type": "string",
             "nullable": true
+          },
+          "otherUserGender": {
+            "$ref": "#/components/schemas/GenderType"
           },
           "otherUserPhoto": {
             "type": "string",
@@ -2263,19 +1955,7 @@
             },
             "nullable": true
           },
-          "discoveryMode": {
-            "type": "string",
-            "nullable": true
-          },
-          "requestedCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "actualCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "fromCache": {
+          "hasMore": {
             "type": "boolean"
           }
         },
@@ -2644,6 +2324,39 @@
               "$ref": "#/components/schemas/UserPhotoDTO"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DiscoveryUserDTOOperationResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true,
+            "readOnly": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DiscoveryUserDTO"
           }
         },
         "additionalProperties": false
@@ -3861,6 +3574,7 @@
       "ReportUserRequest": {
         "required": [
           "reason",
+          "reportedUserGender",
           "reportedUserId"
         ],
         "type": "object",
@@ -3869,8 +3583,16 @@
             "type": "string",
             "format": "uuid"
           },
+          "reportedUserGender": {
+            "$ref": "#/components/schemas/GenderType"
+          },
           "reason": {
             "$ref": "#/components/schemas/ReportReason"
+          },
+          "reporterUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
           "description": {
             "maxLength": 1000,
@@ -3991,7 +3713,8 @@
           "UserNotFound",
           "MatchCreated",
           "SwipeUndone",
-          "NoRecentPassToUndo"
+          "NoRecentPassToUndo",
+          "InternalError"
         ],
         "type": "string"
       },
@@ -4066,66 +3789,6 @@
           "Reported"
         ],
         "type": "string"
-      },
-      "UnblockUserData": {
-        "type": "object",
-        "properties": {
-          "unblockedUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "unblockedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UnblockUserDataOperationResult": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "readOnly": true
-          },
-          "errorCode": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "errorMessage": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": { },
-            "nullable": true,
-            "readOnly": true
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "data": {
-            "$ref": "#/components/schemas/UnblockUserData"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UnblockUserRequest": {
-        "required": [
-          "unblockedUserId"
-        ],
-        "type": "object",
-        "properties": {
-          "unblockedUserId": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
       },
       "UpdateDiscoveryFiltersRequest": {
         "type": "object",
@@ -4598,7 +4261,7 @@
             "type": "string",
             "nullable": true
           },
-          "notificaitonsEnabled": {
+          "notificationsEnabled": {
             "type": "boolean"
           },
           "isVerified": {
@@ -4752,48 +4415,6 @@
         },
         "additionalProperties": false
       },
-      "UserReportDTO": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reportedUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "reportedUserName": {
-            "type": "string",
-            "nullable": true
-          },
-          "primaryPhoto": {
-            "type": "string",
-            "nullable": true
-          },
-          "reason": {
-            "$ref": "#/components/schemas/ReportReason"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
-          "reportedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "resolvedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "UserReportData": {
         "type": "object",
         "properties": {
@@ -4854,67 +4475,6 @@
           },
           "data": {
             "$ref": "#/components/schemas/UserReportData"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserReportsListData": {
-        "type": "object",
-        "properties": {
-          "reports": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserReportDTO"
-            },
-            "nullable": true
-          },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pendingCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "lastUpdated": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": false
-      },
-      "UserReportsListDataOperationResult": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "readOnly": true
-          },
-          "errorCode": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "errorMessage": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": { },
-            "nullable": true,
-            "readOnly": true
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "data": {
-            "$ref": "#/components/schemas/UserReportsListData"
           }
         },
         "additionalProperties": false

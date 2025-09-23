@@ -13,6 +13,24 @@ namespace MomomiAPI.Common.Caching
             _logger = logger;
         }
 
+        public async Task InvalidateOnLogoutOrDelete(Guid userId)
+        {
+
+            var keysToInvalidate = new List<string>
+                {
+                    CacheKeys.Messaging.UserConversations(userId),
+                    CacheKeys.Discovery.GlobalResults(userId),
+                    CacheKeys.Discovery.LocalResults(userId),
+                    CacheKeys.Users.OnlineStatus(userId),
+                    CacheKeys.Users.Profile(userId),
+                    CacheKeys.Users.ActiveStatus(userId),
+                };
+
+
+
+            await _cacheService.RemoveManyAsync(keysToInvalidate);
+        }
+
         public async Task InvalidateUserProfile(Guid userId)
         {
             var tasks = new[]

@@ -8,11 +8,16 @@ namespace MomomiAPI.Models.Requests
     /// </summary>
     public class ReportUserRequest
     {
+
         [Required]
         public Guid ReportedUserId { get; set; }
 
         [Required]
+        public GenderType ReportedUserGender { get; set; }
+
+        [Required]
         public ReportReason Reason { get; set; }
+        public Guid? ReporterUserId { get; set; }
 
         [MaxLength(1000, ErrorMessage = "Description cannot exceed 1000 characters")]
         public string? Description { get; set; }
@@ -23,8 +28,15 @@ namespace MomomiAPI.Models.Requests
     /// </summary>
     public class BlockUserRequest
     {
+
+
         [Required]
         public Guid BlockedUserId { get; set; }
+
+        [Required]
+        public GenderType BlockedUserGender { get; set; }
+        public Guid? BlockerUserId { get; set; }
+
     }
 
     /// <summary>

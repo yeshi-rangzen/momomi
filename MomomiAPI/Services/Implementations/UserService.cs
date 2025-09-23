@@ -9,7 +9,6 @@ using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Models.Requests;
 using MomomiAPI.Services.Interfaces;
-using static MomomiAPI.Common.Constants.AppConstants;
 
 namespace MomomiAPI.Services.Implementations
 {
@@ -60,11 +59,44 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 _logger.LogDebug("Retrieved profile for user {UserId}", userId);
-                return UserProfileResult.Successful(userDto, wasCached: true);
+                return UserProfileResult.Successful(userDto);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving user profile: {UserId}", userId);
+                return UserProfileResult.Error("Unable to retrieve user profile. Please try again.");
+            }
+        }
+
+        public async Task<UserProfileResult> GetUserProfileWithSupabaseIdAsync(Guid supabaseUid)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving user profile with supabaseUid: {UserId}", supabaseUid);
+
+                var user = await _dbContext.Users
+                    .Include(u => u.Photos)
+                    .Include(u => u.Preferences)
+                    .Include(u => u.Subscription)
+                    .Include(u => u.UsageLimit)
+                    .FirstOrDefaultAsync(u => u.SupabaseUid == supabaseUid && u.IsActive);
+
+                if (user == null)
+                {
+                    return UserProfileResult.UserNotFound();
+                }
+
+                var userDto = UserMapper.UserToDTO(user);
+
+                var cacheKey = CacheKeys.Users.Profile(userDto.Id);
+                _ = _cacheService.SetAsync(cacheKey, userDto, CacheKeys.Duration.UserProfile);
+
+                _logger.LogDebug("Retrieved profile for user {UserId}", userDto.Id);
+                return UserProfileResult.Successful(userDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving user profile with supabaseId: {UserId}", supabaseUid);
                 return UserProfileResult.Error("Unable to retrieve user profile. Please try again.");
             }
         }
@@ -86,8 +118,6 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 var user = await _dbContext.Users
-                    .Include(u => u.Preferences)
-                    .Include(u => u.Subscription)
                     .FirstOrDefaultAsync(u => u.Id == userId);
 
                 if (user == null)
@@ -105,12 +135,9 @@ namespace MomomiAPI.Services.Implementations
                 user.UpdatedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
 
-                // Invalidate relevant caches based on what was updated
-                await InvalidateProfileCaches(userId, updatedFields, requiresDiscoveryRefresh);
-
                 // Get updated profile
-                var updatedUser = await FetchUserProfileFromDatabase(userId);
-                if (updatedUser == null)
+                var userDto = await FetchUserProfileFromDatabase(userId);
+                if (userDto == null)
                 {
                     return ProfileUpdateResult.Error("Failed to retrieve updated profile");
                 }
@@ -118,7 +145,10 @@ namespace MomomiAPI.Services.Implementations
                 _logger.LogInformation("Successfully updated profile for user {UserId}, fields: {Fields}",
                     userId, string.Join(", ", updatedFields));
 
-                return ProfileUpdateResult.Successful(updatedUser, updatedFields, requiresDiscoveryRefresh);
+                // Invalidate relevant caches based on what was updated
+                _ = InvalidateProfileCaches(userDto, requiresDiscoveryRefresh);
+
+                return ProfileUpdateResult.Successful(updatedFields);
             }
             catch (Exception ex)
             {
@@ -127,37 +157,6 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        /// <summary>
-        /// Gets discovery filters with caching
-        /// </summary>
-        public async Task<OperationResult<DiscoverySettingsDTO>> GetDiscoveryFiltersAsync(Guid userId)
-        {
-            try
-            {
-                _logger.LogInformation("Getting discovery filters for user {UserId}", userId);
-
-                var cacheKey = $"discovery_filters:{userId}";
-
-                var settings = await _cacheService.GetOrSetAsync(
-                    cacheKey,
-                    async () => await FetchDiscoveryFiltersFromDatabase(userId),
-                    CacheKeys.Duration.UserProfile
-                );
-
-                if (settings == null)
-                {
-                    return OperationResult<DiscoverySettingsDTO>.FailureResult(ErrorCodes.UNAUTHORIZED, "User not found");
-                }
-
-                _logger.LogDebug("Retrieved discovery filters for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Successful(settings);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting discovery filters for user {UserId}", userId);
-                return OperationResult<DiscoverySettingsDTO>.Failed("Unable to retrieve discovery filters. Please try again.");
-            }
-        }
 
         /// <summary>
         /// Updates discovery filters with comprehensive validation and cache optimization
@@ -186,41 +185,27 @@ namespace MomomiAPI.Services.Implementations
                     return DiscoveryFiltersUpdateResult.UserNotFound();
                 }
 
-                // Check premium filters access
                 var isPremiumUser = IsActivePremiumUser(user);
-                var premiumFilters = request.GetPremiumFiltersBeingUpdated();
-
-                if (premiumFilters.Any() && !isPremiumUser)
-                {
-                    return DiscoveryFiltersUpdateResult.SubscriptionRequired(string.Join(", ", premiumFilters));
-                }
-
-                // Track changes
                 var updatedFilters = new List<string>();
-                var locationChanged = false;
-                var filtersChanged = false;
 
                 // Update discovery settings and preferences
-                UpdateDiscoverySettings(user, request, updatedFilters, ref locationChanged, ref filtersChanged);
+                UpdateDiscoverySettings(user, request, updatedFilters);
                 UpdateDiscoveryPreferences(user, request, updatedFilters, isPremiumUser);
 
                 user.UpdatedAt = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
 
-                // Invalidate caches based on what changed
-                await InvalidateDiscoveryCaches(userId, locationChanged, filtersChanged);
+                var userDto = await FetchUserProfileFromDatabase(userId);
 
-                // Get updated settings
-                var updatedSettings = await FetchDiscoveryFiltersFromDatabase(userId);
-                if (updatedSettings == null)
+                if (userDto != null)
                 {
-                    return DiscoveryFiltersUpdateResult.Error("Failed to retrieve updated settings");
+                    _ = InvalidateProfileCaches(userDto, true);
                 }
 
                 _logger.LogInformation("Successfully updated discovery filters for user {UserId}, filters: {Filters}",
                     userId, string.Join(", ", updatedFilters));
 
-                return DiscoveryFiltersUpdateResult.Successful(updatedSettings, updatedFilters, locationChanged, filtersChanged);
+                return DiscoveryFiltersUpdateResult.Successful(updatedFilters);
             }
             catch (Exception ex)
             {
@@ -295,7 +280,6 @@ namespace MomomiAPI.Services.Implementations
                             .Include(u => u.Subscription)
                             .Include(u => u.UsageLimit)
                             .Include(u => u.Notifications)
-                            .Include(u => u.ReportsMade)
                             .FirstOrDefaultAsync(u => u.Id == userId);
 
                         if (user == null)
@@ -309,7 +293,7 @@ namespace MomomiAPI.Services.Implementations
                         var swipesCount = user.SwipesGiven.Count + user.SwipesReceived.Count;
 
                         // Delete user photos from storage (fire and forget for performance)
-                        _ = Task.Run(async () => await DeleteUserPhotosFromStorage(user.Photos.ToList()));
+                        _ = DeleteUserPhotosFromStorage(user.Photos.ToList());
 
                         // Delete database records in correct order
                         await DeleteUserRelatedDataOptimized(user);
@@ -318,7 +302,7 @@ namespace MomomiAPI.Services.Implementations
                         await transaction.CommitAsync();
 
                         // Invalidate all user-related caches
-                        await InvalidateAllUserCaches(userId);
+                        _ = InvalidateAllUserCaches(userId);
 
                         _logger.LogInformation("Successfully deleted user {UserId} and all associated data", userId);
                         return AccountDeletionResult.Successful(userId, photosCount, conversationsCount, swipesCount);
@@ -349,10 +333,10 @@ namespace MomomiAPI.Services.Implementations
                 if (_inMemoryActiveUsers.TryGetValue(userId, out var cachedResult) && cachedResult != null)
                 {
                     // Check if cachedResult is not null AND is the correct type
-                    if (cachedResult is UserActiveStatus userActiveStatus)
+                    if (cachedResult is bool isActive)
                     {
                         _logger.LogDebug("In-memory cache hit for user activity check: {UserId}", userId);
-                        return userActiveStatus.IsActive;
+                        return isActive;
                     }
                     else
                     {
@@ -363,10 +347,8 @@ namespace MomomiAPI.Services.Implementations
                 }
 
                 // Layer 2: Redis cache for fast distributed access
-                var cacheKey = CacheKeys.Users.ActiveStatus(userId);
-                var redisResult = await _cacheService.GetAsync<UserActiveStatus>(cacheKey);
-
-                if (redisResult != null)
+                var userResult = await GetUserProfileAsync(userId);
+                if (userResult != null && userResult.Data != null)
                 {
                     _logger.LogDebug("Redis cache hit for user activity check: {UserId}", userId);
 
@@ -377,62 +359,15 @@ namespace MomomiAPI.Services.Implementations
                         Size = 1 // Each entry counts as size 1
                     };
                     // Update in-memory cache for next time
-                    _inMemoryActiveUsers.Set(userId, redisResult, cacheEntryOptionsFromRedis);
-                    return redisResult.IsActive;
+                    _inMemoryActiveUsers.Set(userId, true, cacheEntryOptionsFromRedis);
+                    return true;
                 }
-
-                // Layer 3: Database query (cache miss)
-                _logger.LogDebug("Cache miss for user activity check, querying database: {UserId}", userId);
-
-                var userResult = await _dbContext.Users
-                    .Where(u => u.Id == userId)
-                    .Select(u => new { UserId = u.Id, IsActive = u.IsActive })
-                    .FirstOrDefaultAsync();
-
-                if (userResult == null)
+                else
                 {
-                    // User does not exist - cache this result to avoid repeated DB queries
-                    var nonExistentUserStatus = new UserActiveStatus
-                    {
-                        UserId = userId,
-                        IsActive = null, // null indicates user doesn't exist
-                        CheckedAt = DateTime.UtcNow
-                    };
-
-                    // Cache the "user doesn't exist" result with shorter TTL
-                    var redisTask = _cacheService.SetAsync(cacheKey, nonExistentUserStatus, TimeSpan.FromMinutes(2));
-                    var inMemoryTask = Task.Run(() => _inMemoryActiveUsers.Set(userId, nonExistentUserStatus, TimeSpan.FromMinutes(1)));
-
-                    // Fire and forget cache updates
-                    _ = Task.WhenAll(redisTask, inMemoryTask);
-
-                    _logger.LogDebug("User does not exist: {UserId}", userId);
-                    return null;
+                    _logger.LogWarning("User not found or inactive during activity check: {UserId}", userId);
+                    _inMemoryActiveUsers.Remove(userId);
+                    return false;
                 }
-
-                var userStatus = new UserActiveStatus
-                {
-                    UserId = userId,
-                    IsActive = userResult.IsActive,
-                    CheckedAt = DateTime.UtcNow
-                };
-
-                var cacheEntryOptions = new MemoryCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = _inMemoryCacheExpiry,
-                    Priority = CacheItemPriority.Normal,
-                    Size = 1 // Each entry counts as size 1
-                };
-
-                // Cache the result in both layers
-                var redisCacheTask = _cacheService.SetAsync(cacheKey, userStatus, CacheKeys.Duration.UserActiveStatus);
-                var inMemoryCacheTask = Task.Run(() => _inMemoryActiveUsers.Set(userId, userStatus, cacheEntryOptions));
-
-                // Fire and forget cache updates for performance
-                _ = Task.WhenAll(redisCacheTask, inMemoryCacheTask);
-
-                _logger.LogDebug("User activity status cached for: {UserId}, IsActive: {IsActive}", userId, userResult.IsActive);
-                return userResult.IsActive;
             }
             catch (Exception ex)
             {
@@ -446,25 +381,7 @@ namespace MomomiAPI.Services.Implementations
         }
 
         #region Private Helper Methods
-        /// Invalidate user active status cache when user is deactivated/activated
-        public async Task InvalidateUserActiveStatusCache(Guid userId)
-        {
-            try
-            {
-                // Remove from in-memory cache
-                _inMemoryActiveUsers.Remove(userId);
 
-                // Remove from Redis cache
-                var cacheKey = CacheKeys.Users.ActiveStatus(userId);
-                await _cacheService.RemoveAsync(cacheKey);
-
-                _logger.LogDebug("Invalidated active status cache for user: {UserId}", userId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to invalidate active status cache for user: {UserId}", userId);
-            }
-        }
 
         /// <summary>
         /// Fetches complete user profile from database
@@ -499,60 +416,6 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        /// <summary>
-        /// Fetches discovery filters from database
-        /// </summary>
-        private async Task<DiscoverySettingsDTO?> FetchDiscoveryFiltersFromDatabase(Guid userId)
-        {
-            var user = await _dbContext.Users
-                .Include(u => u.Preferences)
-                .Include(u => u.Subscription)
-                .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
-
-            if (user == null) return null;
-
-            var isPremiumUser = IsActivePremiumUser(user);
-
-            return new DiscoverySettingsDTO
-            {
-                // Basic Discovery Controls
-                EnableGlobalDiscovery = user.EnableGlobalDiscovery,
-                IsDiscoverable = user.IsDiscoverable,
-                IsGloballyDiscoverable = user.IsGloballyDiscoverable,
-
-                // Core Matching Criteria
-                InterestedIn = user.InterestedIn,
-                MinAge = user.MinAge,
-                MaxAge = user.MaxAge,
-                MaxDistanceKm = user.MaxDistanceKm,
-
-                // Location
-                Latitude = user.Latitude,
-                Longitude = user.Longitude,
-                Neighbourhood = user.Neighbourhood,
-                HasLocation = user.Latitude != 0 && user.Longitude != 0,
-
-                // Free User Filters
-                PreferredHeritage = user.Preferences?.PreferredHeritage,
-                PreferredReligions = user.Preferences?.PreferredReligions,
-                PreferredLanguagesSpoken = user.Preferences?.LanguagePreference,
-
-                // Premium Subscriber Filters (only if premium)
-                PreferredHeightMin = isPremiumUser ? user.Preferences?.PreferredHeightMin : null,
-                PreferredHeightMax = isPremiumUser ? user.Preferences?.PreferredHeightMax : null,
-                PreferredEducationLevels = isPremiumUser ? user.Preferences?.PreferredEducationLevels : null,
-                PreferredChildren = isPremiumUser ? user.Preferences?.PreferredChildren : null,
-                PreferredFamilyPlans = isPremiumUser ? user.Preferences?.PreferredFamilyPlans : null,
-                PreferredDrugs = isPremiumUser ? user.Preferences?.PreferredDrugs : null,
-                PreferredSmoking = isPremiumUser ? user.Preferences?.PreferredSmoking : null,
-                PreferredDrinking = isPremiumUser ? user.Preferences?.PreferredDrinking : null,
-                PreferredMarijuana = isPremiumUser ? user.Preferences?.PreferredMarijuana : null,
-
-                // Metadata
-                IsPremiumUser = isPremiumUser,
-                LastUpdated = user.UpdatedAt
-            };
-        }
 
         /// <summary>
         /// Validates profile update request
@@ -622,7 +485,7 @@ namespace MomomiAPI.Services.Implementations
                 updatedFields.Add("FirstName");
             }
 
-            if (!string.IsNullOrEmpty(request.LastName))
+            if (request.LastName != null)
             {
                 user.LastName = request.LastName;
                 updatedFields.Add("LastName");
@@ -638,21 +501,22 @@ namespace MomomiAPI.Services.Implementations
             {
                 user.DateOfBirth = request.DateOfBirth.Value;
                 updatedFields.Add("Gender");
+                requiresDiscoveryRefresh = true;
             }
 
-            if (!string.IsNullOrEmpty(request.Bio))
+            if (request.Bio != null)
             {
                 user.Bio = request.Bio;
                 updatedFields.Add("Bio");
             }
 
-            if (!string.IsNullOrEmpty(request.Hometown))
+            if (request.Hometown != null)
             {
                 user.Hometown = request.Hometown;
                 updatedFields.Add("Hometown");
             }
 
-            if (!string.IsNullOrEmpty(request.Occupation))
+            if (request.Occupation != null)
             {
                 user.Occupation = request.Occupation;
                 updatedFields.Add("Occupation");
@@ -662,77 +526,66 @@ namespace MomomiAPI.Services.Implementations
             {
                 user.HeightCm = request.HeightCm.Value;
                 updatedFields.Add("HeightCm");
-                requiresDiscoveryRefresh = true; // Height affects discovery filtering
             }
 
             if (request.Heritage != null)
             {
                 user.Heritage = request.Heritage;
                 updatedFields.Add("Heritage");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Religion != null)
             {
                 user.Religion = request.Religion;
                 updatedFields.Add("Religion");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.LanguagesSpoken != null)
             {
                 user.LanguagesSpoken = request.LanguagesSpoken;
                 updatedFields.Add("LanguagesSpoken");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.EducationLevel.HasValue)
             {
                 user.EducationLevel = request.EducationLevel.Value;
                 updatedFields.Add("EducationLevel");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Children.HasValue)
             {
                 user.Children = request.Children.Value;
                 updatedFields.Add("Children");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.FamilyPlan.HasValue)
             {
                 user.FamilyPlan = request.FamilyPlan.Value;
                 updatedFields.Add("FamilyPlan");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Drugs.HasValue)
             {
                 user.Drugs = request.Drugs.Value;
                 updatedFields.Add("Drugs");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Smoking.HasValue)
             {
                 user.Smoking = request.Smoking.Value;
                 updatedFields.Add("Smoking");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Marijuana.HasValue)
             {
                 user.Marijuana = request.Marijuana.Value;
                 updatedFields.Add("Marijuana");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.Drinking.HasValue)
             {
                 user.Drinking = request.Drinking.Value;
                 updatedFields.Add("Drinking");
-                requiresDiscoveryRefresh = true;
             }
 
             if (request.NotificationsEnabled.HasValue)
@@ -741,7 +594,7 @@ namespace MomomiAPI.Services.Implementations
                 updatedFields.Add("NotificationsEnabled");
             }
 
-            if (!string.IsNullOrEmpty(request.PushToken))
+            if (request.PushToken != null)
             {
                 user.PushToken = request.PushToken;
                 updatedFields.Add("PushToken");
@@ -757,55 +610,48 @@ namespace MomomiAPI.Services.Implementations
         /// Updates discovery settings and tracks changes
         /// </summary>
         private static void UpdateDiscoverySettings(User user, UpdateDiscoveryFiltersRequest request,
-            List<string> updatedFilters, ref bool locationChanged, ref bool filtersChanged)
+            List<string> updatedFilters)
         {
             if (request.IsDiscoverable.HasValue)
             {
                 user.IsDiscoverable = request.IsDiscoverable.Value;
                 updatedFilters.Add("IsDiscoverable");
-                filtersChanged = true;
             }
 
             if (request.IsGloballyDiscoverable.HasValue)
             {
                 user.IsGloballyDiscoverable = request.IsGloballyDiscoverable.Value;
                 updatedFilters.Add("IsGloballyDiscoverable");
-                filtersChanged = true;
             }
 
             if (request.EnableGlobalDiscovery.HasValue)
             {
                 user.EnableGlobalDiscovery = request.EnableGlobalDiscovery.Value;
                 updatedFilters.Add("EnableGlobalDiscovery");
-                filtersChanged = true;
             }
 
             if (request.InterestedIn.HasValue)
             {
                 user.InterestedIn = request.InterestedIn.Value;
                 updatedFilters.Add("InterestedIn");
-                filtersChanged = true;
             }
 
             if (request.MinAge.HasValue)
             {
                 user.MinAge = request.MinAge.Value;
                 updatedFilters.Add("MinAge");
-                filtersChanged = true;
             }
 
             if (request.MaxAge.HasValue)
             {
                 user.MaxAge = request.MaxAge.Value;
                 updatedFilters.Add("MaxAge");
-                filtersChanged = true;
             }
 
             if (request.MaxDistanceKm.HasValue)
             {
                 user.MaxDistanceKm = request.MaxDistanceKm.Value;
                 updatedFilters.Add("MaxDistanceKm");
-                filtersChanged = true;
             }
 
             // Location updates
@@ -823,21 +669,12 @@ namespace MomomiAPI.Services.Implementations
                     var distance = LocationHelper.CalculateDistance(
                         oldLat, oldLon,
                         (decimal)request.Latitude.Value, (decimal)request.Longitude.Value);
-
-                    if (distance > 1) // 1km threshold
-                    {
-                        locationChanged = true;
-                    }
-                }
-                else
-                {
-                    locationChanged = true; // First time setting location
                 }
 
                 updatedFilters.Add("Location");
             }
 
-            if (!string.IsNullOrEmpty(request.Neighbourhood))
+            if (request.Neighbourhood != null)
             {
                 user.Neighbourhood = request.Neighbourhood;
                 updatedFilters.Add("Neighbourhood");
@@ -874,15 +711,16 @@ namespace MomomiAPI.Services.Implementations
                 updatedFilters.Add("PreferredReligions");
             }
 
-            if (request.PreferredLanguagesSpoken != null)
-            {
-                user.Preferences.LanguagePreference = request.PreferredLanguagesSpoken;
-                updatedFilters.Add("PreferredLanguagesSpoken");
-            }
 
             // Premium user filters (only if user has premium subscription)
             if (isPremiumUser)
             {
+                if (request.PreferredLanguagesSpoken != null)
+                {
+                    user.Preferences.LanguagePreference = request.PreferredLanguagesSpoken;
+                    updatedFilters.Add("PreferredLanguagesSpoken");
+                }
+
                 if (request.PreferredHeightMin.HasValue)
                 {
                     user.Preferences.PreferredHeightMin = request.PreferredHeightMin.Value;
@@ -953,62 +791,25 @@ namespace MomomiAPI.Services.Implementations
         /// <summary>
         /// Invalidates profile-related caches based on updated fields
         /// </summary>
-        private async Task InvalidateProfileCaches(Guid userId, List<string> updatedFields, bool requiresDiscoveryRefresh)
+        private async Task InvalidateProfileCaches(UserDTO userDto, bool requiresDiscoveryRefresh)
         {
-            var keysToInvalidate = new List<string>
+            // Set updated profile in cache
+            await _cacheService.SetAsync(CacheKeys.Users.Profile(userDto.Id), userDto, CacheKeys.Duration.UserProfile);
+
+            if (requiresDiscoveryRefresh)
             {
-                CacheKeys.Users.Profile(userId),
-                CacheKeys.Discovery.GlobalResults(userId),
-                CacheKeys.Discovery.LocalResults(userId),
-            };
+                var keysToInvalidate = new List<string>
+                {
+                    CacheKeys.Discovery.GlobalResults(userDto.Id),
+                    CacheKeys.Discovery.LocalResults(userDto.Id)
+                };
 
-            // Add additional caches based on what was updated
-            //if (updatedFields.Any(f => f.Contains("Photo") || f == "Bio" || f == "FirstName"))
-            //{
-            //    keysToInvalidate.Add(CacheKeys.Users.Photos(userId));
-            //}
+                await _cacheService.RemoveManyAsync(keysToInvalidate);
+            }
 
-            //if (requiresDiscoveryRefresh)
-            //{
-            //    // Add discovery cache keys
-            //    for (int count = 5; count <= 30; count += 5)
-            //    {
-            //        keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId, count));
-            //        keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId, count));
-            //    }
-            //}
-
-            await _cacheService.RemoveManyAsync(keysToInvalidate);
-            _logger.LogDebug("Invalidated {Count} cache keys for user {UserId}", keysToInvalidate.Count, userId);
+            _logger.LogDebug("Invalidated cache keys for user {UserId}", userDto.Id);
         }
 
-        /// <summary>
-        /// Invalidates discovery-related caches
-        /// </summary>
-        private async Task InvalidateDiscoveryCaches(Guid userId, bool locationChanged, bool filtersChanged)
-        {
-            var keysToInvalidate = new List<string>
-            {
-                CacheKeys.Users.Profile(userId),
-                  CacheKeys.Discovery.GlobalResults(userId),
-                CacheKeys.Discovery.LocalResults(userId),
-                //$"discovery_filters:{userId}"
-            };
-
-            // If location or filters changed, invalidate discovery cache
-            //if (locationChanged || filtersChanged)
-            //{
-            //    for (int count = 5; count <= 30; count += 5)
-            //    {
-            //        keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId, count));
-            //        keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId, count));
-            //    }
-            //}
-
-            await _cacheService.RemoveManyAsync(keysToInvalidate);
-            _logger.LogDebug("Invalidated discovery caches for user {UserId}, location changed: {LocationChanged}, filters changed: {FiltersChanged}",
-                userId, locationChanged, filtersChanged);
-        }
 
         /// <summary>
         /// Invalidates all user-related caches
@@ -1018,20 +819,11 @@ namespace MomomiAPI.Services.Implementations
             var keysToInvalidate = new List<string>
             {
                 CacheKeys.Users.Profile(userId),
-                //CacheKeys.Users.Photos(userId),
-                //CacheKeys.Users.Preferences(userId),
-                //CacheKeys.Users.SubscriptionStatus(userId),
-                //CacheKeys.Users.UsageLimits(userId),
                 CacheKeys.Matching.UserMatches(userId),
                 CacheKeys.Messaging.UserConversations(userId),
-                //$"discovery_filters:{userId}",
                 CacheKeys.Discovery.GlobalResults(userId),
                 CacheKeys.Discovery.LocalResults(userId),
             };
-
-            // Add discovery cache variations
-            //keysToInvalidate.Add(CacheKeys.Discovery.GlobalResults(userId));
-            //keysToInvalidate.Add(CacheKeys.Discovery.LocalResults(userId));
 
             await _cacheService.RemoveManyAsync(keysToInvalidate);
             _logger.LogDebug("Invalidated all caches for user {UserId}", userId);
@@ -1109,12 +901,6 @@ namespace MomomiAPI.Services.Implementations
                 _dbContext.UserUsageLimits.Remove(user.UsageLimit);
             }
 
-            // Delete reports
-            if (user.ReportsMade.Any())
-            {
-                _dbContext.UserReports.RemoveRange(user.ReportsMade);
-            }
-
             // Delete notifications
             if (user.Notifications.Any())
             {
@@ -1126,16 +912,6 @@ namespace MomomiAPI.Services.Implementations
         }
 
 
-        #endregion
-
-        #region Helper classes
-        /// Cache model for user active status
-        private class UserActiveStatus
-        {
-            public Guid UserId { get; set; }
-            public bool? IsActive { get; set; }
-            public DateTime CheckedAt { get; set; }
-        }
         #endregion
     }
 }
