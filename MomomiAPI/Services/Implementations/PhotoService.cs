@@ -3,6 +3,7 @@ using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Constants;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Services.Interfaces;
@@ -112,7 +113,10 @@ namespace MomomiAPI.Services.Implementations
                 userDto.Photos.Add(MapToPhotoDTO(userPhoto));
 
                 // Invalidate relevent caches
-                _ = InvalidateUserPhotosCaches(userDto);
+                FireAndForgetHelper.Run(
+                    InvalidateUserPhotosCaches(userDto),
+                    _logger,
+                    "Invalidating after adding profile");
 
                 var photoDto = MapToPhotoDTO(userPhoto);
 
@@ -411,7 +415,10 @@ namespace MomomiAPI.Services.Implementations
                 await _dbContext.SaveChangesAsync();
 
                 // Invalidate caches
-                //_ = _cacheService.RemoveAsync(CacheKeys.Users.Photos(userId));
+                FireAndForgetHelper.Run(
+                    _cacheService.RemoveAsync(CacheKeys.Users.Profile(userId)),
+                    _logger,
+                    "Removing Profile Cache after reordering photos");
 
                 _logger.LogInformation("Successfully reordered photos for user {UserId}", userId);
                 return PhotoReorderResult.ReorderSuccess();
@@ -631,18 +638,21 @@ namespace MomomiAPI.Services.Implementations
 
                 // Check if image is already mobile-processed (1080x1350 with 4:5 ratio)
                 var isMobileProcessed = IsMobileProcessedImage(image.Width, image.Height);
-                if (isMobileProcessed && file.Length <= 3 * 1024 * 1024) // 3MB threshold
-                {
-                    // Image is already optimally processed by mobile, minimal processing
-                    _logger.LogDebug("Image appears to be mobile-processed, applying minimal processing");
-                    return await ApplyMinimalProcessing(image, file.ContentType);
-                }
-                else
-                {
-                    // Apply full processing for web uploads or oversized images
-                    _logger.LogDebug("Applying full image processing");
-                    return await ApplyFullProcessing(image, file.ContentType);
-                }
+
+                return await ApplyMinimalProcessing(image, file.ContentType);
+
+                //if (isMobileProcessed && file.Length <= 3 * 1024 * 1024) // 3MB threshold
+                //{
+                //    // Image is already optimally processed by mobile, minimal processing
+                //    _logger.LogDebug("Image appears to be mobile-processed, applying minimal processing");
+                //    return await ApplyMinimalProcessing(image, file.ContentType);
+                //}
+                //else
+                //{
+                //    // Apply full processing for web uploads or oversized images
+                //    _logger.LogDebug("Applying full image processing");
+                //    return await ApplyFullProcessing(image, file.ContentType);
+                //}
             }
             catch (Exception ex)
             {

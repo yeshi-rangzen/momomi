@@ -68,7 +68,7 @@ namespace MomomiAPI.Controllers
 
         /// Reorder photos
         [HttpPut("reorder")]
-        public async Task<ActionResult<OperationResult<PhotoReorderData>>> ReorderPhotos([FromBody] List<Guid> photoIds)
+        public async Task<ActionResult<OperationResult>> ReorderPhotos([FromBody] List<Guid> photoIds)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;

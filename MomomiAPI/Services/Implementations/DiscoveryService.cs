@@ -15,13 +15,13 @@ namespace MomomiAPI.Services.Implementations
         private readonly MomomiDbContext _dbContext;
         private readonly ICacheService _cacheService;
         private readonly ILogger<DiscoveryService> _logger;
-        private readonly UserService _userService;
+        private readonly IUserService _userService;
 
         public DiscoveryService(
             MomomiDbContext dbContext,
             ICacheService cacheService,
             ILogger<DiscoveryService> logger,
-            UserService userService)
+            IUserService userService)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
