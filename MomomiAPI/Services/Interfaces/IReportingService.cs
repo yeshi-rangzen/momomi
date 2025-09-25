@@ -8,12 +8,12 @@ namespace MomomiAPI.Services.Interfaces
         /// <summary>
         /// Reports a user for policy violations
         /// </summary>
-        Task<UserReportResult> ReportUserAsync(ReportUserRequest reportRequest);
+        Task<OperationResult> ReportUserAsync(ReportUserRequest reportRequest);
 
         /// <summary>
         /// Blocks a user and removes all interactions
         /// </summary>
-        Task<BlockUserResult> BlockUserAsync(BlockUserRequest blockRequest);
+        Task<OperationResult> BlockUserAsync(BlockUserRequest blockRequest);
 
     }
 }

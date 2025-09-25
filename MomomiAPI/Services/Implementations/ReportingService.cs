@@ -2,6 +2,7 @@
 using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
+using MomomiAPI.Helpers;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Models.Requests;
@@ -28,7 +29,7 @@ namespace MomomiAPI.Services.Implementations
         /// <summary>
         /// Reports a user for policy violations with optimized database operations
         /// </summary>
-        public async Task<UserReportResult> ReportUserAsync(ReportUserRequest reportRequest)
+        public async Task<OperationResult> ReportUserAsync(ReportUserRequest reportRequest)
         {
             try
             {
@@ -76,20 +77,14 @@ namespace MomomiAPI.Services.Implementations
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
-                        // Invalidate relevant caches (fire and forget for performance)
-                        _ = InvalidateReportingCaches((Guid)reportRequest.ReporterUserId!, reportRequest.ReportedUserId);
+                        // Invalidate relevant caches (fire and forget for performance
+                        FireAndForgetHelper.Run(
+                            InvalidateReportingCaches((Guid)reportRequest.ReporterUserId!, reportRequest.ReportedUserId),
+                            _logger,
+                            "Invalidate Reporting Caches");
 
-                        _logger.LogInformation("User {ReporterId} successfully reported user {ReportedId} for {Reason}",
-                            reportRequest.ReporterUserId, reportRequest.ReportedUserId, reportRequest.Reason);
 
-                        return UserReportResult.Successful(
-                            userReport.Id,
-                            reportRequest.ReportedUserId,
-                            reportRequest.Reason,
-                            reportRequest.Description,
-                            removalResult.MatchRemoved,
-                            removalResult.ConversationDeleted
-                        );
+                        return UserReportResult.Successful();
                     }
                     catch (Exception)
                     {
@@ -109,7 +104,7 @@ namespace MomomiAPI.Services.Implementations
         /// <summary>
         /// Blocks a user and removes all interactions (optimized for immediate blocking)
         /// </summary>
-        public async Task<BlockUserResult> BlockUserAsync(BlockUserRequest blockRequest)
+        public async Task<OperationResult> BlockUserAsync(BlockUserRequest blockRequest)
         {
             try
             {
@@ -151,21 +146,13 @@ namespace MomomiAPI.Services.Implementations
 
                         _dbContext.UserReports.Add(blockReport);
 
-                        // Remove all interactions between users
-                        //var removalResult = await RemoveUserInteractionsAsync(blockerId, blockedUserId);
-
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
                         _logger.LogInformation("User {BlockerId} successfully blocked user {BlockedUserId}",
                             blockRequest.BlockerUserId, blockRequest.BlockedUserId);
 
-                        return BlockUserResult.Successful(
-                            blockRequest.BlockedUserId,
-                            false,
-                            false,
-                            0
-                        );
+                        return BlockUserResult.Successful();
                     }
                     catch (Exception)
                     {

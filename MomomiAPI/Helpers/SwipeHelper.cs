@@ -5,8 +5,8 @@ namespace MomomiAPI.Helpers
 {
     public class SwipeUserData
     {
-        public User? CurrentUser { get; init; }
-        public User? TargetUser { get; init; }
+        public required User CurrentUser { get; init; }
+        public required User TargetUser { get; init; }
         public bool IsAlreadyLikedByTarget { get; init; }
         public bool IsSuperLikedByTarget { get; init; }
         public bool IsValid { get; init; }
@@ -28,6 +28,8 @@ namespace MomomiAPI.Helpers
         {
             return new SwipeUserData
             {
+                CurrentUser = null!,
+                TargetUser = null!,
                 IsValid = false,
                 Error = error
             };

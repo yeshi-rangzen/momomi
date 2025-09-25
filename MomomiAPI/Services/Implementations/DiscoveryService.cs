@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using MomomiAPI.Common.Caching;
 using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
 using MomomiAPI.Helpers;
@@ -13,18 +12,15 @@ namespace MomomiAPI.Services.Implementations
     public class DiscoveryService : IDiscoveryService
     {
         private readonly MomomiDbContext _dbContext;
-        private readonly ICacheService _cacheService;
         private readonly ILogger<DiscoveryService> _logger;
         private readonly IUserService _userService;
 
         public DiscoveryService(
             MomomiDbContext dbContext,
-            ICacheService cacheService,
             ILogger<DiscoveryService> logger,
             IUserService userService)
         {
             _dbContext = dbContext;
-            _cacheService = cacheService;
             _logger = logger;
             _userService = userService;
         }
@@ -63,34 +59,6 @@ namespace MomomiAPI.Services.Implementations
                     discoveredUserDtos,
                     hasMore
                 );
-        }
-
-        private async Task<CachedDiscoveryData> PerformDiscoveryAndCreateCacheData(UserDTO currentUser, int maxResults, string discoveryMode)
-        {
-            List<User> discoveredUsers;
-            if (discoveryMode == "global")
-            {
-                discoveredUsers = await DiscoverGlobalCandidatesAsync(currentUser, maxResults);
-            }
-            else
-            {
-                discoveredUsers = await DiscoverLocalCandidatesAsync(currentUser, maxResults);
-            }
-
-            var discoveredUserDtos = discoveredUsers.Select(user => UserMapper.UserToDiscoveryDTO(user)).ToList();
-
-            return new CachedDiscoveryData
-            {
-                Users = discoveredUserDtos,
-                DiscoveryMode = discoveryMode,
-                RequestedCount = maxResults,
-                ActualCount = discoveredUserDtos.Count,
-                FromCache = false,
-                CachedAt = DateTime.UtcNow,
-                UserLatitude = currentUser.Latitude,
-                UserLongitude = currentUser.Longitude,
-                HasMore = maxResults == discoveredUserDtos.Count
-            };
         }
 
         private async Task<List<User>> DiscoverLocalCandidatesAsync(UserDTO currentUser, int maxResults)
@@ -164,6 +132,11 @@ namespace MomomiAPI.Services.Implementations
                 .Where(ur => ur.ReporterEmail == currentUser.Email || ur.ReportedEmail == currentUser.Email)
                 .Select(ur => ur.ReporterEmail == currentUser.Email ? ur.ReportedEmail : ur.ReporterEmail);
 
+            // Age filters
+            var today = DateTime.UtcNow.Date;
+            var minBirthDate = today.AddYears(-currentUser.MaxAge);
+            var maxBirthDate = today.AddYears(-currentUser.MinAge);
+
             var query = _dbContext.Users
                 .Include(u => u.Preferences)
                 .Include(u => u.Photos)
@@ -173,63 +146,14 @@ namespace MomomiAPI.Services.Implementations
                     && u.InterestedIn == currentUser.Gender
                     && !swipedUserIdsQuery.Contains(u.Id)
                     && !reportExclusionQuery.Contains(u.Email)
+                    && u.DateOfBirth >= minBirthDate && u.DateOfBirth <= maxBirthDate
                     && u.IsGloballyDiscoverable == currentUser.EnableGlobalDiscovery // Global constraint
                     );
-
-            // Apply core filters (available to all users)
-            query = ApplyCoreMatchingFilters(query, currentUser);
 
             return query;
         }
 
         #region Private Helper Methods
-        // Validates if cached discovery data is still valid
-        // Checks location changes for local discovery
-        private bool IsCacheValid(CachedDiscoveryData cache, UserDTO currentUser)
-        {
-            // Check if cache is too old (additional safety check)
-            if (cache.CachedAt < DateTime.UtcNow.Subtract(CacheKeys.Duration.DiscoveryResults))
-            {
-                _logger.LogDebug("Cache expired for user {UserId}", currentUser.Id);
-                return false;
-            }
-
-            // Check if location changed significantly for local discovery
-            if (cache.DiscoveryMode == "local" && cache.UserLatitude.HasValue && cache.UserLongitude.HasValue)
-            {
-                var distance = LocationHelper.CalculateDistance(
-                    currentUser.Latitude, currentUser.Longitude, cache.UserLatitude.Value, cache.UserLongitude.Value);
-
-                if (distance > 5)
-                {
-                    _logger.LogDebug("Location changed significantly ({Distance}km) for user {UserId}, invalidating cache", distance, currentUser.Id);
-                    return false;
-                }
-            }
-
-            // Check if cache is empty but hasMore
-            if (cache.Users.Count == 0 && cache.HasMore)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static IQueryable<User> ApplyCoreMatchingFilters(IQueryable<User> query, UserDTO currentUser)
-        {
-            // Gender preference filter
-            query = query.Where(u => u.Gender == currentUser.InterestedIn);
-
-            // Age filters
-            var today = DateTime.UtcNow.Date;
-            var minBirthDate = today.AddYears(-currentUser.MaxAge);
-            var maxBirthDate = today.AddYears(-currentUser.MinAge);
-
-            query = query.Where(u => u.DateOfBirth >= minBirthDate && u.DateOfBirth <= maxBirthDate);
-
-            return query;
-        }
 
         private static List<User> ApplyPreferenceFilters(List<User> users, UserDTO currentUser)
         {
@@ -257,13 +181,6 @@ namespace MomomiAPI.Services.Implementations
             }).ToList();
         }
 
-        private static bool IsActiveSubscriber(User currentUser)
-        {
-            return currentUser.Subscription?.SubscriptionType == SubscriptionType.Premium &&
-                   (!currentUser.Subscription.ExpiresAt.HasValue ||
-                    currentUser.Subscription.ExpiresAt > DateTime.UtcNow);
-        }
-
         private static bool IsActiveSubscriber(UserDTO currentUser)
         {
             return currentUser.Subscription?.SubscriptionType == SubscriptionType.Premium &&
@@ -281,6 +198,7 @@ namespace MomomiAPI.Services.Implementations
                 // Height range filters
                 if (preferences.PreferredHeightMin.HasValue && u.HeightCm < preferences.PreferredHeightMin.Value)
                     return false;
+
                 if (preferences.PreferredHeightMax.HasValue && u.HeightCm > preferences.PreferredHeightMax.Value)
                     return false;
 
@@ -297,6 +215,7 @@ namespace MomomiAPI.Services.Implementations
                     if (!u.Children.HasValue || !preferences.PreferredChildren.Contains(u.Children.Value))
                         return false;
                 }
+
                 if (preferences.PreferredFamilyPlans?.Count > 0)
                 {
                     if (!u.FamilyPlan.HasValue || !preferences.PreferredFamilyPlans.Contains(u.FamilyPlan.Value))
@@ -340,16 +259,4 @@ namespace MomomiAPI.Services.Implementations
         #endregion
     }
 
-    public class CachedDiscoveryData
-    {
-        public List<DiscoveryUserDTO> Users { get; set; } = [];
-        public string DiscoveryMode { get; set; } = string.Empty;
-        public int RequestedCount { get; set; }
-        public int ActualCount { get; set; }
-        public bool FromCache { get; set; }
-        public DateTime CachedAt { get; set; }
-        public decimal? UserLatitude { get; set; }
-        public decimal? UserLongitude { get; set; }
-        public bool HasMore { get; set; } = false;
-    }
 }

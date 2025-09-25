@@ -16,7 +16,6 @@ namespace MomomiAPI.Services.Implementations
         private readonly ICacheService _cacheService;
         private readonly ILogger<SwipeService> _logger;
         private readonly IPushNotificationService _pushNotificationService;
-        private readonly IUserService _userService;
 
         private static readonly SwipeType[] PositiveSwipeTypes = { SwipeType.Like, SwipeType.SuperLike };
 
@@ -24,86 +23,76 @@ namespace MomomiAPI.Services.Implementations
             MomomiDbContext dbContext,
             ICacheService cacheService,
             ILogger<SwipeService> logger,
-            IUserService userService,
             IPushNotificationService pushNotificationService)
         {
             _dbContext = dbContext;
             _cacheService = cacheService;
             _logger = logger;
             _pushNotificationService = pushNotificationService;
-            _userService = userService;
         }
 
-        public async Task<SwipeResult> LikeUser(Guid userId, Guid likedUserId)
+        public async Task<SwipeResult> Swipe(Guid userId, Guid targetUserId, SwipeType swipeType)
         {
+            if (swipeType == SwipeType.Pass)
+            {
+                return await PassUser(userId, targetUserId);
+            }
+
+            var swipeUserData = await GetUserDataForSwipe(userId, targetUserId, swipeType);
+            if (!swipeUserData.IsValid)
+            {
+                return swipeUserData.Error!;
+            }
+
+            return swipeType switch
+            {
+                SwipeType.Like => await LikeUser(swipeUserData),
+                SwipeType.SuperLike => await SuperLikeUser(swipeUserData),
+                _ => SwipeResult.Error("Invalid swipe type", targetUserId)
+            };
+        }
+
+        public async Task<SwipeResult> RewardedSwipe(Guid userId, Guid targetUserId, SwipeType swipeType)
+        {
+            var swipeUserData = await GetUserDataForSwipe(userId, targetUserId, swipeType, true);
+            if (!swipeUserData.IsValid)
+            {
+                return swipeUserData.Error!;
+            }
+
+            // For rewarded swipes, we only allow normal like
+            return await LikeUser(swipeUserData, true);
+        }
+
+        public async Task<SwipeResult> LikeUser(SwipeUserData swipeUserData, bool isRewarded = false)
+        {
+            var currentUser = swipeUserData.CurrentUser;
+            var targetUser = swipeUserData.TargetUser;
+            var isAlreadyLikedByTarget = swipeUserData.IsAlreadyLikedByTarget;
+            var isSuperLikedByTarget = swipeUserData.IsSuperLikedByTarget;
+
             try
             {
-                // Single query to get all user data and validate in one go
-                var userData = await GetUserDataForSwipe(userId, likedUserId);
-                if (!userData.IsValid)
-                {
-                    return userData.Error!;
-                }
-
-                var currentUser = userData.CurrentUser!;
-                var targetUser = userData.TargetUser!;
-
-                // Reset usage limits if needed
-                ResetDailyLimitsIfNeeded(currentUser.UsageLimit!);
-
-                if (HasReachedUsageLimit(currentUser.UsageLimit!, SwipeType.Like, currentUser.Subscription!.SubscriptionType))
-                {
-                    return SwipeResult.LimitReached("Like limit reached. Try again tomorrow", likedUserId);
-                }
-
                 // Use the execution strategy to handle retries and transactions
                 var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
 
                 return await executionStrategy.ExecuteAsync(async () =>
                 {
-
-                    // Use transaction for atomicity
                     using var transaction = await _dbContext.Database.BeginTransactionAsync();
                     try
                     {
-                        // Create swipe record
-                        var swipeRecord = CreateSwipeRecord(userId, likedUserId, SwipeType.Like);
-                        _dbContext.UserSwipes.Add(swipeRecord);
-
-                        // Update usage counter
-                        currentUser.UsageLimit!.LikesUsedToday++;
-                        currentUser.UsageLimit!.UpdatedAt = DateTime.UtcNow;
-
-                        // Check fo match
-                        var isMatch = userData.IsAlreadyLikedByTarget;
-                        if (isMatch)
-                        {
-                            var convSwipeType = userData.IsSuperLikedByTarget ? SwipeType.SuperLike : SwipeType.Like;
-                            var conversationRecord = CreateConversationRecord(userId, likedUserId, convSwipeType);
-                            _dbContext.Conversations.Add(conversationRecord);
-
-                            // Send push notifications if user is not online
-                            var userOnlineStatus = await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(likedUserId));
-
-                            // Updated the line to handle the nullability of `likedUser` and its properties.
-                            if (!userOnlineStatus && targetUser != null && targetUser.NotificationsEnabled && !string.IsNullOrEmpty(targetUser.PushToken))
-                            {
-                                // Fire-and-forget push notification
-                                _ = _pushNotificationService.SendNewMatchNotificationAsync(targetUser.PushToken, currentUser.FirstName ?? "Someone");
-                            }
-                        }
+                        ProcessNewSwipeRecord(currentUser.Id, targetUser.Id, SwipeType.Like, currentUser.UsageLimit!, isRewarded);
+                        ProcessLikeMatch(currentUser, targetUser, swipeUserData, false);
 
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
-                        // Don't wait for cache invalidation - fire and forget
-                        _ = InvalidateRelevantCaches(userId, likedUserId, isMatch);
+                        FireAndForgetHelper.Run(
+                           SendNotificationIfNeeded(currentUser, targetUser, isAlreadyLikedByTarget, false),
+                           _logger,
+                           "Send super like or matched notification");
 
-                        _logger.LogInformation("User {UserId} liked user {LikedUserId}. Match: {IsMatch}",
-                            userId, likedUserId, isMatch);
-
-                        return isMatch ? SwipeResult.MatchCreated(likedUserId) : SwipeResult.LikeRecorded(likedUserId);
-
+                        return isAlreadyLikedByTarget ? SwipeResult.MatchCreated(targetUser.Id) : SwipeResult.LikeRecorded(targetUser.Id);
                     }
                     catch
                     {
@@ -114,82 +103,41 @@ namespace MomomiAPI.Services.Implementations
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error liking between user {UserId} and {TargetUserId}", userId, likedUserId);
-                return SwipeResult.Error("An error occurred while processing your like", likedUserId);
+                _logger.LogError(ex, "Error liking between user {UserId} and {TargetUserId}", currentUser.Id, targetUser.Id);
+                return SwipeResult.Error("An error occurred while processing your like", targetUser.Id);
             }
         }
 
-        public async Task<SwipeResult> SuperLikeUser(Guid userId, Guid likedUserId)
+        public async Task<SwipeResult> SuperLikeUser(SwipeUserData swipeUserData)
         {
+            var currentUser = swipeUserData.CurrentUser;
+            var targetUser = swipeUserData.TargetUser;
+            var isAlreadyLikedByTarget = swipeUserData.IsAlreadyLikedByTarget;
+            var isSuperLikedByTarget = swipeUserData.IsSuperLikedByTarget;
+
             try
             {
-                // Single query to get all user data and validate in one go
-                var userData = await GetUserDataForSwipe(userId, likedUserId);
-                if (!userData.IsValid)
-                {
-                    return userData.Error!;
-                }
-
-                var currentUser = userData.CurrentUser!;
-                var targetUser = userData.TargetUser!;
-
-                // Reset usage limits if needed
-                ResetDailyLimitsIfNeeded(currentUser.UsageLimit!);
-
-                if (HasReachedUsageLimit(currentUser.UsageLimit!, SwipeType.SuperLike, currentUser.Subscription!.SubscriptionType))
-                {
-                    return SwipeResult.SuperLikeLimitReached("Super Like limit reached. Try again tomorrow", likedUserId);
-                }
-
                 // Use the execution strategy to handle retries and transactions
                 var executionStrategy = _dbContext.Database.CreateExecutionStrategy();
                 return await executionStrategy.ExecuteAsync(async () =>
                 {
-
-                    // Use transaction for atomicity
                     using var transaction = await _dbContext.Database.BeginTransactionAsync();
                     try
                     {
-                        // Create swipe record
-                        var swipeRecord = CreateSwipeRecord(userId, likedUserId, SwipeType.SuperLike);
-                        _dbContext.UserSwipes.Add(swipeRecord);
+                        ProcessNewSwipeRecord(currentUser.Id, targetUser.Id, SwipeType.SuperLike, currentUser.UsageLimit);
 
-                        // Update usage counter
-                        currentUser.UsageLimit!.SuperLikesUsedToday++;
-                        currentUser.UsageLimit!.UpdatedAt = DateTime.UtcNow;
-
-                        // Check fo match
-                        var isMatch = userData.IsAlreadyLikedByTarget;
-                        if (isMatch)
-                        {
-                            var conversationRecord = CreateConversationRecord(userId, likedUserId, SwipeType.SuperLike);
-                            _dbContext.Conversations.Add(conversationRecord);
-
-                            // Send push notifications if user is not online
-                            var userOnlineStatus = await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(likedUserId));
-
-                            // Updated the line to handle the nullability of `likedUser` and its properties.
-                            if (!userOnlineStatus && targetUser != null && targetUser.NotificationsEnabled && !string.IsNullOrEmpty(targetUser.PushToken))
-                            {
-
-                                // Fire-and-forget push notification
-                                _ = _pushNotificationService.SendNewMatchNotificationAsync(targetUser.PushToken, currentUser.FirstName ?? "Someone");
-
-                            }
-                        }
+                        ProcessLikeMatch(currentUser, targetUser, swipeUserData, true);
 
                         await _dbContext.SaveChangesAsync();
                         await transaction.CommitAsync();
 
-                        // Don't wait for cache invalidation - fire and forget
-                        _ = InvalidateRelevantCaches(userId, likedUserId);
+                        FireAndForgetHelper.Run(
+                            SendNotificationIfNeeded(currentUser, targetUser, isSuperLikedByTarget, true),
+                            _logger,
+                            "Send super like or matched notification");
 
 
-                        _logger.LogInformation("User {UserId} super liked user {LikedUserId}. Match: {IsMatch}",
-                            userId, likedUserId, isMatch);
-
-                        return isMatch ? SwipeResult.MatchCreated(likedUserId) : SwipeResult.SuperLikeRecorded(likedUserId);
-
+                        return isAlreadyLikedByTarget ? SwipeResult.MatchCreated(targetUser.Id) : SwipeResult.SuperLikeRecorded(targetUser.Id);
                     }
                     catch
                     {
@@ -201,8 +149,8 @@ namespace MomomiAPI.Services.Implementations
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error super liking between user {UserId} and {TargetUserId}", userId, likedUserId);
-                return SwipeResult.Error("An error occurred while processing your super like", likedUserId);
+                _logger.LogError(ex, "Error super liking between user {UserId} and {TargetUserId}", currentUser.Id, targetUser.Id);
+                return SwipeResult.Error("An error occurred while processing your super like", targetUser.Id);
             }
         }
 
@@ -216,11 +164,9 @@ namespace MomomiAPI.Services.Implementations
                     return validationData.Error!;
                 }
 
-                // Single atomic operation (no transaction needed)
-                var swipeRecord = CreateSwipeRecord(userId, dismissedUserId, SwipeType.Pass);
-                _dbContext.UserSwipes.Add(swipeRecord);
+                ProcessNewSwipeRecord(userId, dismissedUserId, SwipeType.Pass);
+
                 await _dbContext.SaveChangesAsync();
-                _logger.LogInformation("User {UserId} passed user {DismissedUserId}", userId, dismissedUserId);
 
                 return SwipeResult.PassRecorded(dismissedUserId);
             }
@@ -232,7 +178,7 @@ namespace MomomiAPI.Services.Implementations
             }
         }
 
-        public async Task<SwipeResult> UndoLastSwipe(Guid userId)
+        public async Task<SwipeResult> UndoSwipe(Guid userId)
         {
             try
             {
@@ -266,19 +212,23 @@ namespace MomomiAPI.Services.Implementations
         }
 
         // Single optimized query for all validation
-        private async Task<SwipeUserData> GetUserDataForSwipe(Guid userId, Guid targetUserId)
+        private async Task<SwipeUserData> GetUserDataForSwipe(Guid userId, Guid targetUserId, SwipeType swipeType, bool isRewarded = false)
         {
             // Single query that gets all needed data
             var currentUser = await _dbContext.Users
                 .Include(u => u.UsageLimit)
                 .Include(u => u.Subscription)
                 .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
-            var userResult = await _userService.GetUserProfileAsync(userId);
-            if (!userResult.Success || userResult.Data == null)
+
+            if (currentUser == null)
             {
-                return SwipeUserData.Invalid(SwipeResult.Error("Current user profile not found or inactive"));
+                return SwipeUserData.Invalid(SwipeResult.UserNotFound(userId));
             }
-            var userDto = userResult.Data.User;
+
+            if (HasLimitReached(currentUser, swipeType, isRewarded))
+            {
+                return SwipeUserData.Invalid(SwipeResult.LimitReached("Like limit reached. Try again tomorrow", targetUserId));
+            }
 
             // Batch query for all validations
             var validationData = await _dbContext.Users
@@ -287,17 +237,13 @@ namespace MomomiAPI.Services.Implementations
                 {
                     TargetUser = u,
                     IsReported = _dbContext.UserReports
-                        .Any(ur => ur.ReportedEmail == userDto.Email && ur.ReporterEmail == u.Email),
-                    ExistingSwipe = _dbContext.UserSwipes
-                        .Any(us => us.SwiperUserId == userId && us.SwipedUserId == targetUserId),
-                    IsAlreadyLikedByTarget = _dbContext.UserSwipes
-                        .Any(us => us.SwiperUserId == targetUserId
+                        .Any(ur => ur.ReportedEmail == currentUser.Email && ur.ReporterEmail == u.Email),
+                    ExistingTargetSwipeType = _dbContext.UserSwipes
+                        .Where(us => us.SwiperUserId == targetUserId
                             && us.SwipedUserId == userId
-                            && PositiveSwipeTypes.Contains(us.SwipeType)),
-                    ExistingSwipeType = _dbContext.UserSwipes
-                        .Where(us => us.SwiperUserId == userId && us.SwipedUserId == targetUserId)
-                        .Select(us => us.SwipeType)
-                        .FirstOrDefault()
+                            && PositiveSwipeTypes.Contains(us.SwipeType)).Select(us => us.SwipeType).FirstOrDefault(),
+                    ExistingUserSwipe = _dbContext.UserSwipes
+                        .Any(us => us.SwiperUserId == userId && us.SwipedUserId == targetUserId),
                 })
                 .FirstOrDefaultAsync();
 
@@ -311,69 +257,14 @@ namespace MomomiAPI.Services.Implementations
                 return SwipeUserData.Invalid(SwipeResult.UserBlocked(targetUserId));
             }
 
-            if (validationData.ExistingSwipe)
+            if (validationData.ExistingUserSwipe)
             {
                 return SwipeUserData.Invalid(SwipeResult.UserAlreadyProcessed(targetUserId));
             }
 
-            return SwipeUserData.Valid(currentUser, validationData.TargetUser, validationData.IsAlreadyLikedByTarget, validationData.ExistingSwipeType == SwipeType.SuperLike);
+            return SwipeUserData.Valid(currentUser, validationData.TargetUser, Convert.ToBoolean(validationData.ExistingTargetSwipeType), validationData.ExistingTargetSwipeType == SwipeType.SuperLike);
         }
 
-        // Usage limit logic 
-        private static bool HasReachedUsageLimit(UserUsageLimit usageLimit, SwipeType swipeType, SubscriptionType subscriptionType)
-        {
-            var (dailyLimit, usedToday) = (subscriptionType, swipeType) switch
-            {
-                (SubscriptionType.Free, SwipeType.Like) =>
-                    (AppConstants.Limits.FreeUserDailyLikes, usageLimit.LikesUsedToday),
-                (SubscriptionType.Free, SwipeType.SuperLike) =>
-                    (AppConstants.Limits.FreeUserDailySuperLikes, usageLimit.SuperLikesUsedToday),
-                (SubscriptionType.Premium, SwipeType.Like) =>
-                    (AppConstants.Limits.PremiumUserDailyLikes, usageLimit.LikesUsedToday),
-                (SubscriptionType.Premium, SwipeType.SuperLike) =>
-                    (AppConstants.Limits.PremiumUserDailySuperLikes, usageLimit.SuperLikesUsedToday),
-                _ => (0, int.MaxValue)
-            };
-
-            return usedToday >= dailyLimit;
-        }
-
-        // Reset daily limits if needed
-        private static void ResetDailyLimitsIfNeeded(UserUsageLimit usageLimit)
-        {
-            var twentyFourHoursAgo = DateTime.UtcNow.AddHours(-24);
-
-            if (usageLimit.LastResetDate.Date < twentyFourHoursAgo)
-            {
-                usageLimit.LikesUsedToday = 0;
-                usageLimit.SuperLikesUsedToday = 0;
-                usageLimit.AdsWatchedToday = 0;
-                usageLimit.LastResetDate = DateTime.UtcNow.Date;
-            }
-        }
-
-
-        // Cache Invalidation for related data
-        private async Task InvalidateRelevantCaches(Guid userId, Guid targetUserId, bool isMatch = false)
-        {
-            // Only invalidate if it was a match
-            if (isMatch)
-            {
-                var keysToRemove = new List<string>
-                {
-                    CacheKeys.Matching.UserMatches(userId),
-                    CacheKeys.Matching.UserMatches(targetUserId),
-                    CacheKeys.Messaging.UserConversations(userId),
-                    CacheKeys.Messaging.UserConversations(targetUserId),
-                };
-
-                await _cacheService.RemoveManyAsync(keysToRemove);
-            }
-
-            _logger.LogDebug("Invalidated caches after swiping for {UserId}", userId);
-        }
-
-        // Validation for PassUser - single query
         private async Task<PassUserValidation> ValidatePassUser(Guid userId, Guid targetUserId)
         {
             var validationData = await _dbContext.Users
@@ -397,6 +288,135 @@ namespace MomomiAPI.Services.Implementations
             }
 
             return PassUserValidation.Valid();
+        }
+
+        private static bool HasLimitReached(User user, SwipeType swipeType, bool isRewarded = false)
+        {
+            if (user.Subscription == null || user.UsageLimit == null)
+            {
+                return true; // No subscription or usage limit record means no swipes allowed
+            }
+
+            ResetDailyLimitsIfNeeded(user.UsageLimit);
+
+            var subscriptionType = user.Subscription.SubscriptionType;
+            var usageLimit = user.UsageLimit;
+
+            if (isRewarded)
+            {
+                var dailyLimit = AppConstants.Limits.FreeUserDailyAds;
+                var usedToday = usageLimit.AdsWatchedToday;
+                return usedToday >= dailyLimit;
+            }
+            else
+            {
+
+                var (dailyLimit, usedToday) = (subscriptionType, swipeType) switch
+                {
+                    (SubscriptionType.Free, SwipeType.Like) =>
+                        (AppConstants.Limits.FreeUserDailyLikes, usageLimit.LikesUsedToday),
+                    (SubscriptionType.Free, SwipeType.SuperLike) =>
+                        (AppConstants.Limits.FreeUserDailySuperLikes, usageLimit.SuperLikesUsedToday),
+                    (SubscriptionType.Premium, SwipeType.Like) =>
+                        (AppConstants.Limits.PremiumUserDailyLikes, usageLimit.LikesUsedToday),
+                    (SubscriptionType.Premium, SwipeType.SuperLike) =>
+                        (AppConstants.Limits.PremiumUserDailySuperLikes, usageLimit.SuperLikesUsedToday),
+                    _ => (0, int.MaxValue)
+                };
+                return usedToday >= dailyLimit;
+            }
+        }
+
+        private static void ResetDailyLimitsIfNeeded(UserUsageLimit usageLimit)
+        {
+            var twentyFourHoursAgo = DateTime.UtcNow.AddHours(-24);
+
+            if (usageLimit.LastResetDate.Date < twentyFourHoursAgo)
+            {
+                usageLimit.LikesUsedToday = 0;
+                usageLimit.SuperLikesUsedToday = 0;
+                usageLimit.AdsWatchedToday = 0;
+                usageLimit.LastResetDate = DateTime.UtcNow.Date;
+            }
+        }
+
+        private void ProcessNewSwipeRecord(Guid currentUserId, Guid targetUserId, SwipeType swipeType, UserUsageLimit usageLimit = null, bool isRewarded = false)
+        {
+            var swipeRecord = CreateSwipeRecord(currentUserId, targetUserId, swipeType);
+            _dbContext.UserSwipes.Add(swipeRecord);
+
+            if (usageLimit != null)
+            {
+                // Update usage counter
+                if (isRewarded)
+                {
+                    usageLimit!.AdsWatchedToday++;
+                }
+                else if (swipeType == SwipeType.Like)
+                {
+                    usageLimit!.LikesUsedToday++;
+                }
+                else if (swipeType == SwipeType.SuperLike)
+                {
+                    usageLimit!.SuperLikesUsedToday++;
+                }
+                usageLimit!.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        private void ProcessLikeMatch(User currentUser, User targetUser, SwipeUserData swipeData, bool isSuperLikedByUser = false)
+        {
+            // Check fo match
+            if (swipeData.IsAlreadyLikedByTarget)
+            {
+                var convSwipeType = (swipeData.IsSuperLikedByTarget || isSuperLikedByUser) ? SwipeType.SuperLike : SwipeType.Like;
+                var conversationRecord = CreateConversationRecord(currentUser.Id, targetUser.Id, convSwipeType);
+                _dbContext.Conversations.Add(conversationRecord);
+
+                // Don't wait for cache invalidation - fire and forget
+                FireAndForgetHelper.Run(
+                    InvalidateRelevantCaches(currentUser.Id, targetUser.Id, swipeData.IsAlreadyLikedByTarget),
+                    _logger,
+                    "Invalidate caches after like match");
+            }
+        }
+
+        private async Task SendNotificationIfNeeded(User currentUser, User targetUser, bool isAlreadyLikedByTarget, bool IsSuperLikedByUser)
+        {
+            // Send push notifications if user is not online
+            var isTargetUserOnline = await _cacheService.GetAsync<bool>(CacheKeys.Users.OnlineStatus(targetUser.Id));
+            var canSendNotification = !isTargetUserOnline && targetUser.NotificationsEnabled && !string.IsNullOrEmpty(targetUser.PushToken);
+
+            if (isAlreadyLikedByTarget && canSendNotification)
+            {
+                await _pushNotificationService.SendNewMatchNotificationAsync(targetUser.PushToken!, currentUser.FirstName ?? "Someone");
+            }
+            else if (canSendNotification)
+            {
+                await _pushNotificationService.SendLikeNotificationAsync(targetUser.PushToken!, currentUser.FirstName ?? "Someone");
+            }
+        }
+
+        private async Task InvalidateRelevantCaches(Guid userId, Guid targetUserId, bool isMatch = false)
+        {
+            var keysToRemove = new List<string>
+            {
+                CacheKeys.Users.Profile(userId)
+            };
+
+            if (isMatch)
+            {
+                keysToRemove.AddRange([
+                    CacheKeys.Matching.UserMatches(userId),
+                    CacheKeys.Matching.UserMatches(targetUserId),
+                    CacheKeys.Messaging.UserConversations(userId),
+                    CacheKeys.Messaging.UserConversations(targetUserId)
+                ]);
+            }
+
+            await _cacheService.RemoveManyAsync(keysToRemove);
+
+            _logger.LogDebug("Invalidated caches after swiping for {UserId}", userId);
         }
 
         private static UserSwipe CreateSwipeRecord(Guid userId, Guid targetUserId, SwipeType swipeType)
@@ -423,7 +443,5 @@ namespace MomomiAPI.Services.Implementations
                 SwipeType = swipeType
             };
         }
-
-
     }
 }

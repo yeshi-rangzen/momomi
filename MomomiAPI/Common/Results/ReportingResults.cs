@@ -1,64 +1,35 @@
 ﻿using MomomiAPI.Models.DTOs;
-using MomomiAPI.Models.Enums;
 using static MomomiAPI.Common.Constants.AppConstants;
 
 namespace MomomiAPI.Common.Results
 {
     /// User report submission data
-    public class UserReportData
-    {
-        public Guid ReportId { get; set; }
-        public Guid ReportedUserId { get; set; }
-        public ReportReason Reason { get; set; }
-        public string? Description { get; set; }
-        public bool MatchRemoved { get; set; }
-        public bool ConversationDeleted { get; set; }
-        public DateTime ReportedAt { get; set; }
-    }
 
-    public class UserReportResult : OperationResult<UserReportData>
+    public class UserReportResult : OperationResult
     {
-        private UserReportResult(bool success, UserReportData? data, string? errorCode = null,
+        private UserReportResult(bool success, string? errorCode = null,
             string? errorMessage = null, Dictionary<string, object>? metadata = null)
-            : base(success, data, errorCode, errorMessage, metadata)
+            : base(success, errorCode, errorMessage, metadata)
         {
-        }
-
-        public static UserReportResult Successful(Guid reportId, Guid reportedUserId, ReportReason reason,
-            string? description, bool matchRemoved, bool conversationDeleted,
-            Dictionary<string, object>? metadata = null)
-        {
-            var data = new UserReportData
-            {
-                ReportId = reportId,
-                ReportedUserId = reportedUserId,
-                Reason = reason,
-                Description = description,
-                MatchRemoved = matchRemoved,
-                ConversationDeleted = conversationDeleted,
-                ReportedAt = DateTime.UtcNow
-            };
-
-            return new UserReportResult(true, data, null, null, metadata);
         }
 
         public static UserReportResult AlreadyReported()
-            => new(false, null, ErrorCodes.BUSINESS_RULE_VIOLATION,
+            => new(false, ErrorCodes.BUSINESS_RULE_VIOLATION,
                 "You have already reported this user");
 
         public static UserReportResult UserNotFound()
-            => new(false, null, ErrorCodes.USER_NOT_FOUND,
+            => new(false, ErrorCodes.USER_NOT_FOUND,
                 "User not found or inactive");
 
         public static UserReportResult CannotReportSelf()
-            => new(false, null, ErrorCodes.BUSINESS_RULE_VIOLATION,
+            => new(false, ErrorCodes.BUSINESS_RULE_VIOLATION,
                 "You cannot report yourself");
 
         public static UserReportResult ValidationError(string message)
-            => new(false, null, ErrorCodes.VALIDATION_ERROR, message);
+            => new(false, ErrorCodes.VALIDATION_ERROR, message);
 
         public static UserReportResult Error(string message)
-            => new(false, null, ErrorCodes.INTERNAL_SERVER_ERROR, message);
+            => new(false, ErrorCodes.INTERNAL_SERVER_ERROR, message);
     }
 
     /// Block user data
@@ -71,43 +42,28 @@ namespace MomomiAPI.Common.Results
         public DateTime BlockedAt { get; set; }
     }
 
-    public class BlockUserResult : OperationResult<BlockUserData>
+    public class BlockUserResult : OperationResult
     {
-        private BlockUserResult(bool success, BlockUserData? data, string? errorCode = null,
+        private BlockUserResult(bool success, string? errorCode = null,
             string? errorMessage = null, Dictionary<string, object>? metadata = null)
-            : base(success, data, errorCode, errorMessage, metadata)
+            : base(success, errorCode, errorMessage, metadata)
         {
-        }
-
-        public static BlockUserResult Successful(Guid blockedUserId, bool matchRemoved,
-            bool conversationDeleted, int messagesDeleted, Dictionary<string, object>? metadata = null)
-        {
-            var data = new BlockUserData
-            {
-                BlockedUserId = blockedUserId,
-                MatchRemoved = matchRemoved,
-                ConversationDeleted = conversationDeleted,
-                MessagesDeleted = messagesDeleted,
-                BlockedAt = DateTime.UtcNow
-            };
-
-            return new BlockUserResult(true, data, null, null, metadata);
         }
 
         public static BlockUserResult AlreadyBlocked()
-            => new(false, null, ErrorCodes.BUSINESS_RULE_VIOLATION,
+            => new(false, ErrorCodes.BUSINESS_RULE_VIOLATION,
                 "You have already blocked this user");
 
         public static BlockUserResult UserNotFound()
-            => new(false, null, ErrorCodes.USER_NOT_FOUND,
+            => new(false, ErrorCodes.USER_NOT_FOUND,
                 "User not found or inactive");
 
         public static BlockUserResult CannotBlockSelf()
-            => new(false, null, ErrorCodes.BUSINESS_RULE_VIOLATION,
+            => new(false, ErrorCodes.BUSINESS_RULE_VIOLATION,
                 "You cannot block yourself");
 
         public static BlockUserResult Error(string message)
-            => new(false, null, ErrorCodes.INTERNAL_SERVER_ERROR, message);
+            => new(false, ErrorCodes.INTERNAL_SERVER_ERROR, message);
     }
 
     /// User reports list data

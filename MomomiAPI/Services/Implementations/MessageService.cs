@@ -568,8 +568,6 @@ namespace MomomiAPI.Services.Implementations
                 TotalCount = conversationDtos.Count,
                 UnreadConversationsCount = conversationDtos.Count(c => c.UnreadCount > 0),
                 TotalUnreadMessages = conversationDtos.Sum(c => c.UnreadCount),
-                LastUpdated = DateTime.UtcNow,
-                FromCache = false
             };
         }
 

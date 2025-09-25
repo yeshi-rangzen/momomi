@@ -1,12 +1,12 @@
 ﻿using MomomiAPI.Common.Results;
+using MomomiAPI.Models.Enums;
 
 namespace MomomiAPI.Services.Interfaces
 {
     public interface ISwipeService
     {
-        Task<SwipeResult> LikeUser(Guid userId, Guid likedUserId);
-        Task<SwipeResult> SuperLikeUser(Guid userId, Guid likedUserId);
-        Task<SwipeResult> PassUser(Guid userId, Guid dismissedUserId);
-        Task<SwipeResult> UndoLastSwipe(Guid userId);
+        Task<SwipeResult> Swipe(Guid userId, Guid likedUserId, SwipeType swipeType);
+        Task<SwipeResult> RewardedSwipe(Guid userId, Guid likedUserId, SwipeType swipeType);
+        Task<SwipeResult> UndoSwipe(Guid userId);
     }
 }

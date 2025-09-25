@@ -199,7 +199,7 @@ namespace MomomiAPI.Services.Implementations
 
                 if (userDto != null)
                 {
-                    _ = InvalidateProfileCaches(userDto, true);
+                    await InvalidateProfileCaches(userDto, true);
                 }
 
                 _logger.LogInformation("Successfully updated discovery filters for user {UserId}, filters: {Filters}",
@@ -397,13 +397,19 @@ namespace MomomiAPI.Services.Implementations
 
             if (user?.UsageLimit != null)
             {
-                ResetDailyLimitsIfNeeded(user.UsageLimit);
+                bool limitsReset = ResetDailyLimitsIfNeeded(user.UsageLimit);
+
+                if (limitsReset)
+                {
+                    // Persist changes to the database
+                    await _dbContext.SaveChangesAsync();
+                }
             }
 
             return user != null ? UserMapper.UserToDTO(user) : null;
         }
 
-        private static void ResetDailyLimitsIfNeeded(UserUsageLimit usageLimit)
+        private static bool ResetDailyLimitsIfNeeded(UserUsageLimit usageLimit)
         {
             var twentyFourHoursAgo = DateTime.UtcNow.AddHours(-24);
 
@@ -413,7 +419,9 @@ namespace MomomiAPI.Services.Implementations
                 usageLimit.SuperLikesUsedToday = 0;
                 usageLimit.AdsWatchedToday = 0;
                 usageLimit.LastResetDate = DateTime.UtcNow.Date;
+                return true;
             }
+            return false;
         }
 
 
@@ -796,16 +804,16 @@ namespace MomomiAPI.Services.Implementations
             // Set updated profile in cache
             await _cacheService.SetAsync(CacheKeys.Users.Profile(userDto.Id), userDto, CacheKeys.Duration.UserProfile);
 
-            if (requiresDiscoveryRefresh)
-            {
-                var keysToInvalidate = new List<string>
-                {
-                    CacheKeys.Discovery.GlobalResults(userDto.Id),
-                    CacheKeys.Discovery.LocalResults(userDto.Id)
-                };
+            //if (requiresDiscoveryRefresh)
+            //{
+            //    var keysToInvalidate = new List<string>
+            //    {
+            //        CacheKeys.Discovery.GlobalResults(userDto.Id),
+            //        CacheKeys.Discovery.LocalResults(userDto.Id)
+            //    };
 
-                await _cacheService.RemoveManyAsync(keysToInvalidate);
-            }
+            //    await _cacheService.RemoveManyAsync(keysToInvalidate);
+            //}
 
             _logger.LogDebug("Invalidated cache keys for user {UserId}", userDto.Id);
         }

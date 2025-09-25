@@ -19,12 +19,29 @@ namespace MomomiAPI.Services.Implementations
             var payload = new
             {
                 to = deviceToken,
-                title = "It's a Match! 🎉",
-                body = $"You and {matchName} have matched.",
+                title = "❤️It's a Match!",
+                body = $"You and {matchName} have matched",
                 data = new
                 {
                     type = "newMatch",
                     matchName = matchName
+                }
+            };
+
+            await SendNotificationAsync(payload);
+        }
+
+        public async Task SendLikeNotificationAsync(string deviceToken, string senderName)
+        {
+            var payload = new
+            {
+                to = deviceToken,
+                title = "✨New Like",
+                body = "You received a new like",
+                data = new
+                {
+                    type = "superLiked",
+                    sender = senderName
                 }
             };
 
@@ -35,7 +52,7 @@ namespace MomomiAPI.Services.Implementations
             var payload = new
             {
                 to = deviceToken,
-                title = $"New Message from {senderName}",
+                title = $"✨New Message from {senderName}",
                 body = message,
                 data = new
                 {

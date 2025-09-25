@@ -100,8 +100,6 @@ namespace MomomiAPI.Common.Results
         public int TotalCount { get; set; }
         public int UnreadConversationsCount { get; set; }
         public int TotalUnreadMessages { get; set; }
-        public DateTime LastUpdated { get; set; }
-        public bool FromCache { get; set; }
     }
 
     public class UserConversationsResult : OperationResult<UserConversationsData>
@@ -122,8 +120,6 @@ namespace MomomiAPI.Common.Results
                 TotalCount = totalCount,
                 UnreadConversationsCount = unreadConversationsCount,
                 TotalUnreadMessages = totalUnreadMessages,
-                LastUpdated = DateTime.UtcNow,
-                FromCache = fromCache
             };
 
             return new UserConversationsResult(true, data, null, null, metadata);

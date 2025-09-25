@@ -23,7 +23,7 @@ namespace MomomiAPI.Controllers
         /// Report a user for policy violations
         /// </summary>
         [HttpPost("report")]
-        public async Task<ActionResult<OperationResult<UserReportData>>> ReportUser([FromBody] ReportUserRequest request)
+        public async Task<ActionResult<OperationResult>> ReportUser([FromBody] ReportUserRequest request)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;
@@ -49,7 +49,7 @@ namespace MomomiAPI.Controllers
         /// Block a user and remove all interactions
         /// </summary>
         [HttpPost("block")]
-        public async Task<ActionResult<OperationResult<BlockUserData>>> BlockUser([FromBody] BlockUserRequest request)
+        public async Task<ActionResult<OperationResult>> BlockUser([FromBody] BlockUserRequest request)
         {
             var userIdResult = GetCurrentUserIdOrUnauthorized();
             if (userIdResult.Result != null) return userIdResult.Result;

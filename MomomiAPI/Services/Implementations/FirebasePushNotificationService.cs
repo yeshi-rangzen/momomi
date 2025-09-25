@@ -13,5 +13,10 @@ namespace MomomiAPI.Services.Implementations
         {
             throw new NotImplementedException();
         }
+
+        public Task SendLikeNotificationAsync(string deviceToken, string senderName)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

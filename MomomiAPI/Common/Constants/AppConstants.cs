@@ -8,7 +8,7 @@
             public const int FreeUserDailySuperLikes = 1;
             public const int PremiumUserDailyLikes = 50;
             public const int PremiumUserDailySuperLikes = 10;
-            public const int FreeUserDailyAds = 10;
+            public const int FreeUserDailyAds = 3;
             public const int MaxPhotosPerUser = 6;
             public const int MinPhotosRequired = 3;
             public const int MaxConversationMessagesPerPage = 50;
