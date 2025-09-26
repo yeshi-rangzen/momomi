@@ -679,20 +679,8 @@ namespace MomomiAPI.Services.Implementations
             // Location updates
             if (request.Latitude.HasValue && request.Longitude.HasValue)
             {
-                var oldLat = user.Latitude;
-                var oldLon = user.Longitude;
-
-                user.Latitude = (decimal)request.Latitude.Value;
-                user.Longitude = (decimal)request.Longitude.Value;
-
-                // Check if location changed significantly (>1km)
-                if (oldLat != 0 && oldLon != 0)
-                {
-                    var distance = LocationHelper.CalculateDistance(
-                        oldLat, oldLon,
-                        (decimal)request.Latitude.Value, (decimal)request.Longitude.Value);
-                }
-
+                user.Latitude = request.Latitude.Value;
+                user.Longitude = request.Longitude.Value;
                 updatedFilters.Add("Location");
             }
 

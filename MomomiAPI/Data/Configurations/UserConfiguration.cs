@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 
+
 namespace MomomiAPI.Data.Configurations
 {
     public class UserConfiguration : IEntityTypeConfiguration<User>
@@ -142,6 +143,13 @@ namespace MomomiAPI.Data.Configurations
                 .WithOne(p => p.User)
                 .HasForeignKey<UserPreference>(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Property(u => u.Location)
+                .HasColumnType("geography (point,4326)"); // PostGIS geography
+
+            builder.HasIndex(u => u.Location)
+                .HasDatabaseName("idx_users_location")
+                .HasMethod("GIST"); // Postgres GIST index for spatial queries
         }
 
         // Helper method to clean and parse enum values

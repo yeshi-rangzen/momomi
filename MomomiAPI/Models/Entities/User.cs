@@ -1,6 +1,8 @@
 ﻿using MomomiAPI.Models.Enums;
+using NetTopologySuite.Geometries;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+
 
 namespace MomomiAPI.Models.Entities
 {
@@ -58,12 +60,14 @@ namespace MomomiAPI.Models.Entities
         // LOCATION & GEOGRAPHY
         // Geographic location and area information
         // ========================================
+        [Column("location", TypeName = "geography (point, 4326)")]
+        public required Point Location { get; set; }
 
-        [Column("latitude", TypeName = "decimal(10,8)")]
-        public decimal Latitude { get; set; }
+        [Column("latitude")]
+        public double Latitude { get; set; }
 
-        [Column("longitude", TypeName = "decimal(11,8)")]
-        public decimal Longitude { get; set; }
+        [Column("longitude")]
+        public double Longitude { get; set; }
 
         [Column("hometown")]
         [MaxLength(200)]

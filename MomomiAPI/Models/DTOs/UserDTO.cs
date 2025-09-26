@@ -18,8 +18,8 @@ namespace MomomiAPI.Models.DTOs
         public string? Bio { get; set; }
 
         // Location information
-        public decimal Latitude { get; set; }
-        public decimal Longitude { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
         public required string Hometown { get; set; }
         public string? Neighbourhood { get; set; }
 

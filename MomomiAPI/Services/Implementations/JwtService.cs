@@ -433,6 +433,7 @@ namespace MomomiAPI.Services.Implementations
                     LastName = u.LastName,
                     IsVerified = u.IsVerified,
                     IsOnboarding = u.IsOnboarding,
+                    Location = u.Location
                 })
                 .FirstOrDefaultAsync();
         }

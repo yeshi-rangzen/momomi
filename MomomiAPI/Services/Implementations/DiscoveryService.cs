@@ -3,9 +3,10 @@ using MomomiAPI.Common.Results;
 using MomomiAPI.Data;
 using MomomiAPI.Helpers;
 using MomomiAPI.Models.DTOs;
-using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
+using NetTopologySuite.Geometries;
+using User = MomomiAPI.Models.Entities.User;
 
 namespace MomomiAPI.Services.Implementations
 {
@@ -63,26 +64,21 @@ namespace MomomiAPI.Services.Implementations
 
         private async Task<List<User>> DiscoverLocalCandidatesAsync(UserDTO currentUser, int maxResults)
         {
-            // For local discovery, we need to handle distance filtering differently
-            // due to the complexity of SQL-based distance calculations
-
             var query = BuildBaseCandidateQuery(currentUser).Where(u => u.Latitude != 0 && u.Longitude != 0);
 
-            var candidateBatch = await query
-                .OrderBy(u => u.LastActive) // Add some ordering for consistency
-                .Take(200)
+            var userLng = currentUser.Longitude;
+            var userLat = currentUser.Latitude;
+            var maxDistanceMeters = currentUser.MaxDistanceKm * 1000;
+            var currentLocation = new Point(userLng, userLat) { SRID = 4326 };
+
+            var candidates = await query
+                .Where(u => u.Location.Distance(currentLocation) <= maxDistanceMeters)
+                .OrderBy(u => u.LastActive)
+                .Take(30)
                 .ToListAsync();
 
-            // Apply distance filtering in memory (unavoidable for complex distance calculations)
-            var localCandidates = candidateBatch
-                .Where(u => LocationHelper.IsWithinDistance(
-                    currentUser.Latitude, currentUser.Longitude,
-                    u.Latitude, u.Longitude,
-                    currentUser.MaxDistanceKm))
-                .ToList();
-
             // Apply preference filters
-            var filteredCandidates = ApplyPreferenceFilters(localCandidates, currentUser);
+            var filteredCandidates = ApplyPreferenceFilters(candidates, currentUser);
 
             // Apply premium filters if user is a subscriber
             if (IsActiveSubscriber(currentUser))
@@ -92,18 +88,21 @@ namespace MomomiAPI.Services.Implementations
 
             var finalResults = filteredCandidates.Take(maxResults).ToList();
 
-            _logger.LogInformation("Local discovery for user {UserId}: Found {Count}/{BatchSize} users within {Distance}km after all filtering",
-                currentUser.Id, finalResults.Count, candidateBatch.Count, currentUser.MaxDistanceKm);
+            _logger.LogInformation("Local discovery for user {UserId}: Found {Count}/{CandidatesSize} users within {Distance}km after all filtering",
+                currentUser.Id, finalResults.Count, candidates.Count, currentUser.MaxDistanceKm);
 
             return finalResults;
         }
 
         private async Task<List<User>> DiscoverGlobalCandidatesAsync(UserDTO currentUser, int maxResults)
         {
-            var candidates = await BuildBaseCandidateQuery(currentUser)
-                .OrderByDescending(u => u.LastActive) // Prioritize recently active users
+            var query = BuildBaseCandidateQuery(currentUser);
+
+            var candidates = await query.Where(u => u.IsGloballyDiscoverable).
+                OrderByDescending(u => u.LastActive) // Prioritize recently active users
                 .Take(maxResults * 3) // Get 3x more to account for preference filtering
-                .ToListAsync();
+                .ToListAsync(); ;
+
 
             // Apply preference filters in memory
             var filteredCandidates = ApplyPreferenceFilters(candidates, currentUser);
@@ -124,14 +123,6 @@ namespace MomomiAPI.Services.Implementations
 
         private IQueryable<User> BuildBaseCandidateQuery(UserDTO currentUser)
         {
-            var swipedUserIdsQuery = _dbContext.UserSwipes
-               .Where(ul => ul.SwiperUserId == currentUser.Id)
-               .Select(ul => ul.SwipedUserId);
-
-            var reportExclusionQuery = _dbContext.UserReports
-                .Where(ur => ur.ReporterEmail == currentUser.Email || ur.ReportedEmail == currentUser.Email)
-                .Select(ur => ur.ReporterEmail == currentUser.Email ? ur.ReportedEmail : ur.ReporterEmail);
-
             // Age filters
             var today = DateTime.UtcNow.Date;
             var minBirthDate = today.AddYears(-currentUser.MaxAge);
@@ -140,15 +131,14 @@ namespace MomomiAPI.Services.Implementations
             var query = _dbContext.Users
                 .Include(u => u.Preferences)
                 .Include(u => u.Photos)
-                .Where(u => u.IsActive
-                    && u.IsDiscoverable
-                    && u.Id != currentUser.Id
-                    && u.InterestedIn == currentUser.Gender
-                    && !swipedUserIdsQuery.Contains(u.Id)
-                    && !reportExclusionQuery.Contains(u.Email)
-                    && u.DateOfBirth >= minBirthDate && u.DateOfBirth <= maxBirthDate
-                    && u.IsGloballyDiscoverable == currentUser.EnableGlobalDiscovery // Global constraint
-                    );
+                .Where(u => u.IsActive && u.IsDiscoverable && u.Id != currentUser.Id)
+                .Where(u => u.InterestedIn == currentUser.Gender)
+                .Where(u => !_dbContext.UserSwipes.Any(s => s.SwiperUserId == currentUser.Id && s.SwipedUserId == u.Id))
+                .Where(u => !_dbContext.UserReports.Any(r =>
+                    (r.ReporterEmail == currentUser.Email && r.ReportedEmail == u.Email) ||
+                    (r.ReportedEmail == currentUser.Email && r.ReporterEmail == u.Email)
+                ))
+                .Where(u => u.DateOfBirth >= minBirthDate && u.DateOfBirth <= maxBirthDate);
 
             return query;
         }

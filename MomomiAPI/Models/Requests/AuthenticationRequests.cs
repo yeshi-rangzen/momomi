@@ -52,9 +52,9 @@ namespace MomomiAPI.Models.Requests
             public string Hometown { get; set; } = string.Empty;
 
             [Required]
-            public decimal Latitude { get; set; }
+            public double Latitude { get; set; }
             [Required]
-            public decimal Longitude { get; set; }
+            public double Longitude { get; set; }
             public string? Neighbourhood { get; set; } = string.Empty;
 
 

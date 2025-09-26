@@ -7,6 +7,7 @@ using MomomiAPI.Helpers;
 using MomomiAPI.Models.Entities;
 using MomomiAPI.Models.Enums;
 using MomomiAPI.Services.Interfaces;
+using NetTopologySuite.Geometries;
 using Supabase.Gotrue;
 using System.Text.Json.Serialization;
 using static MomomiAPI.Models.Requests.AuthenticationRequests;
@@ -334,6 +335,10 @@ namespace MomomiAPI.Services.Implementations
                 Heritage = request.Heritage,
                 Religion = request.Religion,
                 LanguagesSpoken = request.LanguagesSpoken,
+                Location = new Point(request.Latitude, request.Longitude)
+                {
+                    SRID = 4326 // WGS84 standard for geospatial
+                },
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 Neighbourhood = request.Neighbourhood,

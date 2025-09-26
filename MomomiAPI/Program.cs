@@ -67,6 +67,7 @@ builder.Services.AddDbContext<MomomiDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
         npgsqlOptions =>
         {
+            npgsqlOptions.UseNetTopologySuite();
             npgsqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(5),
