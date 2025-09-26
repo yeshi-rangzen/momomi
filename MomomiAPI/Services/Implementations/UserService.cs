@@ -86,10 +86,24 @@ namespace MomomiAPI.Services.Implementations
                     return UserProfileResult.UserNotFound();
                 }
 
+                if (user?.UsageLimit != null)
+                {
+                    bool limitsReset = ResetDailyLimitsIfNeeded(user.UsageLimit);
+
+                    if (limitsReset)
+                    {
+                        // Persist changes to the database
+                        await _dbContext.SaveChangesAsync();
+                    }
+                }
+
                 var userDto = UserMapper.UserToDTO(user);
 
                 var cacheKey = CacheKeys.Users.Profile(userDto.Id);
-                _ = _cacheService.SetAsync(cacheKey, userDto, CacheKeys.Duration.UserProfile);
+                FireAndForgetHelper.Run(
+                    _cacheService.SetAsync(cacheKey, userDto, CacheKeys.Duration.UserProfile),
+                    _logger,
+                    "Setting Profile in cache");
 
                 _logger.LogDebug("Retrieved profile for user {UserId}", userDto.Id);
                 return UserProfileResult.Successful(userDto);

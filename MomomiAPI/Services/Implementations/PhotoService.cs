@@ -630,29 +630,34 @@ namespace MomomiAPI.Services.Implementations
         {
             try
             {
+                //using var stream = file.OpenReadStream();
+                //using var ms = new MemoryStream();
+                //await stream.CopyToAsync(ms);
+                //return ms;
+
                 using var inputStream = file.OpenReadStream();
                 using var image = await Image.LoadAsync(inputStream);
 
                 _logger.LogDebug("Processing image: {Width}x{Height}, Size: {Size}KB",
-                    image.Width, image.Height, file.Length / 1024);
+                image.Width, image.Height, file.Length / 1024);
 
-                // Check if image is already mobile-processed (1080x1350 with 4:5 ratio)
+                //return await ApplyMinimalProcessing(image, file.ContentType);
+
+                //Check if image is already mobile - processed(1080x1350 with 4:5 ratio)
                 var isMobileProcessed = IsMobileProcessedImage(image.Width, image.Height);
 
-                return await ApplyMinimalProcessing(image, file.ContentType);
-
-                //if (isMobileProcessed && file.Length <= 3 * 1024 * 1024) // 3MB threshold
-                //{
-                //    // Image is already optimally processed by mobile, minimal processing
-                //    _logger.LogDebug("Image appears to be mobile-processed, applying minimal processing");
-                //    return await ApplyMinimalProcessing(image, file.ContentType);
-                //}
-                //else
-                //{
-                //    // Apply full processing for web uploads or oversized images
-                //    _logger.LogDebug("Applying full image processing");
-                //    return await ApplyFullProcessing(image, file.ContentType);
-                //}
+                if (isMobileProcessed && file.Length <= 2 * 1024 * 1024) // 3MB threshold
+                {
+                    // Image is already optimally processed by mobile, minimal processing
+                    _logger.LogDebug("Image appears to be mobile-processed, applying minimal processing");
+                    return await ApplyMinimalProcessing(image, file.ContentType);
+                }
+                else
+                {
+                    // Apply full processing for web uploads or oversized images
+                    _logger.LogDebug("Applying full image processing");
+                    return await ApplyFullProcessing(image, file.ContentType);
+                }
             }
             catch (Exception ex)
             {

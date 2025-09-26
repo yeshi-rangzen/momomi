@@ -238,10 +238,14 @@ namespace MomomiAPI.Services.Implementations
                     TargetUser = u,
                     IsReported = _dbContext.UserReports
                         .Any(ur => ur.ReportedEmail == currentUser.Email && ur.ReporterEmail == u.Email),
-                    ExistingTargetSwipeType = _dbContext.UserSwipes
-                        .Where(us => us.SwiperUserId == targetUserId
+                    IsAlreadyLikedByTarget = _dbContext.UserSwipes
+                        .Any(us => us.SwiperUserId == targetUserId
                             && us.SwipedUserId == userId
-                            && PositiveSwipeTypes.Contains(us.SwipeType)).Select(us => us.SwipeType).FirstOrDefault(),
+                            && PositiveSwipeTypes.Contains(us.SwipeType)),
+                    SwipeTypeByTarget = _dbContext.UserSwipes
+                        .Where(us => us.SwiperUserId == targetUserId && us.SwipedUserId == userId)
+                        .Select(us => us.SwipeType)
+                        .FirstOrDefault(),
                     ExistingUserSwipe = _dbContext.UserSwipes
                         .Any(us => us.SwiperUserId == userId && us.SwipedUserId == targetUserId),
                 })
@@ -262,7 +266,7 @@ namespace MomomiAPI.Services.Implementations
                 return SwipeUserData.Invalid(SwipeResult.UserAlreadyProcessed(targetUserId));
             }
 
-            return SwipeUserData.Valid(currentUser, validationData.TargetUser, Convert.ToBoolean(validationData.ExistingTargetSwipeType), validationData.ExistingTargetSwipeType == SwipeType.SuperLike);
+            return SwipeUserData.Valid(currentUser, validationData.TargetUser, validationData.IsAlreadyLikedByTarget, validationData.SwipeTypeByTarget == SwipeType.SuperLike);
         }
 
         private async Task<PassUserValidation> ValidatePassUser(Guid userId, Guid targetUserId)
@@ -372,13 +376,12 @@ namespace MomomiAPI.Services.Implementations
                 var convSwipeType = (swipeData.IsSuperLikedByTarget || isSuperLikedByUser) ? SwipeType.SuperLike : SwipeType.Like;
                 var conversationRecord = CreateConversationRecord(currentUser.Id, targetUser.Id, convSwipeType);
                 _dbContext.Conversations.Add(conversationRecord);
-
-                // Don't wait for cache invalidation - fire and forget
-                FireAndForgetHelper.Run(
-                    InvalidateRelevantCaches(currentUser.Id, targetUser.Id, swipeData.IsAlreadyLikedByTarget),
-                    _logger,
-                    "Invalidate caches after like match");
             }
+            // Don't wait for cache invalidation - fire and forget
+            FireAndForgetHelper.Run(
+                InvalidateRelevantCaches(currentUser.Id, targetUser.Id, swipeData.IsAlreadyLikedByTarget),
+                _logger,
+                "Invalidate caches after like match");
         }
 
         private async Task SendNotificationIfNeeded(User currentUser, User targetUser, bool isAlreadyLikedByTarget, bool IsSuperLikedByUser)
